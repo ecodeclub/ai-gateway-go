@@ -1,0 +1,12 @@
+# 这个配置文件是来生成对应的文件都
+version: v1
+managed:
+  enabled: true
+plugins:
+  - plugin: buf.build/protocolbuffers/go
+    out: ./pkg
+    opt: paths=source_relative
+
+  - plugin: buf.build/grpc/go
+    out:  ./pkg
+    opt: paths=source_relative

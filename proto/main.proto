@@ -1,0 +1,19 @@
+syntax = "proto3";
+package model;
+option go_package = "/pkg/grpc/deepseek";
+
+service AIService {
+  rpc Ask(AskRequest) returns (stream AskResponse);
+}
+
+message AskRequest {
+  string id = 1;
+  string text = 2;
+}
+
+message AskResponse {
+  // 因为是流式的 需要判断是否是终止的
+  bool final = 1;
+  // 返回的 结果
+  string text = 2;
+}

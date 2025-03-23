@@ -1,13 +1,10 @@
-package main
+package service
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/cohesion-org/deepseek-go"
 	"io"
-	"log"
-	"time"
 )
 
 type StreamResponse struct {
@@ -19,13 +16,16 @@ func (s *StreamResponse) Work() error {
 	for {
 		chunk, err := s.stream.Recv()
 		if err != nil {
+			// 结束
 			if errors.Is(err, io.EOF) {
+				s.Chan <- "finished"
 				return nil
 			}
 			return err
 		}
 
 		if len(chunk.Choices) > 0 && chunk.Choices[0].FinishReason != "" {
+			s.Chan <- "finished"
 			return nil
 		}
 
@@ -33,45 +33,24 @@ func (s *StreamResponse) Work() error {
 	}
 }
 
-func sendReq(token string) (*StreamResponse, error) {
+func SendReq(token string, content string) (*StreamResponse, error) {
 	client := deepseek.NewClient(token)
 	request := deepseek.StreamChatCompletionRequest{
 		Model: deepseek.DeepSeekChat,
 		Messages: []deepseek.ChatCompletionMessage{
 			{
 				Role:    deepseek.ChatMessageRoleUser,
-				Content: "Hello!",
+				Content: content,
 			},
 		},
 		Stream: true,
 	}
 	ctx := context.Background()
 	resp, err := client.CreateChatCompletionStream(ctx, &request)
+
 	if err != nil {
-		log.Fatalf("ChatCompletionStream failed: %v", err)
 		return nil, err
 	}
 
 	return &StreamResponse{stream: resp, Chan: make(chan string)}, nil
-}
-
-func ask(token string) {
-	stream, err := sendReq(token)
-	if err != nil {
-		fmt.Println("请求错误")
-		return
-	}
-
-	go func() {
-		err := stream.Work()
-		if err != nil {
-			fmt.Println("stream 错误")
-		}
-	}()
-
-	time.Sleep(time.Second)
-
-	for content := range stream.Chan {
-		fmt.Print(content)
-	}
 }
