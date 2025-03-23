@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pb "github.com/ecodeclub/ai-gateway-go/pkg/proto"
+	"github.com/ecodeclub/ai-gateway-go/api/gen"
 	"google.golang.org/grpc"
 	"io"
 	"testing"
@@ -17,8 +17,8 @@ func TestServer(t *testing.T) {
 	}
 	defer conn.Close()
 
-	client := pb.NewAIServiceClient(conn)
-	stream, err := client.Ask(context.Background(), &pb.AskRequest{Text: "hello"})
+	client := gen.NewAIServiceClient(conn)
+	stream, err := client.Ask(context.Background(), &gen.AskRequest{Text: "你好"})
 	if err != nil {
 		fmt.Println("方法调用失败", err)
 		return

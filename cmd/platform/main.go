@@ -2,18 +2,23 @@ package main
 
 import (
 	"fmt"
-	GRPC "github.com/ecodeclub/ai-gateway-go/grpc"
-	pb "github.com/ecodeclub/ai-gateway-go/pkg/proto"
+	pb "github.com/ecodeclub/ai-gateway-go/api/gen"
+	GRPC "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"google.golang.org/grpc"
 	"net"
+	"os"
 )
 
 const (
 	port = "8080"
 )
 
+var token = os.Getenv("DEEPSEEK_TOKEN")
+
 func main() {
-	server := &GRPC.Server{}
+	svc := service.NewAIService(token)
+	server := GRPC.NewServer(svc)
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println(err)
