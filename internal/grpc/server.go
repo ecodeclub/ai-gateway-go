@@ -1,48 +1,53 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
-	"github.com/ecodeclub/ai-gateway-go/api/gen"
+	"github.com/ecodeclub/ai-gateway-go/api/ai"
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"time"
 )
 
 type Server struct {
 	svc *service.AIService
-	gen.UnimplementedAIServiceServer
+	ai.UnimplementedAIServiceServer
 }
 
 func NewServer(svc *service.AIService) *Server {
 	return &Server{svc: svc}
 }
 
-func (server *Server) Ask(r *gen.AskRequest, s gen.AIService_AskServer) error {
-	msg, err := server.svc.Ask(r.GetId(), r.GetText())
+func (server *Server) Stream(r *ai.StreamRequest, resp ai.AIService_StreamServer) error {
+	ch, err := server.svc.Stream(
+		context.Background(),
+		domain.StreamRequest{Id: r.GetId(), Text: r.GetText()})
+
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		err := msg.Work()
-		if err != nil {
-			fmt.Println("msg 错误")
-		}
-	}()
+	err = server.stream(ch, resp)
+	if err != nil {
+		return err
+	}
 
-	time.Sleep(time.Second)
+	return nil
+}
 
-	for content := range msg.Chan {
-		if content == "finished" {
-			return nil
-		}
-
-		res := &gen.AskResponse{
-			Text: content,
-		}
-
-		if err := s.Send(res); err != nil {
-			return err
+func (server *Server) stream(ch chan domain.StreamEvent, resp ai.AIService_StreamServer) error {
+	var err error
+	for {
+		select {
+		case e, ok := <-ch:
+			if !ok || e.Done {
+				err = resp.Send(&ai.StreamResponse{Final: true})
+				return err
+			}
+			if e.Error != nil {
+				err = resp.Send(&ai.StreamResponse{Err: fmt.Sprint(e.Error)})
+				return err
+			}
+			err = resp.Send(&ai.StreamResponse{Final: false, Text: e.Content})
 		}
 	}
-	return nil
 }
