@@ -41,7 +41,7 @@ func main_() {
 func AIServer() server.Server {
 	handler := deepseek.NewHandler(ds.NewClient(token))
 	svc := service.NewAIService(handler)
-	build := egrpc.Load("build.grpc").Build()
+	build := egrpc.Load("server.grpc").Build()
 	pb.RegisterAIServiceServer(build.Server, GRPC.NewServer(svc))
 	return build
 }

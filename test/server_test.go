@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ecodeclub/ai-gateway-go/api/ai"
+	"github.com/gotomicro/ego"
+	"github.com/gotomicro/ego/core/elog"
 	"google.golang.org/grpc"
 	"io"
 	"testing"
@@ -42,5 +44,12 @@ func TestServer(t *testing.T) {
 			break
 		}
 		fmt.Println(resp.Text)
+	}
+}
+
+func TestServerWithEgo(t *testing.T) {
+	// 首先启动对应的客户端
+	if err := ego.New().Invoker().Run(); err != nil {
+		elog.Error("startup", elog.FieldErr(err))
 	}
 }
