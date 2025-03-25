@@ -1,6 +1,6 @@
 syntax = "proto3";
 package ai;
-option go_package = "github.com/ai-gateway-go/api/gen/ai";
+option go_package = "./api/ai";
 
 service AIService {
   rpc Stream(StreamRequest) returns (stream StreamResponse);

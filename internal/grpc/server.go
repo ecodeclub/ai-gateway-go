@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"github.com/ecodeclub/ai-gateway-go/api/ai"
+	"github.com/ecodeclub/ai-gateway-go/api/proto"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 )

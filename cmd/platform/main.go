@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	ds "github.com/cohesion-org/deepseek-go"
-	pb "github.com/ecodeclub/ai-gateway-go/api/ai"
+	pb "github.com/ecodeclub/ai-gateway-go/api/proto"
 	GRPC "github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/deepseek"
@@ -25,14 +25,14 @@ func main_() {
 	handler := deepseek.NewHandler(ds.NewClient(token))
 	svc := service.NewAIService(handler)
 
-	server := GRPC.NewServer(svc)
+	se := GRPC.NewServer(svc)
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterAIServiceServer(s, server)
+	pb.RegisterAIServiceServer(s, se)
 	if err := s.Serve(listener); err != nil {
 		fmt.Println("", err)
 	}
