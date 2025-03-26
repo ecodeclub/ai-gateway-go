@@ -7,10 +7,21 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/api/ai"
 	"github.com/gotomicro/ego"
 	"github.com/gotomicro/ego/core/elog"
+	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"io"
 	"testing"
 )
+
+type AIServiceSuite struct {
+	suite.Suite
+}
+
+func (as *AIServiceSuite) SetupSuite() {
+}
+
+func (as *AIServiceSuite) TestServer() {
+}
 
 func TestServer(t *testing.T) {
 	conn, err := grpc.Dial("localhost:8080", grpc.WithInsecure())

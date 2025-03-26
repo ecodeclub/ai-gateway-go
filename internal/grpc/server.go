@@ -18,15 +18,17 @@ func NewServer(svc *service.AIService) *Server {
 }
 
 func (server *Server) Stream(r *ai.StreamRequest, resp ai.AIService_StreamServer) error {
+	ctx := resp.Context()
+
 	ch, err := server.svc.Stream(
-		context.Background(),
+		ctx,
 		domain.StreamRequest{Id: r.GetId(), Text: r.GetText()})
 
 	if err != nil {
 		return err
 	}
 
-	err = server.stream(ch, resp)
+	err = server.stream(ctx, ch, resp)
 	if err != nil {
 		return err
 	}
@@ -34,10 +36,12 @@ func (server *Server) Stream(r *ai.StreamRequest, resp ai.AIService_StreamServer
 	return nil
 }
 
-func (server *Server) stream(ch chan domain.StreamEvent, resp ai.AIService_StreamServer) error {
+func (server *Server) stream(ctx context.Context, ch chan domain.StreamEvent, resp ai.AIService_StreamServer) error {
 	var err error
 	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case e, ok := <-ch:
 			if !ok || e.Done {
 				err = resp.Send(&ai.StreamResponse{Final: true})

@@ -33,7 +33,7 @@ func (h *Handler) StreamHandle(ctx context.Context, req domain.StreamRequest) (c
 
 	go func() {
 		// 设置对应的超时时间
-		newCtx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+		newCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
 		stream, err := h.client.CreateChatCompletionStream(newCtx, &request)
 

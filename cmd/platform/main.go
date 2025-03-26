@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	ds "github.com/cohesion-org/deepseek-go"
 	pb "github.com/ecodeclub/ai-gateway-go/api/ai"
 	GRPC "github.com/ecodeclub/ai-gateway-go/internal/grpc"
@@ -11,8 +10,6 @@ import (
 	"github.com/gotomicro/ego/core/elog"
 	"github.com/gotomicro/ego/server"
 	"github.com/gotomicro/ego/server/egrpc"
-	"google.golang.org/grpc"
-	"net"
 	"os"
 )
 
@@ -20,23 +17,6 @@ var (
 	port  = "8080"
 	token = os.Getenv("DEEPSEEK_TOKEN")
 )
-
-func main_() {
-	handler := deepseek.NewHandler(ds.NewClient(token))
-	svc := service.NewAIService(handler)
-
-	server := GRPC.NewServer(svc)
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	s := grpc.NewServer()
-	pb.RegisterAIServiceServer(s, server)
-	if err := s.Serve(listener); err != nil {
-		fmt.Println("", err)
-	}
-}
 
 func AIServer() server.Server {
 	handler := deepseek.NewHandler(ds.NewClient(token))
