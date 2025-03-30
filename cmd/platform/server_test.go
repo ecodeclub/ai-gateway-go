@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ecodeclub/ai-gateway-go/api/ai"
+	ai "github.com/ecodeclub/ai-gateway-go/api/gen/api/proto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"io"

@@ -25,6 +25,7 @@ func DeepSeekServer() server.Server {
 	pb.RegisterAIServiceServer(build.Server, GRPC.NewServer(svc))
 	return build
 }
+
 func EgoStart() error {
 	err := ego.New().Run()
 	return err
@@ -51,5 +52,6 @@ func NewGrpcServer(port string) error {
 func main() {
 	err := NewGrpcServer("8080")
 	if err != nil {
+		panic(err)
 	}
 }
