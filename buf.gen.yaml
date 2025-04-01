@@ -6,9 +6,9 @@ managed:
 
 plugins:
   - plugin: buf.build/protocolbuffers/go
-    out: ./api/gen
+    out: ./api/proto/gen
     opt: paths=source_relative
 
   - plugin: buf.build/grpc/go
-    out:  ./api/gen
+    out:  ./api/proto/gen
     opt: paths=source_relative

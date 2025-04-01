@@ -2,11 +2,13 @@ package main
 
 import (
 	ds "github.com/cohesion-org/deepseek-go"
-	pb "github.com/ecodeclub/ai-gateway-go/api/gen/api/proto"
-	GRPC "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	pb "github.com/ecodeclub/ai-gateway-go/api/proto/gen/api/proto"
+	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/deepseek"
 	"github.com/gotomicro/ego"
+	"github.com/gotomicro/ego/core/econf"
+	"github.com/gotomicro/ego/core/elog"
 	"github.com/gotomicro/ego/server"
 	"github.com/gotomicro/ego/server/egrpc"
 	"google.golang.org/grpc"
@@ -14,27 +16,20 @@ import (
 	"os"
 )
 
-var (
-	token = os.Getenv("DEEPSEEK_TOKEN")
-)
-
-func DeepSeekServer() server.Server {
+func Server() server.Server {
+	token := econf.GetString("deepseek.token")
 	handler := deepseek.NewHandler(ds.NewClient(token))
 	svc := service.NewAIService(handler)
-	build := egrpc.Load("").Build()
-	pb.RegisterAIServiceServer(build.Server, GRPC.NewServer(svc))
+	build := egrpc.Load("grpc.server").Build()
+	pb.RegisterAIServiceServer(build.Server, igrpc.NewServer(svc))
 	return build
 }
 
-func EgoStart() error {
-	err := ego.New().Run()
-	return err
-}
-
 func NewGrpcServer(port string) error {
+	token := os.Getenv("token")
 	handler := deepseek.NewHandler(ds.NewClient(token))
 	svc := service.NewAIService(handler)
-	grpcServer := GRPC.NewServer(svc)
+	grpcServer := igrpc.NewServer(svc)
 	listener, err := net.Listen("tcp", ":"+port)
 
 	if err != nil {
@@ -50,8 +45,7 @@ func NewGrpcServer(port string) error {
 }
 
 func main() {
-	err := NewGrpcServer("8080")
-	if err != nil {
-		panic(err)
+	if err := ego.New().Serve(Server()).Run(); err != nil {
+		elog.Panic("startup", elog.Any("err", err))
 	}
 }

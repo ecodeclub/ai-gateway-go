@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	ai "github.com/ecodeclub/ai-gateway-go/api/gen/api/proto"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/api/proto"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"io"
@@ -15,47 +15,61 @@ import (
 
 type AIServiceSuite struct {
 	suite.Suite
+	client ai.AIServiceClient
 }
 
-func (as *AIServiceSuite) CallStream() error {
+func (as *AIServiceSuite) SetupSuite() {
+	t := as.T()
+	conn, err := grpc.Dial("localhost:8080", grpc.WithInsecure())
+
+	require.NoError(t, err)
+	as.client = ai.NewAIServiceClient(conn)
+}
+
+func (as *AIServiceSuite) TestStream() {
 	t := as.T()
 
-	conn, err := grpc.Dial("localhost:8080", grpc.WithInsecure())
-	if err != nil {
-		fmt.Print(err)
+	testCases := []struct {
+		name string
+		Id   string
+		text string
+	}{
+		{
+			name: "hello",
+			Id:   "1",
+			text: "hello, deepseek",
+		},
+		{
+			name: "你好",
+			Id:   "2",
+			text: "你好, deepseek",
+		},
 	}
-	defer conn.Close()
 
-	client := ai.NewAIServiceClient(conn)
-	stream, err := client.Stream(context.Background(), &ai.StreamRequest{Id: "1", Text: "你好"})
-	if err != nil {
-		return err
-	}
+	for _, tc := range testCases {
+		stream, err := as.client.Stream(
+			context.Background(),
+			&ai.StreamRequest{Id: tc.Id, Text: tc.text})
 
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
+		require.NoError(t, err)
+
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return
+				}
+				require.NoError(t, err)
 			}
-			return err
-		}
 
-		if resp.Final == true {
-			return nil
-		}
+			if resp.Final == true {
+				return
+			}
 
-		if resp.Err != "" {
-			return fmt.Errorf(resp.Err)
-
+			assert.Empty(t, resp.Err)
+			t.Log(resp.Content)
 		}
-		t.Log(resp.Text)
 	}
-}
-
-func (as *AIServiceSuite) TestServer() {
-	err := as.CallStream()
-	require.NoError(as.T(), err)
 }
 
 func TestAIService(t *testing.T) {

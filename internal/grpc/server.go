@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
-	ai "github.com/ecodeclub/ai-gateway-go/api/gen/api/proto"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/api/proto"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 )
@@ -51,7 +51,7 @@ func (server *Server) stream(ctx context.Context, ch chan domain.StreamEvent, re
 				err = resp.Send(&ai.StreamResponse{Err: fmt.Sprint(e.Error)})
 				return err
 			}
-			err = resp.Send(&ai.StreamResponse{Final: false, Text: e.Content})
+			err = resp.Send(&ai.StreamResponse{Final: false, Content: e.Content})
 			if err != nil {
 				return err
 			}

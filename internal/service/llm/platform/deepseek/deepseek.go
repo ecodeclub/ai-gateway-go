@@ -32,6 +32,8 @@ func (h *Handler) StreamHandle(ctx context.Context, req domain.StreamRequest) (c
 	events := make(chan domain.StreamEvent, 10)
 
 	go func() {
+		defer close(events)
+
 		// 设置对应的超时时间
 		newCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
@@ -49,7 +51,6 @@ func (h *Handler) StreamHandle(ctx context.Context, req domain.StreamRequest) (c
 }
 
 func (h *Handler) recv(eventCh chan domain.StreamEvent, stream deepseek.ChatCompletionStream) {
-	defer close(eventCh)
 	for {
 		chunk, err := stream.Recv()
 		if err != nil {

@@ -13,6 +13,7 @@ message StreamRequest {
 
 message StreamResponse {
   bool final = 1;
-  string text = 2;
-  string err = 3;
+  string reasoningContent = 2;
+  string content = 3;
+  string err = 4;
 }
