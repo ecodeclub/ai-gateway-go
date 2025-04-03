@@ -5,7 +5,8 @@ type StreamRequest struct {
 	Text string
 }
 type StreamEvent struct {
-	Content string
-	Done    bool
-	Error   error
+	Content          string
+	ReasoningContent string
+	Done             bool
+	Error            error
 }
