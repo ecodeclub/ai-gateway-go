@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"errors"
-	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/api/proto"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen"
+	"github.com/gotomicro/ego"
+	"github.com/gotomicro/ego/client/egrpc"
+	"github.com/gotomicro/ego/core/econf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"io"
-
 	"github.com/stretchr/testify/suite"
+	"io"
 	"testing"
 )
 
@@ -19,14 +20,15 @@ type AIServiceSuite struct {
 }
 
 func (as *AIServiceSuite) SetupSuite() {
-	t := as.T()
-	conn, err := grpc.Dial("localhost:8080", grpc.WithInsecure())
+	econf.Set("grpc.client.addr", "127.0.0.1:9002")
+	grpcConn := egrpc.Load("grpc.client").Build()
+	as.client = ai.NewAIServiceClient(grpcConn.ClientConn)
 
-	require.NoError(t, err)
-	as.client = ai.NewAIServiceClient(conn)
+	err := ego.New().Invoker(as.TestStream).Run()
+	require.NoError(as.T(), err)
 }
 
-func (as *AIServiceSuite) TestStream() {
+func (as *AIServiceSuite) TestStream() error {
 	t := as.T()
 
 	testCases := []struct {
@@ -46,6 +48,8 @@ func (as *AIServiceSuite) TestStream() {
 		},
 	}
 
+	var answer = ""
+
 	for _, tc := range testCases {
 		stream, err := as.client.Stream(
 			context.Background(),
@@ -57,19 +61,21 @@ func (as *AIServiceSuite) TestStream() {
 			resp, err := stream.Recv()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
-					return
+					break
 				}
 				require.NoError(t, err)
 			}
 
 			if resp.Final == true {
-				return
+				break
 			}
 
 			assert.Empty(t, resp.Err)
-			t.Log(resp.Content)
+			answer += resp.Content
 		}
+		assert.Contains(t, answer, "DeepSeek")
 	}
+	return nil
 }
 
 func TestAIService(t *testing.T) {
