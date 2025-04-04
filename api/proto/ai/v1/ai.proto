@@ -1,0 +1,19 @@
+syntax = "proto3";
+package ai.v1;
+option go_package = "ai/v1;aiv1";
+
+service AIService {
+  rpc Stream(StreamRequest) returns (stream StreamResponse);
+}
+
+message StreamRequest {
+  string id = 1;
+  string text = 2;
+}
+
+message StreamResponse {
+  bool final = 1;
+  string reasoningContent = 2;
+  string content = 3;
+  string err = 4;
+}
