@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"context"
-	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen"
+	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 )

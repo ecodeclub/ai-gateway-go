@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen"
+	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
 	"github.com/gotomicro/ego"
 	"github.com/gotomicro/ego/client/egrpc"
 	"github.com/gotomicro/ego/core/econf"

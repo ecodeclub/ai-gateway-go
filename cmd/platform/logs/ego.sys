@@ -1,0 +1,11 @@
+{"lv":"info","ts":1743746318,"msg":"read watch","comp":"core.econf","comp":"file datasource","configFile":"/Users/yangzhengwang/Desktop/code/other/project/ai-gateway-go/cmd/platform/config.toml","realConfigFile":"/Users/yangzhengwang/Desktop/code/other/project/ai-gateway-go/cmd/platform/config.toml","fppath":"/Users/yangzhengwang/Desktop/code/other/project/ai-gateway-go/cmd/platform/config.toml"}
+{"lv":"info","ts":1743746318,"msg":"init config","comp":"core.econf","addr":"config.toml"}
+{"lv":"info","ts":1743746318,"msg":"init app","comp":"app","pid":10351,"coreNum":8}
+{"lv":"info","ts":1743746318,"msg":"init trace","comp":"app"}
+{"lv":"info","ts":1743746318,"msg":"start server","comp":"server.egrpc","compName":"grpc.server","addr":"grpc://127.0.0.1:9002"}
+{"lv":"warn","ts":1743746337,"msg":"access","comp":"server.egrpc","compName":"grpc.server","key":"stream","event":"normal","code":0,"ucode":200,"desc":"OK","cost":7061.983,"peerName":"___AIServiceSuite_in_github_com_ecodeclub_ai_gateway_go_cmd_platform__2_.test","peerIp":"127.0.0.1"}
+{"lv":"warn","ts":1743746344,"msg":"access","comp":"server.egrpc","compName":"grpc.server","key":"stream","event":"normal","code":0,"ucode":200,"desc":"OK","cost":7335.636,"peerName":"___AIServiceSuite_in_github_com_ecodeclub_ai_gateway_go_cmd_platform__2_.test","peerIp":"127.0.0.1"}
+{"lv":"warn","ts":1743746350,"msg":"access","comp":"server.egrpc","compName":"grpc.server","key":"stream","event":"normal","code":0,"ucode":200,"desc":"OK","cost":5323.433,"peerName":"___AIServiceSuite_in_github_com_ecodeclub_ai_gateway_go_cmd_platform__2_.test","peerIp":"127.0.0.1"}
+{"lv":"warn","ts":1743746355,"msg":"access","comp":"server.egrpc","compName":"grpc.server","key":"stream","event":"normal","code":0,"ucode":200,"desc":"OK","cost":5669.344,"peerName":"___AIServiceSuite_in_github_com_ecodeclub_ai_gateway_go_cmd_platform__2_.test","peerIp":"127.0.0.1"}
+{"lv":"info","ts":1743746366,"msg":"stop server","comp":"server.egrpc","compName":"grpc.server","addr":"grpc://127.0.0.1:9002"}
+{"lv":"info","ts":1743746366,"msg":"stop ego, bye!","comp":"app","cost":0.458,"grace":true,"stopTimeout":"5s"}

@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: ai.proto
 
-package gen
+package aiv1
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AIService_Stream_FullMethodName = "/gen.AIService/Stream"
+	AIService_Stream_FullMethodName = "/ai.v1.AIService/Stream"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -110,7 +110,7 @@ type AIService_StreamServer = grpc.ServerStreamingServer[StreamResponse]
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AIService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "gen.AIService",
+	ServiceName: "ai.v1.AIService",
 	HandlerType: (*AIServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{

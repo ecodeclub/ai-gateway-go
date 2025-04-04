@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: ai.proto
 
-package gen
+package aiv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -145,7 +145,7 @@ var File_ai_proto protoreflect.FileDescriptor
 
 const file_ai_proto_rawDesc = "" +
 	"\n" +
-	"\bai.proto\x12\x03gen\"3\n" +
+	"\bai.proto\x12\x05ai.v1\"3\n" +
 	"\rStreamRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\"~\n" +
@@ -153,10 +153,10 @@ const file_ai_proto_rawDesc = "" +
 	"\x05final\x18\x01 \x01(\bR\x05final\x12*\n" +
 	"\x10reasoningContent\x18\x02 \x01(\tR\x10reasoningContent\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x12\x10\n" +
-	"\x03err\x18\x04 \x01(\tR\x03err2@\n" +
-	"\tAIService\x123\n" +
-	"\x06Stream\x12\x12.gen.StreamRequest\x1a\x13.gen.StreamResponse0\x01Bp\n" +
-	"\acom.genB\aAiProtoP\x01Z0github.com/ecodeclub/ai-gateway-go/api/proto/gen\xa2\x02\x03GXX\xaa\x02\x03Gen\xca\x02\x03Gen\xe2\x02\x0fGen\\GPBMetadata\xea\x02\x03Genb\x06proto3"
+	"\x03err\x18\x04 \x01(\tR\x03err2D\n" +
+	"\tAIService\x127\n" +
+	"\x06Stream\x12\x14.ai.v1.StreamRequest\x1a\x15.ai.v1.StreamResponse0\x01Bz\n" +
+	"\tcom.ai.v1B\aAiProtoP\x01Z/github.com/ecodeclub/ai-gateway-go/api/gen;aiv1\xa2\x02\x03AXX\xaa\x02\x05Ai.V1\xca\x02\x05Ai\\V1\xe2\x02\x11Ai\\V1\\GPBMetadata\xea\x02\x06Ai::V1b\x06proto3"
 
 var (
 	file_ai_proto_rawDescOnce sync.Once
@@ -172,12 +172,12 @@ func file_ai_proto_rawDescGZIP() []byte {
 
 var file_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_ai_proto_goTypes = []any{
-	(*StreamRequest)(nil),  // 0: gen.StreamRequest
-	(*StreamResponse)(nil), // 1: gen.StreamResponse
+	(*StreamRequest)(nil),  // 0: ai.v1.StreamRequest
+	(*StreamResponse)(nil), // 1: ai.v1.StreamResponse
 }
 var file_ai_proto_depIdxs = []int32{
-	0, // 0: gen.AIService.Stream:input_type -> gen.StreamRequest
-	1, // 1: gen.AIService.Stream:output_type -> gen.StreamResponse
+	0, // 0: ai.v1.AIService.Stream:input_type -> ai.v1.StreamRequest
+	1, // 1: ai.v1.AIService.Stream:output_type -> ai.v1.StreamResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
