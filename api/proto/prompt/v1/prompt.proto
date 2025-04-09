@@ -1,0 +1,63 @@
+syntax = "proto3";
+package prompt.v1;
+option go_package = "prompt/v1;promptv1";
+
+message AddRequest {
+  string name = 1;
+  string biz = 2;
+  string pattern = 3;
+  string description = 4;
+}
+
+message AddResponse {
+  bool res = 1;
+}
+
+message GetRequest {
+  int64 id = 1;
+}
+
+message GetResponse {
+  string name = 1;
+  string biz = 2;
+  string pattern = 3;
+  string description = 4;
+  int64 create_time = 5;
+  int64 update_time = 6;
+}
+
+message DeleteRequest {
+  int64 id = 1;
+}
+
+message DeleteResponse {
+  bool res = 1;
+}
+
+message UpdateRequest {
+  int64 id = 1;
+  string name = 2;
+  string pattern = 3;
+  string description = 4;
+}
+
+message UpdateResponse {
+  bool res = 1;
+}
+
+message ListRequest {
+  int32 page = 1;
+  int32 size = 2;
+  string biz = 3;
+}
+
+message ListResponse {
+
+}
+
+service PromptService {
+  rpc Add(AddRequest) returns (AddResponse);
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+}

@@ -1,14 +1,13 @@
-version: v1
+version: v2
 managed:
   enabled: true
-  go_package_prefix:
-    default: "github.com/ecodeclub/ai-gateway-go/api/gen"
-
+  override:
+    - file_option: go_package_prefix
+      value: github.com/ecodeclub/ai-gateway-go/api/gen
 plugins:
-  - plugin: buf.build/protocolbuffers/go
-    out: ./api/gen/ai/v1
+  - remote: buf.build/protocolbuffers/go
+    out: ./api/gen
     opt: paths=source_relative
-
-  - plugin: buf.build/grpc/go
-    out: ./api/gen/ai/v1
+  - remote: buf.build/grpc/go
+    out: ./api/gen
     opt: paths=source_relative
