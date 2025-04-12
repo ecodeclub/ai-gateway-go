@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	ds "github.com/cohesion-org/deepseek-go"
 	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/deepseek"
 	"github.com/gotomicro/ego"
 	"github.com/gotomicro/ego/client/egrpc"
 	"github.com/gotomicro/ego/core/econf"
@@ -17,15 +21,19 @@ import (
 
 type AIServiceSuite struct {
 	suite.Suite
-	client ai.AIServiceClient
+	service *service.AIService
+	client  ai.AIServiceClient
 }
 
 func (as *AIServiceSuite) SetupSuite() {
+	token := econf.GetString("deepseek.token")
+	handler := deepseek.NewHandler(ds.NewClient(token))
+	as.service = service.NewAIService(handler)
+
 	econf.Set("grpc.client.addr", "127.0.0.1:9002")
 	grpcConn := egrpc.Load("grpc.client").Build()
 	as.client = ai.NewAIServiceClient(grpcConn.ClientConn)
-
-	err := ego.New().Invoker(as.TestInvoke, as.TestStream).Run()
+	err := ego.New().Invoker(as.TestStream).Run()
 	require.NoError(as.T(), err)
 }
 
@@ -104,9 +112,9 @@ func (as *AIServiceSuite) TestInvoke() error {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
-			resp, err := as.client.Invoke(
+			resp, err := as.service.Invoke(
 				ctx,
-				&ai.LLMRequest{Id: "1", Text: "hello"})
+				domain.LLMRequest{Id: "1", Text: "hello"})
 
 			require.NoError(t, err)
 			assert.Contains(t, resp.Content, "Hello")
