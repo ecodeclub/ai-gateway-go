@@ -3,17 +3,23 @@ package ai.v1;
 option go_package = "ai/v1;aiv1";
 
 service AIService {
-  rpc Stream(StreamRequest) returns (stream StreamResponse);
+  rpc Invoke(LLMRequest) returns (LLMResponse);
+  rpc Stream(LLMRequest) returns (stream StreamEvent);
 }
 
-message StreamRequest {
+message LLMRequest {
   string id = 1;
   string text = 2;
 }
 
-message StreamResponse {
+message StreamEvent {
   bool final = 1;
   string reasoningContent = 2;
   string content = 3;
   string err = 4;
+}
+
+message LLMResponse {
+  string reasoningContent = 1;
+  string content = 2;
 }

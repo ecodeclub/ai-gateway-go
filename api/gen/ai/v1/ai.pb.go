@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type StreamRequest struct {
+type LLMRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
@@ -29,20 +29,20 @@ type StreamRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StreamRequest) Reset() {
-	*x = StreamRequest{}
+func (x *LLMRequest) Reset() {
+	*x = LLMRequest{}
 	mi := &file_ai_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StreamRequest) String() string {
+func (x *LLMRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StreamRequest) ProtoMessage() {}
+func (*LLMRequest) ProtoMessage() {}
 
-func (x *StreamRequest) ProtoReflect() protoreflect.Message {
+func (x *LLMRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_ai_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -54,26 +54,26 @@ func (x *StreamRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamRequest.ProtoReflect.Descriptor instead.
-func (*StreamRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use LLMRequest.ProtoReflect.Descriptor instead.
+func (*LLMRequest) Descriptor() ([]byte, []int) {
 	return file_ai_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *StreamRequest) GetId() string {
+func (x *LLMRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *StreamRequest) GetText() string {
+func (x *LLMRequest) GetText() string {
 	if x != nil {
 		return x.Text
 	}
 	return ""
 }
 
-type StreamResponse struct {
+type StreamEvent struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Final            bool                   `protobuf:"varint,1,opt,name=final,proto3" json:"final,omitempty"`
 	ReasoningContent string                 `protobuf:"bytes,2,opt,name=reasoningContent,proto3" json:"reasoningContent,omitempty"`
@@ -83,20 +83,20 @@ type StreamResponse struct {
 	sizeCache        protoimpl.SizeCache
 }
 
-func (x *StreamResponse) Reset() {
-	*x = StreamResponse{}
+func (x *StreamEvent) Reset() {
+	*x = StreamEvent{}
 	mi := &file_ai_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StreamResponse) String() string {
+func (x *StreamEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StreamResponse) ProtoMessage() {}
+func (*StreamEvent) ProtoMessage() {}
 
-func (x *StreamResponse) ProtoReflect() protoreflect.Message {
+func (x *StreamEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_ai_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -108,35 +108,87 @@ func (x *StreamResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamResponse.ProtoReflect.Descriptor instead.
-func (*StreamResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use StreamEvent.ProtoReflect.Descriptor instead.
+func (*StreamEvent) Descriptor() ([]byte, []int) {
 	return file_ai_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *StreamResponse) GetFinal() bool {
+func (x *StreamEvent) GetFinal() bool {
 	if x != nil {
 		return x.Final
 	}
 	return false
 }
 
-func (x *StreamResponse) GetReasoningContent() string {
+func (x *StreamEvent) GetReasoningContent() string {
 	if x != nil {
 		return x.ReasoningContent
 	}
 	return ""
 }
 
-func (x *StreamResponse) GetContent() string {
+func (x *StreamEvent) GetContent() string {
 	if x != nil {
 		return x.Content
 	}
 	return ""
 }
 
-func (x *StreamResponse) GetErr() string {
+func (x *StreamEvent) GetErr() string {
 	if x != nil {
 		return x.Err
+	}
+	return ""
+}
+
+type LLMResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ReasoningContent string                 `protobuf:"bytes,1,opt,name=reasoningContent,proto3" json:"reasoningContent,omitempty"`
+	Content          string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *LLMResponse) Reset() {
+	*x = LLMResponse{}
+	mi := &file_ai_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMResponse) ProtoMessage() {}
+
+func (x *LLMResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMResponse.ProtoReflect.Descriptor instead.
+func (*LLMResponse) Descriptor() ([]byte, []int) {
+	return file_ai_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *LLMResponse) GetReasoningContent() string {
+	if x != nil {
+		return x.ReasoningContent
+	}
+	return ""
+}
+
+func (x *LLMResponse) GetContent() string {
+	if x != nil {
+		return x.Content
 	}
 	return ""
 }
@@ -145,17 +197,22 @@ var File_ai_proto protoreflect.FileDescriptor
 
 const file_ai_proto_rawDesc = "" +
 	"\n" +
-	"\bai.proto\x12\x05ai.v1\"3\n" +
-	"\rStreamRequest\x12\x0e\n" +
+	"\bai.proto\x12\x05ai.v1\"0\n" +
+	"\n" +
+	"LLMRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"~\n" +
-	"\x0eStreamResponse\x12\x14\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"{\n" +
+	"\vStreamEvent\x12\x14\n" +
 	"\x05final\x18\x01 \x01(\bR\x05final\x12*\n" +
 	"\x10reasoningContent\x18\x02 \x01(\tR\x10reasoningContent\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x12\x10\n" +
-	"\x03err\x18\x04 \x01(\tR\x03err2D\n" +
-	"\tAIService\x127\n" +
-	"\x06Stream\x12\x14.ai.v1.StreamRequest\x1a\x15.ai.v1.StreamResponse0\x01Bz\n" +
+	"\x03err\x18\x04 \x01(\tR\x03err\"S\n" +
+	"\vLLMResponse\x12*\n" +
+	"\x10reasoningContent\x18\x01 \x01(\tR\x10reasoningContent\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent2o\n" +
+	"\tAIService\x12/\n" +
+	"\x06Invoke\x12\x11.ai.v1.LLMRequest\x1a\x12.ai.v1.LLMResponse\x121\n" +
+	"\x06Stream\x12\x11.ai.v1.LLMRequest\x1a\x12.ai.v1.StreamEvent0\x01Bz\n" +
 	"\tcom.ai.v1B\aAiProtoP\x01Z/github.com/ecodeclub/ai-gateway-go/api/gen;aiv1\xa2\x02\x03AXX\xaa\x02\x05Ai.V1\xca\x02\x05Ai\\V1\xe2\x02\x11Ai\\V1\\GPBMetadata\xea\x02\x06Ai::V1b\x06proto3"
 
 var (
@@ -170,16 +227,19 @@ func file_ai_proto_rawDescGZIP() []byte {
 	return file_ai_proto_rawDescData
 }
 
-var file_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_ai_proto_goTypes = []any{
-	(*StreamRequest)(nil),  // 0: ai.v1.StreamRequest
-	(*StreamResponse)(nil), // 1: ai.v1.StreamResponse
+	(*LLMRequest)(nil),  // 0: ai.v1.LLMRequest
+	(*StreamEvent)(nil), // 1: ai.v1.StreamEvent
+	(*LLMResponse)(nil), // 2: ai.v1.LLMResponse
 }
 var file_ai_proto_depIdxs = []int32{
-	0, // 0: ai.v1.AIService.Stream:input_type -> ai.v1.StreamRequest
-	1, // 1: ai.v1.AIService.Stream:output_type -> ai.v1.StreamResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	0, // 0: ai.v1.AIService.Invoke:input_type -> ai.v1.LLMRequest
+	0, // 1: ai.v1.AIService.Stream:input_type -> ai.v1.LLMRequest
+	2, // 2: ai.v1.AIService.Invoke:output_type -> ai.v1.LLMResponse
+	1, // 3: ai.v1.AIService.Stream:output_type -> ai.v1.StreamEvent
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -196,7 +256,7 @@ func file_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_proto_rawDesc), len(file_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
