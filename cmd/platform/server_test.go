@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"io"
 	"testing"
+	"time"
 )
 
 type AIServiceSuite struct {
@@ -24,7 +25,7 @@ func (as *AIServiceSuite) SetupSuite() {
 	grpcConn := egrpc.Load("grpc.client").Build()
 	as.client = ai.NewAIServiceClient(grpcConn.ClientConn)
 
-	err := ego.New().Invoker(as.TestStream).Run()
+	err := ego.New().Invoker(as.TestInvoke, as.TestStream).Run()
 	require.NoError(as.T(), err)
 }
 
@@ -48,33 +49,70 @@ func (as *AIServiceSuite) TestStream() error {
 		},
 	}
 
-	var answer = ""
-
 	for _, tc := range testCases {
-		stream, err := as.client.Stream(
-			context.Background(),
-			&ai.StreamRequest{Id: tc.Id, Text: tc.text})
+		t.Run(tc.name, func(t *testing.T) {
+			stream, err := as.client.Stream(
+				context.Background(),
+				&ai.LLMRequest{Id: tc.Id, Text: tc.text})
 
-		require.NoError(t, err)
+			require.NoError(t, err)
 
-		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				if errors.Is(err, io.EOF) {
+			var answer = ""
+			for {
+				resp, err := stream.Recv()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					require.NoError(t, err)
+				}
+
+				if resp.Final == true {
 					break
 				}
-				require.NoError(t, err)
-			}
 
-			if resp.Final == true {
-				break
+				assert.Empty(t, resp.Err)
+				answer += resp.Content
 			}
-
-			assert.Empty(t, resp.Err)
-			answer += resp.Content
-		}
-		assert.Contains(t, answer, "DeepSeek")
+			assert.Contains(t, answer, "DeepSeek")
+		})
 	}
+	return nil
+}
+
+func (as *AIServiceSuite) TestInvoke() error {
+	t := as.T()
+
+	testCases := []struct {
+		name string
+		Id   string
+		text string
+	}{
+		{
+			name: "hello",
+			Id:   "1",
+			text: "hello, deepseek",
+		},
+		{
+			name: "你好",
+			Id:   "2",
+			text: "你好, deepseek",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+			resp, err := as.client.Invoke(
+				ctx,
+				&ai.LLMRequest{Id: "1", Text: "hello"})
+
+			require.NoError(t, err)
+			assert.Contains(t, resp.Content, "Hello")
+		})
+	}
+
 	return nil
 }
 

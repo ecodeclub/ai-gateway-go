@@ -17,7 +17,25 @@ func NewHandler(client *deepseek.Client) *Handler {
 	return &Handler{client: client}
 }
 
-func (h *Handler) StreamHandle(ctx context.Context, req domain.StreamRequest) (chan domain.StreamEvent, error) {
+func (h *Handler) Handle(ctx context.Context, req domain.LLMRequest) (domain.LLMResponse, error) {
+	request := &deepseek.ChatCompletionRequest{
+		Model: deepseek.DeepSeekChat,
+		Messages: []deepseek.ChatCompletionMessage{
+			{
+				Role:    deepseek.ChatMessageRoleUser,
+				Content: req.Text,
+			},
+		},
+	}
+	response, err := h.client.CreateChatCompletion(ctx, request)
+	if err != nil {
+		return domain.LLMResponse{}, err
+	}
+
+	return domain.LLMResponse{Content: response.Choices[0].Message.Content}, nil
+}
+
+func (h *Handler) StreamHandle(ctx context.Context, req domain.LLMRequest) (chan domain.StreamEvent, error) {
 	request := deepseek.StreamChatCompletionRequest{
 		Model: deepseek.DeepSeekChat,
 		Messages: []deepseek.ChatCompletionMessage{

@@ -1,12 +1,17 @@
 package domain
 
-type StreamRequest struct {
+type LLMRequest struct {
 	Id   string
 	Text string
 }
 type StreamEvent struct {
-	Content          string
 	ReasoningContent string
+	Content          string
 	Done             bool
 	Error            error
+}
+
+type LLMResponse struct {
+	ReasoningContent string
+	Content          string
 }
