@@ -1,5 +1,5 @@
 [deepseek]
-    token = ""
+    token = "sk-30a1b2ad963447beb2b97a159f4c244c"
 [grpc.server]
     host="127.0.0.1"
     port=9002
