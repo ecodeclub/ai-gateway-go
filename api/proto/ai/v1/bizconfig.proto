@@ -1,0 +1,91 @@
+syntax = "proto3";
+package ai.v1;
+option go_package = "ai/v1;aiv1";
+
+import "google/protobuf/timestamp.proto";
+
+service BizConfigService {
+  rpc CreateBizConfig(CreateBizConfigRequest) returns (BizConfigResponse);
+  rpc GetBizConfig(GetBizConfigRequest) returns (BizConfigResponse);
+  rpc UpdateBizConfig(UpdateBizConfigRequest) returns (BizConfigResponse);
+  rpc DeleteBizConfig(DeleteBizConfigRequest) returns (DeleteBizConfigResponse);
+  rpc ListBizConfigs(ListBizConfigsRequest) returns (ListBizConfigsResponse);
+
+  // 限额控制相关接口
+  rpc CheckQuota(CheckQuotaRequest) returns (CheckQuotaResponse);
+  rpc UpdateQuota(UpdateQuotaRequest) returns (UpdateQuotaResponse);
+}
+
+message BizConfig {
+  string id = 1;
+  int64 owner_id = 2;
+  string owner_type = 3; // "person" or "organization"
+  string token = 4;
+  string config = 5; // JSON string
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  int64 quota = 8; // 限额，例如10w token
+  int64 used_quota = 9; // 已用额度
+}
+
+message CreateBizConfigRequest {
+  int64 owner_id = 1;
+  string owner_type = 2;
+  string config = 3;
+  int64 quota = 4;
+}
+
+message GetBizConfigRequest {
+  string id = 1;
+}
+
+message UpdateBizConfigRequest {
+  string id = 1;
+  string config = 2;
+  int64 quota = 3;
+}
+
+message DeleteBizConfigRequest {
+  string id = 1;
+}
+
+message BizConfigResponse {
+  BizConfig config = 1;
+  string token = 2; // 仅在创建时返回
+}
+
+message DeleteBizConfigResponse {
+  bool success = 1;
+}
+
+message ListBizConfigsRequest {
+  int64 owner_id = 1;
+  string owner_type = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message ListBizConfigsResponse {
+  repeated BizConfig configs = 1;
+  int32 total = 2;
+}
+
+message CheckQuotaRequest {
+  string id = 1;
+  int64 required_quota = 2;
+}
+
+message CheckQuotaResponse {
+  bool allowed = 1;
+  int64 remaining_quota = 2;
+}
+
+message UpdateQuotaRequest {
+  string id = 1;
+  int64 used_quota = 2;
+}
+
+message UpdateQuotaResponse {
+  bool success = 1;
+  int64 remaining_quota = 2;
+}
