@@ -1,4 +1,0 @@
-{"lv":"warn","ts":1744392323,"msg":"no config... ","comp":"core.econf","addr":"config/local.toml","error":"default config not exist"}
-{"lv":"info","ts":1744392323,"msg":"init app","comp":"app","pid":38239,"coreNum":16}
-{"lv":"info","ts":1744392323,"msg":"init trace","comp":"app"}
-{"lv":"panic","ts":1744392323,"msg":"parse config error","comp":"server.egrpc","compName":"grpc.server","error":"grpc.server,err: invalid key, maybe not exist in config","key":"grpc.server","stack":"github.com/gotomicro/ego/core/elog.(*Component).Panic\n\t/home/jared/go/pkg/mod/github.com/gotomicro/ego@v1.2.3/core/elog/component.go:261\ngithub.com/gotomicro/ego/server/egrpc.Load\n\t/home/jared/go/pkg/mod/github.com/gotomicro/ego@v1.2.3/server/egrpc/container.go:32\nmain.Server\n\t/home/jared/go/src/ecodeclub/ai-gateway-go/cmd/platform/server.go:20\nmain.main\n\t/home/jared/go/src/ecodeclub/ai-gateway-go/cmd/platform/server.go:26\nruntime.main\n\t/usr/local/go/src/runtime/proc.go:272"}
