@@ -15,16 +15,7 @@ func NewPromptDAO(db *gorm.DB) *PromptDAO {
 	return &PromptDAO{db: db}
 }
 
-func (p *PromptDAO) Create(ctx context.Context, name, biz, pattern, desc string) error {
-	now := time.Now().UnixMilli()
-	value := Prompt{
-		Name:        name,
-		Biz:         biz,
-		Pattern:     pattern,
-		Description: desc,
-		Ctime:       now,
-		Utime:       now,
-	}
+func (p *PromptDAO) Create(ctx context.Context, value Prompt) error {
 	return p.db.WithContext(ctx).Create(&value).Error
 }
 
@@ -37,21 +28,9 @@ func (p *PromptDAO) FindByID(ctx context.Context, id int64) (Prompt, error) {
 	return res, err
 }
 
-func (p *PromptDAO) Update(ctx context.Context, id int64, name, pattern, desc string) error {
-	now := time.Now().UnixMilli()
-	m := map[string]any{
-		"utime": now,
-	}
-	if name != "" {
-		m["name"] = name
-	}
-	if pattern != "" {
-		m["pattern"] = pattern
-	}
-	if desc != "" {
-		m["description"] = desc
-	}
-	return p.db.WithContext(ctx).Model(&Prompt{}).Where("id = ?", id).Updates(m).Error
+func (p *PromptDAO) Update(ctx context.Context, value Prompt) error {
+	// 更新非零值
+	return p.db.WithContext(ctx).Model(&Prompt{}).Where("id = ?", value.ID).Updates(value).Error
 }
 
 func (p *PromptDAO) Delete(ctx context.Context, id int64) error {
@@ -59,4 +38,20 @@ func (p *PromptDAO) Delete(ctx context.Context, id int64) error {
 		"status": 0,
 		"utime":  time.Now().UnixMilli(),
 	}).Error
+}
+
+type Prompt struct {
+	ID          int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	Name        string `gorm:"column:name"`
+	Owner       int64  `gorm:"column:owner;index:idx_owner_owner_type"`
+	OwnerType   string `gorm:"column:owner_type;type:ENUM('personal','organization');index:idx_owner_owner_type"`
+	Content     string `gorm:"column:content"`
+	Description string `gorm:"column:description"`
+	Status      uint8  `gorm:"column:status;default:1"`
+	Ctime       int64  `gorm:"column:ctime"`
+	Utime       int64  `gorm:"column:utime"`
+}
+
+func (Prompt) TableName() string {
+	return "prompts"
 }
