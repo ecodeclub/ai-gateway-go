@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
@@ -14,7 +13,6 @@ import (
 )
 
 var ErrBizConfigNotFound = repository.ErrBizConfigNotFound
-var ErrQuotaExhausted = repository.ErrQuotaExhausted
 
 type BizConfigService struct {
 	repo        *repository.BizConfigRepository
@@ -40,10 +38,6 @@ func (s *BizConfigService) Create(ctx context.Context, req domain.BizConfig) (do
 		OwnerType: req.OwnerType,
 		Token:     hashToken(token),
 		Config:    req.Config,
-		Quota:     req.Quota,
-		UsedQuota: 0,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
 	created, err := s.repo.Create(ctx, config)
@@ -60,12 +54,12 @@ func (s *BizConfigService) Create(ctx context.Context, req domain.BizConfig) (do
 	return created, jwtToken, nil
 }
 
-func (s *BizConfigService) GetByID(ctx context.Context, id string) (domain.BizConfig, error) {
+func (s *BizConfigService) GetByID(ctx context.Context, id int64) (domain.BizConfig, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
 func (s *BizConfigService) Update(ctx context.Context, config domain.BizConfig) error {
-	config.UpdatedAt = time.Now()
+	config.UpdatedAt = time.Now().UnixMilli()
 	return s.repo.Update(ctx, config)
 }
 
@@ -73,24 +67,7 @@ func (s *BizConfigService) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *BizConfigService) List(ctx context.Context, ownerID int64, ownerType string, page, pageSize int) ([]domain.BizConfig, int, error) {
-	return s.repo.List(ctx, ownerID, ownerType, page, pageSize)
-}
-
-func (s *BizConfigService) CheckQuota(ctx context.Context, id string, requiredQuota int64) (bool, int64, error) {
-	return s.repo.CheckAndUpdateQuota(ctx, id, requiredQuota)
-}
-
-func (s *BizConfigService) ValidateToken(tokenString string) (*jwt.Token, error) {
-	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(s.jwtSecret), nil
-	})
-}
-
-func (s *BizConfigService) generateJWTToken(id string, ownerID int64, ownerType string) (string, error) {
+func (s *BizConfigService) generateJWTToken(id int64, ownerID int64, ownerType string) (string, error) {
 	claims := jwt.MapClaims{
 		"biz_id":     id,
 		"owner_id":   ownerID,
