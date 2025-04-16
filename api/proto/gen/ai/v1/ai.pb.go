@@ -155,8 +155,8 @@ const file_ai_v1_ai_proto_rawDesc = "" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x12\x10\n" +
 	"\x03err\x18\x04 \x01(\tR\x03err2D\n" +
 	"\tAIService\x127\n" +
-	"\x06Stream\x12\x14.ai.v1.StreamRequest\x1a\x15.ai.v1.StreamResponse0\x01B\x80\x01\n" +
-	"\tcom.ai.v1B\aAiProtoP\x01Z5github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1;aiv1\xa2\x02\x03AXX\xaa\x02\x05Ai.V1\xca\x02\x05Ai\\V1\xe2\x02\x11Ai\\V1\\GPBMetadata\xea\x02\x06Ai::V1b\x06proto3"
+	"\x06Stream\x12\x14.ai.v1.StreamRequest\x1a\x15.ai.v1.StreamResponse0\x01B\x86\x01\n" +
+	"\tcom.ai.v1B\aAiProtoP\x01Z;github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1;aiv1\xa2\x02\x03AXX\xaa\x02\x05Ai.V1\xca\x02\x05Ai\\V1\xe2\x02\x11Ai\\V1\\GPBMetadata\xea\x02\x06Ai::V1b\x06proto3"
 
 var (
 	file_ai_v1_ai_proto_rawDescOnce sync.Once

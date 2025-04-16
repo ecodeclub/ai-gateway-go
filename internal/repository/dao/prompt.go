@@ -16,6 +16,9 @@ func NewPromptDAO(db *gorm.DB) *PromptDAO {
 }
 
 func (p *PromptDAO) Create(ctx context.Context, value Prompt) error {
+	now := time.Now().UnixMilli()
+	value.Ctime = now
+	value.Utime = now
 	return p.db.WithContext(ctx).Create(&value).Error
 }
 
@@ -30,6 +33,7 @@ func (p *PromptDAO) FindByID(ctx context.Context, id int64) (Prompt, error) {
 
 func (p *PromptDAO) Update(ctx context.Context, value Prompt) error {
 	// 更新非零值
+	value.Utime = time.Now().UnixMilli()
 	return p.db.WithContext(ctx).Model(&Prompt{}).Where("id = ?", value.ID).Updates(value).Error
 }
 
@@ -54,4 +58,8 @@ type Prompt struct {
 
 func (Prompt) TableName() string {
 	return "prompts"
+}
+
+func InitTable(db *gorm.DB) error {
+	return db.AutoMigrate(&Prompt{})
 }

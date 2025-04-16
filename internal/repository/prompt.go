@@ -16,15 +16,12 @@ func NewPromptRepo(dao *dao.PromptDAO) *PromptRepo {
 }
 
 func (p *PromptRepo) Add(ctx context.Context, prompt domain.Prompt) error {
-	now := time.Now().UnixMilli()
 	return p.dao.Create(ctx, dao.Prompt{
 		Name:        prompt.Name,
 		Owner:       prompt.Owner,
 		OwnerType:   string(prompt.OwnerType),
 		Content:     prompt.Content,
 		Description: prompt.Description,
-		Ctime:       now,
-		Utime:       now,
 	})
 }
 
@@ -55,6 +52,5 @@ func (p *PromptRepo) Update(ctx context.Context, value domain.Prompt) error {
 		Name:        value.Name,
 		Content:     value.Content,
 		Description: value.Description,
-		Utime:       time.Now().UnixMilli(),
 	})
 }
