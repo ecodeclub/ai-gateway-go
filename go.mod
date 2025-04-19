@@ -3,13 +3,6 @@ module github.com/ecodeclub/ai-gateway-go
 go 1.23
 
 require (
-	github.com/cohesion-org/deepseek-go v1.2.8
-	github.com/ecodeclub/ekit v0.0.8-0.20240211141809-d8a351a335b5
-	github.com/ecodeclub/ginx v0.0.1
-	github.com/gin-gonic/gin v1.9.1
-	github.com/gotomicro/ego v1.2.3
-	github.com/stretchr/testify v1.10.0
-	go.uber.org/mock v0.3.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gorm.io/driver/mysql v1.5.7
@@ -83,7 +76,6 @@ require (
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
