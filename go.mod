@@ -1,15 +1,8 @@
 module github.com/ecodeclub/ai-gateway-go
 
-go 1.23.2
+go 1.23
 
 require (
-	github.com/cohesion-org/deepseek-go v1.2.7
-	github.com/ecodeclub/ginx v0.0.1
-	github.com/gin-gonic/gin v1.9.1
-	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/gotomicro/ego v1.2.3
-	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.34.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gorm.io/driver/mysql v1.5.7
@@ -26,7 +19,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/ecodeclub/ekit v0.0.8-0.20240211141809-d8a351a335b5 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
