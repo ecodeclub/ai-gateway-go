@@ -15,8 +15,8 @@ type BizConfig struct {
 	OwnerType string `gorm:"column:owner_type;type:varchar(20);not null"`
 	Token     string `gorm:"column:token;type:varchar(64);not null"`
 	Config    string `gorm:"column:config;type:text"`
-	CreatedAt int64
-	UpdatedAt int64
+	Ctime     int64
+	Utime     int64
 }
 
 func (BizConfig) TableName() string {
@@ -31,30 +31,27 @@ func NewBizConfigDAO(db *gorm.DB) *BizConfigDAO {
 	return &BizConfigDAO{db: db}
 }
 
-// Create 创建记录，返回创建后的对象（含 ID 和 Token）
-func (d *BizConfigDAO) Insert(ctx context.Context, bc *BizConfig) (*BizConfig, error) {
+func (d *BizConfigDAO) Insert(ctx context.Context, bc *BizConfig) (BizConfig, error) {
 	now := time.Now().UnixMilli()
-	bc.CreatedAt = now
-	bc.UpdatedAt = now
+	bc.Ctime = now
+	bc.Utime = now
 	err := d.db.WithContext(ctx).Create(bc).Error
 	if err != nil {
-		return nil, err
+		return BizConfig{}, err
 	}
-	return bc, nil
+	return *bc, nil
 }
 
 // GetByID 根据ID查询
-func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (*BizConfig, error) {
+func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (BizConfig, error) {
 	var bc BizConfig
 	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bc).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrBizConfigNotFound
-	}
-	return &bc, err
+	return bc, err
 }
 
 // Update 更新记录
 func (d *BizConfigDAO) Update(ctx context.Context, bc *BizConfig) error {
+	bc.Utime = time.Now().UnixMilli()
 	return d.db.WithContext(ctx).Save(bc).Error
 }
 

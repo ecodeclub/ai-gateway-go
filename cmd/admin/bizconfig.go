@@ -21,7 +21,7 @@ func main() {
 
 // initDB 初始化数据库并自动建表
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13306)/bizconfig"))
+	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13306)/ai_gateway_platform"))
 	if err != nil {
 		panic(err)
 	}
