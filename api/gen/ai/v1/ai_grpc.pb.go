@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: ai.proto
+// source: ai/v1/ai.proto
 
 package aiv1
 
@@ -159,5 +159,5 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "ai.proto",
+	Metadata: "ai/v1/ai.proto",
 }
