@@ -65,36 +65,20 @@ func (p *PromptRepo) Get(ctx context.Context, id int64) (domain.Prompt, error) {
 	}, nil
 }
 
-func (p *PromptRepo) Delete(ctx context.Context, id, versionID int64) error {
-	return p.dao.Delete(ctx, id, versionID)
+func (p *PromptRepo) Delete(ctx context.Context, id int64) error {
+	return p.dao.Delete(ctx, id)
 }
 
-func (p *PromptRepo) Update(ctx context.Context, value domain.Prompt) error {
-	if value.ID > 0 {
-		err := p.dao.UpdatePrompt(ctx, dao.Prompt{
-			ID:          value.ID,
-			Name:        value.Name,
-			Description: value.Description,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	if len(value.Versions) > 0 {
-		err := p.dao.UpdateVersion(ctx, dao.PromptVersion{
-			ID:            value.Versions[0].ID,
-			Label:         value.Versions[0].Label,
-			Content:       value.Versions[0].Content,
-			SystemContent: value.Versions[0].SystemContent,
-			Temperature:   value.Versions[0].Temperature,
-			TopN:          value.Versions[0].TopN,
-			MaxTokens:     value.Versions[0].MaxTokens,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (p *PromptRepo) DeleteVersion(ctx context.Context, versionID int64) error {
+	return p.dao.DeleteVersion(ctx, versionID)
+}
+
+func (p *PromptRepo) UpdateInfo(ctx context.Context, value domain.Prompt) error {
+	return p.dao.UpdatePrompt(ctx, dao.Prompt{
+		ID:          value.ID,
+		Name:        value.Name,
+		Description: value.Description,
+	})
 }
 
 func (p *PromptRepo) UpdateVersion(ctx context.Context, value domain.PromptVersion) error {
@@ -108,8 +92,8 @@ func (p *PromptRepo) UpdateVersion(ctx context.Context, value domain.PromptVersi
 	})
 }
 
-func (p *PromptRepo) Publish(ctx context.Context, id int64, versionID int64, label string) error {
-	return p.dao.Publish(ctx, id, versionID, label)
+func (p *PromptRepo) UpdateActiveVersion(ctx context.Context, versionID int64, label string) error {
+	return p.dao.UpdateActiveVersion(ctx, versionID, label)
 }
 
 func (p *PromptRepo) InsertVersion(ctx context.Context, id int64, version domain.PromptVersion) error {
@@ -121,4 +105,27 @@ func (p *PromptRepo) InsertVersion(ctx context.Context, id int64, version domain
 		TopN:          version.TopN,
 		MaxTokens:     version.MaxTokens,
 	})
+}
+
+func (p *PromptRepo) GetByVersionID(ctx context.Context, id int64) (domain.Prompt, error) {
+	res, err := p.dao.GetByVersionID(ctx, id)
+	if err != nil {
+		return domain.Prompt{}, err
+	}
+	version := domain.PromptVersion{
+		ID:            res.ID,
+		Label:         res.Label,
+		Content:       res.Content,
+		SystemContent: res.SystemContent,
+		Temperature:   res.Temperature,
+		TopN:          res.TopN,
+		MaxTokens:     res.MaxTokens,
+		Status:        res.Status,
+		Ctime:         time.UnixMilli(res.Ctime),
+		Utime:         time.UnixMilli(res.Utime),
+	}
+	return domain.Prompt{
+		ID:       res.PromptID,
+		Versions: []domain.PromptVersion{version},
+	}, nil
 }

@@ -4,7 +4,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 
-type GetVO struct {
+type PromptVO struct {
 	ID            int64             `json:"id"`
 	Name          string            `json:"name"`
 	Owner         int64             `json:"owner"`
@@ -29,7 +29,7 @@ type PromptVersionVO struct {
 	UpdateTime    int64   `json:"utime"`
 }
 
-func newGetVO(p domain.Prompt) GetVO {
+func newPromptVO(p domain.Prompt) PromptVO {
 	versions := make([]PromptVersionVO, len(p.Versions))
 	for i, v := range p.Versions {
 		versions[i] = PromptVersionVO{
@@ -45,7 +45,7 @@ func newGetVO(p domain.Prompt) GetVO {
 			UpdateTime:    v.Utime.UnixMilli(),
 		}
 	}
-	return GetVO{
+	return PromptVO{
 		ID:            p.ID,
 		Name:          p.Name,
 		Owner:         p.Owner,
@@ -70,22 +70,19 @@ type AddReq struct {
 
 type DeleteReq struct {
 	ID int64 `json:"id"`
-	// 指定更新版本，值为 0 时删除整个 prompt
-	VersionID int64 `json:"version_id,omitempty"`
 }
 
-type UpdateReq struct {
-	updatePromptReq
-	updateVersionReq
+type DeleteVersionReq struct {
+	VersionID int64 `json:"version_id"`
 }
 
-type updatePromptReq struct {
+type UpdatePromptReq struct {
 	ID          int64  `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
-type updateVersionReq struct {
+type UpdateVersionReq struct {
 	VersionID     int64   `json:"version_id,omitempty"`
 	Content       string  `json:"content,omitempty"`
 	SystemContent string  `json:"system_content"`
@@ -95,16 +92,10 @@ type updateVersionReq struct {
 }
 
 type PublishReq struct {
-	ID        int64  `json:"id"`
 	VersionID int64  `json:"version_id"`
 	Label     string `json:"label"`
 }
 
 type ForkReq struct {
-	ID            int64   `json:"id"` // prompt id
-	Content       string  `json:"content"`
-	SystemContent string  `json:"system_content"`
-	Temperature   float32 `json:"temperature"`
-	TopN          float32 `json:"top_n"`
-	MaxTokens     int     `json:"max_tokens"`
+	VersionID int64 `json:"version_id"`
 }

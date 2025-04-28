@@ -52,13 +52,7 @@ func (p *PromptDAO) UpdateVersion(ctx context.Context, value PromptVersion) erro
 	return p.db.WithContext(ctx).Model(&PromptVersion{}).Where("id = ?", value.ID).Updates(value).Error
 }
 
-func (p *PromptDAO) Delete(ctx context.Context, id, versionID int64) error {
-	if versionID > 0 {
-		return p.db.Model(&PromptVersion{}).Where("id = ?", versionID).Updates(map[string]any{
-			"status": 0,
-			"utime":  time.Now().UnixMilli(),
-		}).Error
-	}
+func (p *PromptDAO) Delete(ctx context.Context, id int64) error {
 	return p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UnixMilli()
 		err := tx.Model(&Prompt{}).Where("id = ?", id).Updates(map[string]any{
@@ -75,7 +69,20 @@ func (p *PromptDAO) Delete(ctx context.Context, id, versionID int64) error {
 	})
 }
 
-func (p *PromptDAO) Publish(ctx context.Context, id int64, versionID int64, label string) error {
+func (p *PromptDAO) DeleteVersion(ctx context.Context, versionID int64) error {
+	return p.db.WithContext(ctx).Model(&PromptVersion{}).Where("id = ?", versionID).Updates(map[string]any{
+		"status": 0,
+		"utime":  time.Now().UnixMilli(),
+	}).Error
+}
+
+func (p *PromptDAO) UpdateActiveVersion(ctx context.Context, versionID int64, label string) error {
+	var id int64
+	err := p.db.WithContext(ctx).Model(&PromptVersion{}).Where("id = ?", versionID).Select("prompt_id").First(&id).Error
+	if err != nil {
+		return err
+	}
+
 	return p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UnixMilli()
 		err := tx.Model(&Prompt{}).Where("id = ?", id).Updates(map[string]any{
@@ -90,7 +97,6 @@ func (p *PromptDAO) Publish(ctx context.Context, id int64, versionID int64, labe
 			"utime": now,
 		}).Error
 	})
-
 }
 
 func (p *PromptDAO) InsertVersion(ctx context.Context, version PromptVersion) error {
@@ -98,6 +104,12 @@ func (p *PromptDAO) InsertVersion(ctx context.Context, version PromptVersion) er
 	version.Ctime = now
 	version.Utime = now
 	return p.db.WithContext(ctx).Create(&version).Error
+}
+
+func (p *PromptDAO) GetByVersionID(ctx context.Context, versionID int64) (PromptVersion, error) {
+	var res PromptVersion
+	err := p.db.WithContext(ctx).Model(&PromptVersion{}).Where("id = ?", versionID).First(&res).Error
+	return res, err
 }
 
 type Prompt struct {

@@ -140,7 +140,7 @@ func (s *PromptTestSuite) TestGet() {
 		name       string
 		reqBody    string
 		wantCode   int
-		wantResult web.GetVO
+		wantResult web.PromptVO
 		wantReq    string
 		before     func()
 		after      func()
@@ -175,7 +175,7 @@ func (s *PromptTestSuite) TestGet() {
 			},
 			after:    func() {},
 			wantCode: http.StatusOK,
-			wantResult: web.GetVO{
+			wantResult: web.PromptVO{
 				ID:            1,
 				Name:          "test",
 				Description:   "test",
@@ -204,7 +204,7 @@ func (s *PromptTestSuite) TestGet() {
 			resp := httptest.NewRecorder()
 			s.server.ServeHTTP(resp, req)
 			assert.Equal(t, tc.wantCode, resp.Code)
-			var result Result[web.GetVO]
+			var result Result[web.PromptVO]
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			require.NoError(t, err)
 			assert.True(t, result.Data.CreateTime > 0)
@@ -220,7 +220,7 @@ func (s *PromptTestSuite) TestGet() {
 	}
 }
 
-func (s *PromptTestSuite) TestUpdate() {
+func (s *PromptTestSuite) TestUpdatePrompt() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
 	testCases := []struct {
@@ -246,18 +246,6 @@ func (s *PromptTestSuite) TestUpdate() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "test",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
-				})
 			},
 			after: func() {
 				t := s.T()
@@ -271,23 +259,11 @@ func (s *PromptTestSuite) TestUpdate() {
 				assert.Equal(t, uint8(1), res.Status)
 				assert.True(t, res.Ctime > 0)
 				assert.True(t, res.Utime > res.Ctime)
-
-				var version dao.PromptVersion
-				err = s.db.Where("id = ?", 1).First(&version).Error
-				require.NoError(t, err)
-				assert.Equal(t, int64(1), version.PromptID)
-				assert.Equal(t, "aaa", version.Content)
-				assert.Equal(t, uint8(1), res.Status)
-				assert.Equal(t, float32(1.0), version.TopN)
-				assert.True(t, version.Utime > version.Ctime)
 			},
 			reqBody: `{
 				"id": 1,
 				"name": "aaa",
-				"content": "aaa",
-				"description": "aaa",
-				"version_id": 1,
-				"top_n": 1.0
+				"description": "aaa"
 			}`,
 			wantCode: http.StatusOK,
 		},
@@ -296,6 +272,70 @@ func (s *PromptTestSuite) TestUpdate() {
 		s.T().Run(tc.name, func(t *testing.T) {
 			tc.before()
 			req, err := http.NewRequest(http.MethodPost, "/prompt/update", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			s.server.ServeHTTP(resp, req)
+			assert.Equal(t, tc.wantCode, resp.Code)
+			tc.after()
+		})
+	}
+}
+
+func (s *PromptTestSuite) TestUpdateVersion() {
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+	testCases := []struct {
+		name     string
+		reqBody  string
+		wantCode int
+		wantReq  string
+		before   func()
+		after    func()
+	}{
+		{
+			name: "成功",
+			before: func() {
+				now := time.Now().UnixMilli()
+				err := s.db.Create(&dao.PromptVersion{
+					PromptID:      1,
+					Label:         "test",
+					Content:       "test",
+					SystemContent: "test",
+					Temperature:   9.9,
+					TopN:          0.9,
+					MaxTokens:     1000,
+					Status:        1,
+					Ctime:         now,
+					Utime:         now,
+				}).Error
+				require.NoError(s.T(), err)
+			},
+			after: func() {
+				t := s.T()
+				var version dao.PromptVersion
+				err := s.db.Where("id = ?", 1).First(&version).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(1), version.PromptID)
+				assert.Equal(t, "aaa", version.Content)
+				assert.Equal(t, "test", version.Label)
+				assert.Equal(t, "test", version.SystemContent)
+				assert.Equal(t, uint8(1), version.Status)
+				assert.Equal(t, float32(1.0), version.TopN)
+				assert.True(t, version.Utime > version.Ctime)
+			},
+			reqBody: `{
+				"version_id": 1,
+				"content": "aaa",
+				"top_n": 1.0
+			}`,
+			wantCode: http.StatusOK,
+		},
+	}
+	for _, tc := range testCases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			tc.before()
+			req, err := http.NewRequest(http.MethodPost, "/prompt/update/version", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
@@ -364,8 +404,34 @@ func (s *PromptTestSuite) TestDelete() {
 			}`,
 			wantCode: http.StatusOK,
 		},
+	}
+	for _, tc := range testCases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			tc.before()
+			req, err := http.NewRequest(http.MethodPost, "/prompt/delete", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			s.server.ServeHTTP(resp, req)
+			assert.Equal(t, tc.wantCode, resp.Code)
+			tc.after()
+		})
+	}
+}
+
+func (s *PromptTestSuite) TestDeleteVersion() {
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+	testCases := []struct {
+		name     string
+		reqBody  string
+		wantCode int
+		wantReq  string
+		before   func()
+		after    func()
+	}{
 		{
-			name: "只删除version-成功",
+			name: "删除version-成功",
 			before: func() {
 				now := time.Now().UnixMilli()
 				err := s.db.Create(&dao.Prompt{
@@ -415,7 +481,7 @@ func (s *PromptTestSuite) TestDelete() {
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			tc.before()
-			req, err := http.NewRequest(http.MethodPost, "/prompt/delete", bytes.NewBuffer([]byte(tc.reqBody)))
+			req, err := http.NewRequest(http.MethodPost, "/prompt/delete/version", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
@@ -481,7 +547,6 @@ func (s *PromptTestSuite) TestPublish() {
 				assert.True(t, version.Utime > version.Ctime)
 			},
 			reqBody: `{
-				"id": 1,
 				"version_id": 1,
 				"label": "v1.0.0"
 			}`,
@@ -530,7 +595,7 @@ func (s *PromptTestSuite) TestFork() {
 				require.NoError(s.T(), err)
 				s.db.Create(&dao.PromptVersion{
 					PromptID:      1,
-					Label:         "test",
+					Label:         "v1.0.0",
 					Content:       "test",
 					SystemContent: "test",
 					Temperature:   9.9,
@@ -549,27 +614,25 @@ func (s *PromptTestSuite) TestFork() {
 				require.True(t, len(versions) == 2) // fork 之后有两个版本
 				assert.Equal(t, "test", versions[0].Content)
 				assert.Equal(t, "test", versions[0].SystemContent)
+				assert.Equal(t, "v1.0.0", versions[0].Label)
 				assert.Equal(t, float32(0.9), versions[0].TopN)
 				assert.Equal(t, float32(9.9), versions[0].Temperature)
 				assert.Equal(t, 1000, versions[0].MaxTokens)
 				assert.True(t, versions[0].Ctime > 0)
 				assert.True(t, versions[0].Utime > 0)
 
-				assert.Equal(t, "new version", versions[1].Content)
-				assert.Equal(t, "new version", versions[1].SystemContent)
-				assert.Equal(t, float32(0.6), versions[1].TopN)
-				assert.Equal(t, float32(8.8), versions[1].Temperature)
-				assert.Equal(t, 2000, versions[1].MaxTokens)
-				assert.True(t, versions[1].Ctime > 0)
-				assert.True(t, versions[1].Utime > 0)
+				assert.Equal(t, "test", versions[1].Content)
+				assert.Equal(t, "test", versions[1].SystemContent)
+				// fork 后的 label 为空
+				assert.Equal(t, "", versions[1].Label)
+				assert.Equal(t, float32(0.9), versions[1].TopN)
+				assert.Equal(t, float32(9.9), versions[1].Temperature)
+				assert.Equal(t, 1000, versions[1].MaxTokens)
+				assert.True(t, versions[0].Ctime > 0)
+				assert.True(t, versions[0].Utime > 0)
 			},
 			reqBody: `{
-				"id": 1,
-				"content": "new version",
-  				"system_content": "new version",
-  				"temperature": 8.8,
-  				"top_n":0.6,
-  				"max_tokens":2000
+				"version_id": 1
 			}`,
 			wantCode: http.StatusOK,
 		},
