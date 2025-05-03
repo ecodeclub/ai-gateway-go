@@ -1,19 +1,15 @@
 package dao
 
 import (
-	"errors"
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"time"
 )
 
-var ErrBizConfigNotFound = errors.New("biz config not found")
-
 type BizConfig struct {
 	ID        int64  `gorm:"column:id;primaryKey;autoIncrement"`
 	OwnerID   int64  `gorm:"column:owner_id;type:bigint;not null"`
 	OwnerType string `gorm:"column:owner_type;type:varchar(20);not null"`
-	Token     string `gorm:"column:token;type:varchar(64);not null"`
 	Config    string `gorm:"column:config;type:text"`
 	Ctime     int64
 	Utime     int64
