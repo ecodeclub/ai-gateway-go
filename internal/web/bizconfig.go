@@ -5,152 +5,127 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ginx"
+	"github.com/ecodeclub/ginx/session"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"strconv"
 )
 
 type BizConfigHandler struct {
-	svc *service.BizConfigService
+	svc service.BizConfigService
 }
 
-func NewBizConfigHandler(svc *service.BizConfigService) *BizConfigHandler {
+func NewBizConfigHandler(svc service.BizConfigService) *BizConfigHandler {
 	return &BizConfigHandler{svc: svc}
 }
 
 func (h *BizConfigHandler) RegisterRoutes(server *gin.Engine) {
 	bg := server.Group("/api/v1/biz-configs")
 
-	bg.POST("/create", h.CreateBizConfig)
-	bg.POST("/get", h.GetBizConfig)
-	bg.POST("/update", h.UpdateBizConfig)
-	bg.POST("/delete", h.DeleteBizConfig)
+	bg.POST("/create", ginx.BS[CreateBizConfigReq](h.CreateBizConfig))
+	bg.POST("/get", ginx.BS[GetBizConfigReq](h.GetBizConfig))
+	bg.POST("/update", ginx.BS[UpdateBizConfigReq](h.UpdateBizConfig))
+	bg.POST("/delete", ginx.BS[DeleteBizConfigReq](h.DeleteBizConfig))
 }
 
-func (h *BizConfigHandler) CreateBizConfig(c *gin.Context) {
-	var CreateBizConfigReq struct {
-		ID        int64  `json:"id"`
-		OwnerId   int64  `json:"owner_id"`
-		OwnerType string `json:"owner_type"`
-		Config    string `json:"config"`
-		Token     string `json:"token"`
-	}
-	if err := c.ShouldBindJSON(&CreateBizConfigReq); err != nil {
-		c.JSON(http.StatusBadRequest, ginx.Result{Code: 400, Msg: "invalid request"})
-		return
-	}
+type CreateBizConfigReq struct {
+	ID        int64  `json:"id"`
+	OwnerId   int64  `json:"owner_id"`
+	OwnerType string `json:"owner_type"`
+	Config    string `json:"config"`
+}
 
+func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfigReq, sess session.Session) (ginx.Result, error) {
 	config := domain.BizConfig{
-		ID:        CreateBizConfigReq.ID,
-		OwnerID:   CreateBizConfigReq.OwnerId,
-		OwnerType: CreateBizConfigReq.OwnerType,
-		Config:    CreateBizConfigReq.Config,
-		Token:     CreateBizConfigReq.Token,
+		ID:        req.ID,
+		OwnerID:   req.OwnerId,
+		OwnerType: req.OwnerType,
+		Config:    req.Config,
 	}
 
-	created, access_token, err := h.svc.Create(c.Request.Context(), config)
+	created, err := h.svc.Create(ctx.Request.Context(), config)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ginx.Result{Code: 500, Msg: "failed to create biz config"})
-		return
+		return ginx.Result{Code: 500, Msg: "failed to create biz config"}, err
 	}
 
-	c.JSON(http.StatusOK, ginx.Result{
+	return ginx.Result{
 		Code: 0,
 		Msg:  "success",
 		Data: gin.H{
-			"bizconfig":    h.toResponse(created),
-			"access_token": access_token,
+			"bizconfig": h.toResponse(created),
 		},
-	})
+	}, nil
 }
 
-func (h *BizConfigHandler) GetBizConfig(c *gin.Context) {
-	var GetBizConfigReq struct {
-		ID int64 `json:"id"`
-	}
-	if err := c.ShouldBindJSON(&GetBizConfigReq); err != nil {
-		c.JSON(http.StatusBadRequest, ginx.Result{Code: 400, Msg: "invalid request"})
-		return
-	}
+type GetBizConfigReq struct {
+	ID int64 `json:"id"`
+}
 
-	config, err := h.svc.GetByID(c.Request.Context(), GetBizConfigReq.ID)
+func (h *BizConfigHandler) GetBizConfig(ctx *ginx.Context, req GetBizConfigReq, sess session.Session) (ginx.Result, error) {
+	config, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err == errs.ErrBizConfigNotFound {
-		c.JSON(http.StatusNotFound, ginx.Result{Code: 404, Msg: "biz config not found"})
-		return
+		return ginx.Result{Code: 404, Msg: "biz config not found"}, nil
 	} else if err != nil {
-		c.JSON(http.StatusInternalServerError, ginx.Result{Code: 500, Msg: "failed to get biz config"})
-		return
+		return ginx.Result{Code: 500, Msg: "failed to get biz config"}, err
 	}
 
-	c.JSON(http.StatusOK, ginx.Result{
+	return ginx.Result{
 		Code: 0,
 		Msg:  "success",
 		Data: gin.H{"config": h.toResponse(config)},
-	})
+	}, nil
 }
 
-func (h *BizConfigHandler) UpdateBizConfig(c *gin.Context) {
-	var UpdateBizConfigReq struct {
-		ID        int64  `json:"id"`
-		OwnerId   int64  `json:"owner_id"`
-		OwnerType string `json:"owner_type"`
-		Config    string `json:"config"`
-		Token     string `json:"token"`
-	}
-	if err := c.ShouldBindJSON(&UpdateBizConfigReq); err != nil {
-		c.JSON(http.StatusBadRequest, ginx.Result{Code: 400, Msg: "invalid request"})
-		return
-	}
+type UpdateBizConfigReq struct {
+	ID        int64  `json:"id"`
+	OwnerId   int64  `json:"owner_id"`
+	OwnerType string `json:"owner_type"`
+	Config    string `json:"config"`
+}
 
-	existing, err := h.svc.GetByID(c.Request.Context(), UpdateBizConfigReq.ID)
+func (h *BizConfigHandler) UpdateBizConfig(ctx *ginx.Context, req UpdateBizConfigReq, sess session.Session) (ginx.Result, error) {
+	existing, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err == errs.ErrBizConfigNotFound {
-		c.JSON(http.StatusNotFound, ginx.Result{Code: 404, Msg: "biz config not found"})
-		return
+		return ginx.Result{Code: 404, Msg: "biz config not found"}, nil
+	} else if err != nil {
+		return ginx.Result{Code: 500, Msg: "failed to fetch biz config"}, err
 	}
 
-	existing.OwnerID = UpdateBizConfigReq.OwnerId
-	existing.OwnerType = UpdateBizConfigReq.OwnerType
-	existing.Config = UpdateBizConfigReq.Config
-	existing.Token = UpdateBizConfigReq.Token
+	// 更新字段
+	existing.OwnerID = req.OwnerId
+	existing.OwnerType = req.OwnerType
+	existing.Config = req.Config
 
-	if err := h.svc.Update(c.Request.Context(), existing); err != nil {
-		c.JSON(http.StatusInternalServerError, ginx.Result{Code: 500, Msg: "failed to update biz config"})
-		return
+	if err := h.svc.Update(ctx.Request.Context(), existing); err != nil {
+		return ginx.Result{Code: 500, Msg: "failed to update biz config"}, err
 	}
 
-	updated, err := h.svc.GetByID(c.Request.Context(), UpdateBizConfigReq.ID)
+	updated, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ginx.Result{Code: 500, Msg: "failed to fetch updated biz config"})
-		return
+		return ginx.Result{Code: 500, Msg: "failed to fetch updated biz config"}, err
 	}
 
-	c.JSON(http.StatusOK, ginx.Result{
+	return ginx.Result{
 		Code: 0,
 		Msg:  "success",
 		Data: gin.H{"config": h.toResponse(updated)},
-	})
+	}, nil
 }
 
-func (h *BizConfigHandler) DeleteBizConfig(c *gin.Context) {
-	var DeleteBizConfigReq struct {
-		ID int64 `json:"id"`
-	}
-	if err := c.ShouldBindJSON(&DeleteBizConfigReq); err != nil {
-		c.JSON(http.StatusBadRequest, ginx.Result{Code: 400, Msg: "invalid request"})
-		return
+type DeleteBizConfigReq struct {
+	ID int64 `json:"id"`
+}
+
+func (h *BizConfigHandler) DeleteBizConfig(ctx *ginx.Context, req DeleteBizConfigReq, sess session.Session) (ginx.Result, error) {
+	idStr := strconv.FormatInt(req.ID, 10)
+	if err := h.svc.Delete(ctx.Request.Context(), idStr); err != nil {
+		return ginx.Result{Code: 500, Msg: "failed to delete biz config"}, err
 	}
 
-	idStr := strconv.FormatInt(DeleteBizConfigReq.ID, 10)
-	if err := h.svc.Delete(c.Request.Context(), idStr); err != nil {
-		c.JSON(http.StatusInternalServerError, ginx.Result{Code: 500, Msg: "failed to delete biz config"})
-		return
-	}
-
-	c.JSON(http.StatusOK, ginx.Result{
+	return ginx.Result{
 		Code: 0,
 		Msg:  "success",
 		Data: gin.H{"success": true},
-	})
+	}, nil
 }
 
 func (h *BizConfigHandler) toResponse(config domain.BizConfig) map[string]any {
@@ -158,7 +133,6 @@ func (h *BizConfigHandler) toResponse(config domain.BizConfig) map[string]any {
 		"id":         config.ID,
 		"owner_id":   config.OwnerID,
 		"owner_type": config.OwnerType,
-		"token":      config.Token,
 		"config":     config.Config,
 		"ctime":      config.Ctime.Format("2006-01-02 15:04:05"),
 		"utime":      config.Utime.Format("2006-01-02 15:04:05"),

@@ -1,1 +1,1 @@
-create database bizconfig;
+create database ai_gateway_platform;

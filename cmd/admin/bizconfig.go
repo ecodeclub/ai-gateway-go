@@ -5,13 +5,15 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/web"
+	"github.com/ecodeclub/ai-gateway-go/internal/web/infra"
+	//"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/gotomicro/ego/core/econf"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func main() {
+	infra.Init()
 	db := initDB()
 	server := gin.Default()
 	bizconfig := initBizConfig(db)
@@ -36,11 +38,7 @@ func initDB() *gorm.DB {
 func initBizConfig(db *gorm.DB) *web.BizConfigHandler {
 	dao := dao.NewBizConfigDAO(db)
 	repo := repository.NewBizConfigRepository(dao)
-	svc := service.NewBizConfigService(
-		repo,
-		econf.GetString("jwt.secret"),
-		econf.GetDuration("jwt.expire"),
-	)
+	svc := service.NewBizConfigService(repo)
 	server := web.NewBizConfigHandler(svc)
 	return server
 }
