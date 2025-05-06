@@ -6,5 +6,6 @@ import (
 )
 
 type LLMHandler interface {
-	StreamHandle(ctx context.Context, req domain.StreamRequest) (chan domain.StreamEvent, error)
+	StreamHandle(ctx context.Context, req domain.LLMRequest) (chan domain.StreamEvent, error)
+	Handle(ctx context.Context, req domain.LLMRequest) (domain.LLMResponse, error)
 }

@@ -7,6 +7,7 @@ require (
 	github.com/ecodeclub/ekit v0.0.8-0.20240211141809-d8a351a335b5
 	github.com/ecodeclub/ginx v0.0.1
 	github.com/gin-gonic/gin v1.9.1
+	github.com/golang/mock v1.4.4
 	github.com/gotomicro/ego v1.2.3
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.3.0
