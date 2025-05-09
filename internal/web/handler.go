@@ -20,8 +20,12 @@ func (h *Handler) PrivateRoutes(server *gin.Engine) {
 	prompt := server.Group("/prompt")
 	prompt.POST("/add", ginx.BS(h.Add))
 	prompt.GET("/:id", ginx.W(h.Get))
-	prompt.DELETE("/:id", ginx.W(h.Delete))
-	prompt.POST("/:id", ginx.B(h.Update))
+	prompt.POST("/delete", ginx.B(h.Delete))
+	prompt.POST("/delete/version", ginx.B(h.DeleteVersion))
+	prompt.POST("/update", ginx.B(h.UpdatePrompt))
+	prompt.POST("/update/version", ginx.B(h.UpdateVersion))
+	prompt.POST("/publish", ginx.B(h.Publish))
+	prompt.POST("/fork", ginx.B(h.Fork))
 }
 
 func (h *Handler) PublicRoutes(server *gin.Engine) {}
@@ -33,13 +37,20 @@ func (h *Handler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx
 	if err != nil {
 		return ginx.Result{}, ginx.ErrUnauthorized
 	}
-	err = h.svc.Add(ctx, domain.Prompt{
+	prompt := domain.Prompt{
 		Name:        req.Name,
-		Content:     req.Content,
 		Description: req.Description,
 		Owner:       uid,
 		OwnerType:   domain.OwnerType(ownerType),
-	})
+	}
+	version := domain.PromptVersion{
+		Content:       req.Content,
+		SystemContent: req.SystemContent,
+		Temperature:   req.Temperature,
+		TopN:          req.TopN,
+		MaxTokens:     req.MaxTokens,
+	}
+	err = h.svc.Add(ctx, prompt, version)
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -58,16 +69,13 @@ func (h *Handler) Get(ctx *ginx.Context) (ginx.Result, error) {
 		return systemErrorResult, err
 	}
 	return ginx.Result{
-		Data: newGetVO(res),
+		Data: newPromptVO(res),
 	}, nil
 }
 
-func (h *Handler) Delete(ctx *ginx.Context) (ginx.Result, error) {
-	id, err := ctx.Param("id").AsInt64()
-	if err != nil {
-		return ginx.Result{}, ginx.ErrNoResponse
-	}
-	err = h.svc.Delete(ctx, id)
+// Delete 删除整个 prompt
+func (h *Handler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) {
+	err := h.svc.Delete(ctx, req.ID)
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -76,12 +84,63 @@ func (h *Handler) Delete(ctx *ginx.Context) (ginx.Result, error) {
 	}, nil
 }
 
-func (h *Handler) Update(ctx *ginx.Context, req UpdateReq) (ginx.Result, error) {
-	id, err := ctx.Param("id").AsInt64()
+func (h *Handler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.Result, error) {
+	err := h.svc.DeleteVersion(ctx, req.VersionID)
 	if err != nil {
-		return ginx.Result{}, ginx.ErrNoResponse
+		return systemErrorResult, err
 	}
-	err = h.svc.Update(ctx, id, req.Name, req.Content, req.Description)
+	return ginx.Result{
+		Msg: "OK",
+	}, nil
+}
+
+// UpdatePrompt 更新 prompt 的基本信息
+func (h *Handler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Result, error) {
+	prompt := domain.Prompt{
+		ID:          req.ID,
+		Name:        req.Name,
+		Description: req.Description,
+	}
+	err := h.svc.UpdateInfo(ctx, prompt)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	return ginx.Result{
+		Msg: "OK",
+	}, nil
+}
+
+func (h *Handler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.Result, error) {
+	version := domain.PromptVersion{
+		ID:            req.VersionID,
+		Content:       req.Content,
+		SystemContent: req.SystemContent,
+		Temperature:   req.Temperature,
+		TopN:          req.TopN,
+		MaxTokens:     req.MaxTokens,
+	}
+	err := h.svc.UpdateVersion(ctx, version)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	return ginx.Result{
+		Msg: "OK",
+	}, nil
+}
+
+func (h *Handler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error) {
+	err := h.svc.Publish(ctx, req.VersionID, req.Label)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	return ginx.Result{
+		Msg: "OK",
+	}, nil
+}
+
+// Fork 新增一个版本
+func (h *Handler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Result, error) {
+	err := h.svc.Fork(ctx, req.VersionID)
 	if err != nil {
 		return systemErrorResult, err
 	}
