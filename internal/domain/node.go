@@ -13,7 +13,7 @@ type Node struct {
 }
 
 type Edge struct {
-	Id       int64
+	ID       int64
 	GraphID  int64
 	SourceID int64
 	TargetID int64
@@ -22,7 +22,7 @@ type Edge struct {
 }
 
 type Graph struct {
-	Id       int64
+	ID       int64
 	Nodes    []Node
 	Edges    []Edge
 	Metadata ekit.AnyValue
