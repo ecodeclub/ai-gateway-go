@@ -116,3 +116,19 @@ func (dao *GraphDao) Get(ctx context.Context, id int64) (Graph, error) {
 
 	return graph, err
 }
+
+func (Graph) TableName() string {
+	return "graph"
+}
+
+func (Edge) TableName() string {
+	return "edge"
+}
+
+func (Node) TableName() string {
+	return "node"
+}
+
+func InitGraphTable(db *gorm.DB) error {
+	return db.AutoMigrate(&Graph{}, &Edge{}, &Node{})
+}
