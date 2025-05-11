@@ -1,0 +1,5 @@
+{"lv":"info","ts":1744612941,"msg":"read watch","comp":"core.econf","comp":"file datasource","configFile":"/Users/dns/Downloads/ai-gateway-go/cmd/platform/config.toml","realConfigFile":"/Users/dns/Downloads/ai-gateway-go/cmd/platform/config.toml","fppath":"/Users/dns/Downloads/ai-gateway-go/cmd/platform/config.toml"}
+{"lv":"info","ts":1744612941,"msg":"init config","comp":"core.econf","addr":"config.toml"}
+{"lv":"info","ts":1744612941,"msg":"init app","comp":"app","pid":30162,"coreNum":4}
+{"lv":"info","ts":1744612941,"msg":"init trace","comp":"app"}
+{"lv":"info","ts":1744612942,"msg":"start server","comp":"server.egrpc","compName":"grpc.server","addr":"grpc://127.0.0.1:9002"}
