@@ -1,6 +1,9 @@
 package web
 
-import "github.com/ecodeclub/ai-gateway-go/internal/domain"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/slice"
+)
 
 type GetVO struct {
 	Name        string `json:"name"`
@@ -34,4 +37,32 @@ type UpdateReq struct {
 	Name        string `json:"name,omitempty"`
 	Content     string `json:"content,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+type SavePlanReq struct {
+	ID    int64  `json:"id"`
+	Steps []Step `json:"steps"`
+}
+
+type GetPlanVO struct {
+	ID    int64  `json:"id"`
+	Steps []Step `json:"steps"`
+}
+
+type Step struct {
+	ID       int64  `json:"id"`
+	Type     string `json:"type"`
+	Status   string `json:"status"`
+	Metadata string `json:"metadata"`
+}
+
+func newGetNodeVO(plan domain.Plan) GetPlanVO {
+	var vo GetPlanVO
+	vo.ID = plan.ID
+	vo.Steps = slice.Map[domain.Step, Step](plan.Steps, func(idx int, src domain.Step) Step {
+		m, _ := src.Metadata.AsString()
+		return Step{ID: src.ID, Type: src.Type, Status: src.Status, Metadata: m}
+	})
+
+	return vo
 }

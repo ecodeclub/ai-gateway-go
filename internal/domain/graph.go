@@ -4,7 +4,7 @@ import (
 	"github.com/ecodeclub/ekit"
 )
 
-type Node struct {
+type Step struct {
 	ID       int64
 	GraphID  int64
 	Type     string
@@ -21,9 +21,9 @@ type Edge struct {
 	Metadata ekit.AnyValue // 用于存储边的扩展属性
 }
 
-type Graph struct {
+type Plan struct {
 	ID       int64
-	Nodes    []Node
+	Steps    []Step
 	Edges    []Edge
 	Metadata ekit.AnyValue
 }
