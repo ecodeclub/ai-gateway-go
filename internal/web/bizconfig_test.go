@@ -2,6 +2,11 @@ package web
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/mocks"
@@ -10,10 +15,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	gomock "go.uber.org/mock/gomock"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func fakeAuthMiddleware() gin.HandlerFunc {

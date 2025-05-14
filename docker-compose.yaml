@@ -7,10 +7,23 @@ services:
       MYSQL_ROOT_PASSWORD: root
     volumes:
       #      设置初始化脚本
-      - ./script/mysql/:/docker-entrypoint-initdb.d/
+      - ./script/base/mysql/:/docker-entrypoint-initdb.d/
     ports:
       #      注意这里我映射为了 13306 端口
       - "13306:3306"
+  mysql8_test:
+    image: mysql:8.0.29
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      #      设置初始化脚本
+      - ./script/test/mysql/:/docker-entrypoint-initdb.d/
+    ports:
+      #      注意这里我映射为了 13306 端口
+      - "13316:3306"
+
   redis:
     image: 'bitnami/redis:latest'
     environment:

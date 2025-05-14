@@ -3,6 +3,11 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
@@ -16,10 +21,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 type PromptTestSuite struct {

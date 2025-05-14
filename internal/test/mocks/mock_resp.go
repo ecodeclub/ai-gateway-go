@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+
 	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
 )
 

@@ -1,9 +1,10 @@
 package infra
 
 import (
+	"time"
+
 	"github.com/ecodeclub/ginx/session"
 	redis2 "github.com/ecodeclub/ginx/session/redis"
-	"time"
 )
 
 func Init() {

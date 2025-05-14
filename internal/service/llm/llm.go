@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 

@@ -3,8 +3,9 @@ package dao
 import (
 	"context"
 	"errors"
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type PromptDAO struct {
