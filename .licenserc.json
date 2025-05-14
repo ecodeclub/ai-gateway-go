@@ -1,9 +1,9 @@
 {
   "**/*.go": "// Copyright 2021 ecodeclub",
-  "**/*.{yml,yaml}": "# Copyright 2021 ecodeclub",
+  "**/*.{yml,yaml,sql}": "# Copyright 2021 ecodeclub",
   "**/*.sh": "# Copyright 2021 ecodeclub",
 
   "ignore": [
-    "mocks"
+    "mocks","*.pb.go", "*.pb.gw.go"
   ]
 }
