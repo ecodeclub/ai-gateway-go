@@ -1,9 +1,10 @@
 package dao
 
 import (
+	"time"
+
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
-	"time"
 )
 
 type BizConfig struct {
