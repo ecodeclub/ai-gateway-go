@@ -56,7 +56,7 @@ func (mr *MockProviderMockRecorder) Destroy(arg0 any) *gomock.Call {
 // Get mocks base method.
 func (m *MockProvider) Get(arg0 *gctx.Context) (session.Session, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0)
+	ret := m.ctrl.Call(m, "GetGraph", arg0)
 	ret0, _ := ret[0].(session.Session)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -65,7 +65,7 @@ func (m *MockProvider) Get(arg0 *gctx.Context) (session.Session, error) {
 // Get indicates an expected call of Get.
 func (mr *MockProviderMockRecorder) Get(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockProvider)(nil).Get), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGraph", reflect.TypeOf((*MockProvider)(nil).Get), arg0)
 }
 
 // NewSession mocks base method.

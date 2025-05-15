@@ -85,7 +85,7 @@ func (mr *MockSessionMockRecorder) Destroy(arg0 any) *gomock.Call {
 // Get mocks base method.
 func (m *MockSession) Get(arg0 context.Context, arg1 string) ekit.AnyValue {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetGraph", arg0, arg1)
 	ret0, _ := ret[0].(ekit.AnyValue)
 	return ret0
 }
@@ -93,7 +93,7 @@ func (m *MockSession) Get(arg0 context.Context, arg1 string) ekit.AnyValue {
 // Get indicates an expected call of Get.
 func (mr *MockSessionMockRecorder) Get(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSession)(nil).Get), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGraph", reflect.TypeOf((*MockSession)(nil).Get), arg0, arg1)
 }
 
 // Set mocks base method.

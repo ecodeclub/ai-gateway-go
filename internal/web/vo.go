@@ -83,31 +83,49 @@ type UpdatePromptReq struct {
 	Description string `json:"description,omitempty"`
 }
 
-type SavePlanReq struct {
+type SaveGraphReq struct {
 	ID    int64  `json:"id"`
-	Steps []Step `json:"steps"`
+	Steps []Node `json:"steps"`
+	Edges []Edge `json:"edges"`
 }
 
-type GetPlanVO struct {
+type GetGraphVO struct {
 	ID    int64  `json:"id"`
-	Steps []Step `json:"steps"`
+	Nodes []Node `json:"steps"`
+	Edges []Edge `json:"edges"`
 }
 
-type Step struct {
-	ID       int64  `json:"id"`
-	Type     string `json:"type"`
-	Status   string `json:"status"`
-	Metadata string `json:"metadata"`
+type GetReq struct {
+	ID int64 `json:"id"`
 }
 
-func newGetNodeVO(plan domain.Plan) GetPlanVO {
-	var vo GetPlanVO
+type Node struct {
+	ID       int64  `json:"id,omitempty"`
+	GraphID  int64  `json:"graph_id,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Metadata string `json:"metadata,omitempty"`
+}
+
+type Edge struct {
+	ID       int64  `json:"id,omitempty"`
+	GraphID  int64  `json:"graph_id,omitempty"`
+	SourceID int64  `json:"source_id,omitempty"`
+	TargetID int64  `json:"target_id,omitempty"`
+	Metadata string `json:"metadata,omitempty"`
+}
+
+func newGetNodeVO(plan domain.Graph) GetGraphVO {
+	var vo GetGraphVO
 	vo.ID = plan.ID
-	vo.Steps = slice.Map[domain.Step, Step](plan.Steps, func(idx int, src domain.Step) Step {
+	vo.Nodes = slice.Map[domain.Node, Node](plan.Steps, func(idx int, src domain.Node) Node {
 		m, _ := src.Metadata.AsString()
-		return Step{ID: src.ID, Type: src.Type, Status: src.Status, Metadata: m}
+		return Node{ID: src.ID, Type: src.Type, Status: src.Status, Metadata: m, GraphID: src.GraphID}
 	})
-
+	vo.Edges = slice.Map[domain.Edge, Edge](plan.Edges, func(idx int, src domain.Edge) Edge {
+		m, _ := src.Metadata.AsString()
+		return Edge{ID: src.ID, TargetID: src.TargetID, SourceID: src.SourceID, Metadata: m, GraphID: src.GraphID}
+	})
 	return vo
 }
 

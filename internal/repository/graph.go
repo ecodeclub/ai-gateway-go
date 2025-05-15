@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ekit"
@@ -9,55 +10,88 @@ import (
 )
 
 type NodeRepo struct {
-	graph *dao.GraphDao
+	graph *dao.GraphDAO
 }
 
-func NewNodeRepo(graph *dao.GraphDao) *NodeRepo {
+func NewGraphRepo(graph *dao.GraphDAO) *NodeRepo {
 	return &NodeRepo{graph: graph}
 }
 
-func (n *NodeRepo) Save(ctx context.Context, graph domain.Plan) (int64, error) {
-	g := n.domainToDao(graph)
-	return n.graph.Save(ctx, g)
+func (n *NodeRepo) SaveGraph(ctx context.Context, graph domain.Graph) (int64, error) {
+	return n.graph.SaveGraph(ctx, dao.Graph{
+		ID: graph.ID,
+	})
 }
 
-func (n *NodeRepo) Get(ctx context.Context, id int64) (domain.Plan, error) {
+func (n *NodeRepo) SaveNode(ctx context.Context, node domain.Node) (int64, error) {
+	str, _ := node.Metadata.AsString()
+	return n.graph.SaveNode(ctx, dao.Node{
+		ID:       node.ID,
+		Type:     node.Type,
+		GraphID:  node.GraphID,
+		Status:   node.Status,
+		Metadata: str,
+	})
+}
+
+func (n *NodeRepo) SaveEdge(ctx context.Context, edge domain.Edge) (int64, error) {
+	str, _ := edge.Metadata.AsString()
+
+	return n.graph.SaveEdge(ctx, dao.Edge{
+		ID:       edge.ID,
+		GraphID:  edge.GraphID,
+		SourceID: edge.SourceID,
+		TargetID: edge.TargetID,
+		Metadata: str,
+	})
+}
+
+func (n *NodeRepo) DeleteGraph(ctx context.Context, id int64) error {
+	return n.graph.DeleteGraph(ctx, id)
+}
+
+func (n *NodeRepo) DeleteNode(ctx context.Context, id int64) error {
+	return n.graph.DeleteNode(ctx, id)
+}
+
+func (n *NodeRepo) DeleteEdge(ctx context.Context, id int64) error {
+	return n.graph.DeleteEdge(ctx, id)
+}
+
+func (n *NodeRepo) GetGraph(ctx context.Context, id int64) (domain.Graph, error) {
 	graph, err := n.graph.Get(ctx, id)
 	if err != nil {
-		return domain.Plan{}, err
+		return domain.Graph{}, err
 	}
 	return n.daoToDomain(graph), nil
 }
 
-func (n *NodeRepo) domainToDao(plan domain.Plan) dao.Graph {
-	var g dao.Graph
-	g.ID = plan.ID
-
-	nodes := slice.Map[domain.Step, dao.Node](plan.Steps, func(idx int, src domain.Step) dao.Node {
-		metaData, _ := src.Metadata.AsString()
-		return dao.Node{
-			ID:       src.ID,
-			Type:     src.Type,
-			Status:   src.Status,
-			Metadata: metaData,
-		}
-	})
-	g.Nodes = nodes
-	return g
-}
-
-func (n *NodeRepo) daoToDomain(graph dao.Graph) domain.Plan {
-	var plan domain.Plan
+func (n *NodeRepo) daoToDomain(graph dao.Graph) domain.Graph {
+	var plan domain.Graph
 	plan.ID = graph.ID
-	nodes := slice.Map[dao.Node, domain.Step](graph.Nodes, func(idx int, src dao.Node) domain.Step {
+	steps := slice.Map[dao.Node, domain.Node](graph.Nodes, func(idx int, src dao.Node) domain.Node {
 		metaData := src.Metadata
-		return domain.Step{
+		return domain.Node{
+			GraphID:  src.GraphID,
 			ID:       src.ID,
 			Type:     src.Type,
 			Status:   src.Status,
 			Metadata: ekit.AnyValue{Val: metaData},
 		}
 	})
-	plan.Steps = nodes
+	plan.Steps = steps
+
+	edges := slice.Map[dao.Edge, domain.Edge](graph.Edges, func(idx int, src dao.Edge) domain.Edge {
+		metaData := src.Metadata
+		return domain.Edge{
+			GraphID:  src.GraphID,
+			ID:       src.ID,
+			SourceID: src.SourceID,
+			TargetID: src.TargetID,
+			Metadata: ekit.AnyValue{Val: metaData},
+		}
+	})
+
+	plan.Edges = edges
 	return plan
 }
