@@ -263,7 +263,7 @@ func (n *GraphTestSuite) TestGetGraph() {
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
 			n.server.ServeHTTP(resp, req)
-			var result Result[web.GetGraphVO]
+			var result Result[web.GraphVO]
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			require.NoError(t, err)
 			assert.Equal(t, len(result.Data.Edges), 1)

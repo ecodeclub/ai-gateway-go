@@ -89,7 +89,7 @@ type SaveGraphReq struct {
 	Edges []Edge `json:"edges"`
 }
 
-type GetGraphVO struct {
+type GraphVO struct {
 	ID    int64  `json:"id"`
 	Nodes []Node `json:"steps"`
 	Edges []Edge `json:"edges"`
@@ -115,8 +115,8 @@ type Edge struct {
 	Metadata string `json:"metadata,omitempty"`
 }
 
-func newGetNodeVO(plan domain.Graph) GetGraphVO {
-	var vo GetGraphVO
+func newGetNodeVO(plan domain.Graph) GraphVO {
+	var vo GraphVO
 	vo.ID = plan.ID
 	vo.Nodes = slice.Map[domain.Node, Node](plan.Steps, func(idx int, src domain.Node) Node {
 		m, _ := src.Metadata.AsString()
