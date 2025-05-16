@@ -18,8 +18,11 @@ func NewGraphRepo(graph *dao.GraphDAO) *NodeRepo {
 }
 
 func (n *NodeRepo) SaveGraph(ctx context.Context, graph domain.Graph) (int64, error) {
+	str, _ := graph.Metadata.AsString()
+
 	return n.graph.SaveGraph(ctx, dao.Graph{
-		ID: graph.ID,
+		ID:       graph.ID,
+		Metadata: str,
 	})
 }
 
@@ -63,13 +66,21 @@ func (n *NodeRepo) GetGraph(ctx context.Context, id int64) (domain.Graph, error)
 	if err != nil {
 		return domain.Graph{}, err
 	}
-	return n.daoToDomain(graph), nil
+	edges, err := n.graph.GetEdges(ctx, id)
+	if err != nil {
+		return domain.Graph{}, err
+	}
+	nodes, err := n.graph.GetNodes(ctx, id)
+	if err != nil {
+		return domain.Graph{}, err
+	}
+	return n.daoToDomain(graph, edges, nodes), nil
 }
 
-func (n *NodeRepo) daoToDomain(graph dao.Graph) domain.Graph {
+func (n *NodeRepo) daoToDomain(graph dao.Graph, edges []dao.Edge, nodes []dao.Node) domain.Graph {
 	var plan domain.Graph
 	plan.ID = graph.ID
-	steps := slice.Map[dao.Node, domain.Node](graph.Nodes, func(idx int, src dao.Node) domain.Node {
+	steps := slice.Map[dao.Node, domain.Node](nodes, func(idx int, src dao.Node) domain.Node {
 		metaData := src.Metadata
 		return domain.Node{
 			GraphID:  src.GraphID,
@@ -81,7 +92,7 @@ func (n *NodeRepo) daoToDomain(graph dao.Graph) domain.Graph {
 	})
 	plan.Steps = steps
 
-	edges := slice.Map[dao.Edge, domain.Edge](graph.Edges, func(idx int, src dao.Edge) domain.Edge {
+	domainEdges := slice.Map[dao.Edge, domain.Edge](edges, func(idx int, src dao.Edge) domain.Edge {
 		metaData := src.Metadata
 		return domain.Edge{
 			GraphID:  src.GraphID,
@@ -92,6 +103,6 @@ func (n *NodeRepo) daoToDomain(graph dao.Graph) domain.Graph {
 		}
 	})
 
-	plan.Edges = edges
+	plan.Edges = domainEdges
 	return plan
 }

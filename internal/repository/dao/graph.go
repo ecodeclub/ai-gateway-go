@@ -16,7 +16,6 @@ type Node struct {
 	Metadata string `gorm:"column:metadata"`
 	Ctime    int64  `gorm:"column:ctime"`
 	Utime    int64  `gorm:"column:utime"`
-	Deleted  uint8  `gorm:"column:deleted;default:1"`
 }
 
 func (Node) TableName() string {
@@ -31,7 +30,6 @@ type Edge struct {
 	Metadata string `gorm:"column:metadata;"`
 	Ctime    int64  `gorm:"column:ctime"`
 	Utime    int64  `gorm:"column:utime"`
-	Deleted  uint8  `gorm:"column:deleted;default:1"`
 }
 
 func (Edge) TableName() string {
@@ -40,12 +38,9 @@ func (Edge) TableName() string {
 
 type Graph struct {
 	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Edges    []Edge `gorm:"-"`
-	Nodes    []Node `gorm:"-"`
 	Metadata string `gorm:"column:metadata"`
 	Ctime    int64  `gorm:"column:ctime"`
 	Utime    int64  `gorm:"column:utime"`
-	Deleted  uint8  `gorm:"column:deleted;default:1"`
 }
 
 func (Graph) TableName() string {
@@ -77,12 +72,7 @@ func (dao *GraphDAO) SaveNode(ctx context.Context, node Node) (int64, error) {
 }
 
 func (dao *GraphDAO) DeleteNode(ctx context.Context, id int64) error {
-	now := time.Now().UnixMilli()
-	err := dao.db.WithContext(ctx).Model(&Node{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"deleted": 0,
-		"utime":   now,
-	}).Error
-	return err
+	return dao.db.WithContext(ctx).Delete(&Node{}, id).Error
 }
 
 func (dao *GraphDAO) SaveEdge(ctx context.Context, edge Edge) (int64, error) {
@@ -96,20 +86,13 @@ func (dao *GraphDAO) SaveEdge(ctx context.Context, edge Edge) (int64, error) {
 
 	err := dao.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"graph_id", "target_id", "source_id", "utime"}),
+		DoUpdates: clause.AssignmentColumns([]string{"graph_id", "target_id", "source_id", "metadata", "utime"}),
 	}).Create(&edge).Error
 	return edge.ID, err
 }
 
 func (dao *GraphDAO) DeleteEdge(ctx context.Context, id int64) error {
-	now := time.Now().UnixMilli()
-
-	err := dao.db.WithContext(ctx).Model(&Edge{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"deleted": 0,
-		"utime":   now,
-	}).Error
-
-	return err
+	return dao.db.WithContext(ctx).Delete(&Edge{}, id).Error
 }
 
 func (dao *GraphDAO) SaveGraph(ctx context.Context, graph Graph) (int64, error) {
@@ -129,30 +112,18 @@ func (dao *GraphDAO) SaveGraph(ctx context.Context, graph Graph) (int64, error) 
 }
 
 func (dao *GraphDAO) DeleteGraph(ctx context.Context, id int64) error {
-	now := time.Now().UnixMilli()
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		err := tx.Model(&Graph{}).Where("id = ?", id).Updates(map[string]interface{}{
-			"deleted": 0,
-			"utime":   now,
-		}).Error
+		err := tx.Model(&Graph{}).Where("id = ?", id).Delete(&Graph{}).Error
 		if err != nil {
 			return err
 		}
 
-		err = tx.Model(&Edge{}).Where("graph_id = ?", id).Updates(map[string]interface{}{
-			"deleted": 0,
-			"utime":   now,
-		}).Error
-
+		err = tx.Model(&Node{}).Where("graph_id = ?", id).Delete(&Node{}).Error
 		if err != nil {
 			return err
 		}
 
-		err = tx.Model(&Node{}).Where("graph_id = ?", id).Updates(map[string]interface{}{
-			"deleted": 0,
-			"utime":   now,
-		}).Error
-
+		err = tx.Model(&Edge{}).Where("graph_id = ?", id).Delete(&Edge{}).Error
 		if err != nil {
 			return err
 		}
@@ -160,27 +131,29 @@ func (dao *GraphDAO) DeleteGraph(ctx context.Context, id int64) error {
 	})
 }
 
+func (dao *GraphDAO) GetNodes(ctx context.Context, id int64) ([]Node, error) {
+	var nodes []Node
+	err := dao.db.WithContext(ctx).Where("graph_id = ?", id).Find(&nodes).Error
+	if err != nil {
+		return nodes, err
+	}
+	return nodes, nil
+}
+
+func (dao *GraphDAO) GetEdges(ctx context.Context, id int64) ([]Edge, error) {
+	var edges []Edge
+	err := dao.db.WithContext(ctx).Where("graph_id = ?", id).Find(&edges).Error
+	if err != nil {
+		return edges, err
+	}
+	return edges, nil
+}
+
 func (dao *GraphDAO) Get(ctx context.Context, id int64) (Graph, error) {
 	var graph Graph
 	if err := dao.db.WithContext(ctx).First(&graph, id).Error; err != nil {
 		return Graph{}, err
 	}
-
-	if err := dao.db.WithContext(ctx).Where("id = ? and deleted != ?", id, 0).First(&graph).Error; err != nil {
-		return Graph{}, err
-	}
-
-	var nodes []Node
-	if err := dao.db.WithContext(ctx).Where("graph_id = ? and deleted != ?", id, 0).Find(&nodes).Error; err != nil {
-		return Graph{}, err
-	}
-	graph.Nodes = nodes
-
-	var edges []Edge
-	if err := dao.db.WithContext(ctx).Where("graph_id = ? and deleted != ?", id, 0).Find(&edges).Error; err != nil {
-		return Graph{}, err
-	}
-	graph.Edges = edges
 	return graph, nil
 }
 

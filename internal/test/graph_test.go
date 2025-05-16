@@ -258,7 +258,7 @@ func (n *GraphTestSuite) TestGetGraph() {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.before()
-			req, err := http.NewRequest(http.MethodPost, "/graph/get", bytes.NewBuffer([]byte(tc.reqBody)))
+			req, err := http.NewRequest(http.MethodPost, "/graph/detail", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
@@ -301,7 +301,7 @@ func (n *GraphTestSuite) TestDeleteNode() {
 				var node dao.Node
 				err := n.db.Where("id = ?", 1).First(&node).Error
 				require.NoError(t, err)
-				assert.Equal(t, node.Deleted, uint8(0))
+				assert.True(t, node.ID == 0)
 			},
 			reqBody: `{"id": 1}`,
 		},
@@ -347,8 +347,7 @@ func (n *GraphTestSuite) TestDeleteEdge() {
 				var edge dao.Edge
 				err := n.db.Where("id = ?", 1).First(&edge).Error
 				require.NoError(t, err)
-				assert.Equal(t, edge.Deleted, uint8(0))
-				assert.True(t, edge.Utime > 0)
+				assert.True(t, edge.ID == 0)
 			},
 			reqBody: `{"id": 1}`,
 		},
