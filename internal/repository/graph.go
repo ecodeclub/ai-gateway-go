@@ -62,7 +62,7 @@ func (n *NodeRepo) DeleteEdge(ctx context.Context, id int64) error {
 }
 
 func (n *NodeRepo) GetGraph(ctx context.Context, id int64) (domain.Graph, error) {
-	graph, err := n.graph.Get(ctx, id)
+	graph, err := n.graph.GetGraph(ctx, id)
 	if err != nil {
 		return domain.Graph{}, err
 	}

@@ -106,7 +106,7 @@ func (dao *GraphDAO) SaveGraph(ctx context.Context, graph Graph) (int64, error) 
 
 	err := dao.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		UpdateAll: true,
+		DoUpdates: clause.AssignmentColumns([]string{"utime", "metadata"}),
 	}).Create(&graph).Error
 	return graph.ID, err
 }
@@ -149,7 +149,7 @@ func (dao *GraphDAO) GetEdges(ctx context.Context, id int64) ([]Edge, error) {
 	return edges, nil
 }
 
-func (dao *GraphDAO) Get(ctx context.Context, id int64) (Graph, error) {
+func (dao *GraphDAO) GetGraph(ctx context.Context, id int64) (Graph, error) {
 	var graph Graph
 	if err := dao.db.WithContext(ctx).First(&graph, id).Error; err != nil {
 		return Graph{}, err
