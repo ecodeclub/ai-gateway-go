@@ -3,10 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/errs"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
-	"time"
 )
 
 type BizConfigRepository struct {

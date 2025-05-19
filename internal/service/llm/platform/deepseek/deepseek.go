@@ -3,10 +3,11 @@ package deepseek
 import (
 	"context"
 	"errors"
-	"github.com/cohesion-org/deepseek-go"
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"io"
 	"time"
+
+	"github.com/cohesion-org/deepseek-go"
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 
 type Handler struct {
