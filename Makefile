@@ -1,14 +1,16 @@
-.PHONY:	bench
-bench:
-	@go test -bench=. -benchmem  ./...
+#.PHONY:	bench
+#bench:
+#	@go test -bench=. -benchmem  ./...
 
-.PHONY:	ut
-ut:
-	@go test -race ./... -failfast
+#.PHONY:	ut
+#ut:
+#	@go test -race -v ./... -failfast
 
-.PHONY:	setup
-setup:
-	@sh ./script/setup.sh
+.PHONY: e2e
+e2e:
+	@docker compose -f docker-compose.yaml up -d
+	@go	test -race -v -failfast ./...
+	@docker compose -f docker-compose.yaml down
 
 .PHONY:	fmt
 fmt:
