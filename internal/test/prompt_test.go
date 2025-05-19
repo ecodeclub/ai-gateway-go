@@ -3,6 +3,11 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
@@ -16,10 +21,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 type PromptTestSuite struct {
@@ -33,7 +34,7 @@ func TestPrompt(t *testing.T) {
 }
 
 func (s *PromptTestSuite) SetupSuite() {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(127.0.0.1:13316)/ai_gateway?charset=utf8mb4&parseTime=True&loc=Local&timeout=10s"))
+	db, err := gorm.Open(mysql.Open("root:root@tcp(127.0.0.1:13316)/ai_gateway_go?charset=utf8mb4&parseTime=True&loc=Local&timeout=10s"))
 	require.NoError(s.T(), err)
 	err = dao.InitTable(db)
 	require.NoError(s.T(), err)
