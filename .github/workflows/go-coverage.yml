@@ -47,11 +47,6 @@ jobs:
 
       - name: Wait for MySQL
         run: |
-          until nc -z 127.0.0.1 13306; do
-            echo "Waiting for MySQL..."
-            sleep 2
-          done
-          
           until nc -z 127.0.0.1 13316; do
             echo "Waiting for MySQL..."
             sleep 2
