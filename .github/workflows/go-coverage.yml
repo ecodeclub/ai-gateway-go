@@ -45,20 +45,6 @@ jobs:
         run: |
           docker compose -f ./.script/docker-compose.yaml up -d
 
-      - name: Wait for MySQL
-        run: |
-          timeout=60
-          elapsed=0
-          until nc -z 127.0.0.1 13316; do
-            if [ $elapsed -ge $timeout ]; then
-            echo "MySQL 启动超时（${timeout}s）"
-            exit 1
-            fi
-            echo "Waiting for MySQL..."
-            sleep 2
-            elapsed=$((elapsed+2))
-            done
-
       - name: Build
         run: go build -v ./...
 

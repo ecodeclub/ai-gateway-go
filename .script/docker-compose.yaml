@@ -7,8 +7,13 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
     volumes:
-      #      设置初始化脚本
+      #  设置初始化脚本
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       #      注意这里我映射为了 13316 端口
       - "13316:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-proot" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
