@@ -45,6 +45,23 @@ jobs:
         run: |
           docker compose -f ./.script/docker-compose.yaml up -d
 
+      - name: Test for MySQL
+        run: |
+          # 等待MySQL服务就绪（最多尝试30次，每次等待2秒）
+          timeout=60
+          elapsed=0
+          until docker exec script-mysql8-1 mysqladmin -uroot -proot -h127.0.0.1 ping; do
+          sleep 2
+          elapsed=$((elapsed + 2))
+          if [ $elapsed -ge $timeout ]; then
+          echo "MySQL未在${timeout}秒内启动！"
+          exit 1
+          fi
+          done
+          
+          # MySQL就绪后执行命令
+          docker exec script-mysql8-1 mysql -uroot -proot -h127.0.0.1 -e "SHOW DATABASES;"
+
       - name: Build
         run: go build -v ./...
 
