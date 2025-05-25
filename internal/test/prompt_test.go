@@ -23,16 +23,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// PromptTestSuite 是一个测试套件，用于测试提示相关的所有操作
+// 包括提示的增删改查、版本管理、发布、删除版本等业务逻辑
 type PromptTestSuite struct {
 	suite.Suite
 	db     *gorm.DB
 	server *gin.Engine
 }
 
+// TestPrompt 运行关于提示操作的测试用例
 func TestPrompt(t *testing.T) {
 	suite.Run(t, new(PromptTestSuite))
 }
 
+// SetupSuite 初始化测试环境，配置数据库连接和表结构
 func (s *PromptTestSuite) SetupSuite() {
 	db, err := gorm.Open(mysql.Open("root:root@tcp(127.0.0.1:13316)/ai_gateway_go?charset=utf8mb4&parseTime=True&loc=Local&timeout=10s"))
 	require.NoError(s.T(), err)
@@ -48,6 +52,7 @@ func (s *PromptTestSuite) SetupSuite() {
 	s.server = server
 }
 
+// TearDownTest 每个测试用例执行后清理数据
 func (s *PromptTestSuite) TearDownTest() {
 	err := s.db.Exec("TRUNCATE TABLE prompts").Error
 	require.NoError(s.T(), err)
@@ -55,6 +60,7 @@ func (s *PromptTestSuite) TearDownTest() {
 	require.NoError(s.T(), err)
 }
 
+// TestAdd 测试新增提示及其初始版本的功能
 func (s *PromptTestSuite) TestAdd() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -134,6 +140,7 @@ func (s *PromptTestSuite) TestAdd() {
 	}
 }
 
+// TestGet 测试获取提示信息的功能
 func (s *PromptTestSuite) TestGet() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -221,6 +228,7 @@ func (s *PromptTestSuite) TestGet() {
 	}
 }
 
+// TestUpdatePrompt 测试更新提示基本信息的功能
 func (s *PromptTestSuite) TestUpdatePrompt() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -283,6 +291,7 @@ func (s *PromptTestSuite) TestUpdatePrompt() {
 	}
 }
 
+// TestUpdateVersion 测试更新提示版本信息的功能
 func (s *PromptTestSuite) TestUpdateVersion() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -347,6 +356,7 @@ func (s *PromptTestSuite) TestUpdateVersion() {
 	}
 }
 
+// TestDelete 测试删除整个提示（软删除）的功能
 func (s *PromptTestSuite) TestDelete() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -420,6 +430,7 @@ func (s *PromptTestSuite) TestDelete() {
 	}
 }
 
+// TestDeleteVersion 测试删除特定提示版本的功能
 func (s *PromptTestSuite) TestDeleteVersion() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -493,6 +504,7 @@ func (s *PromptTestSuite) TestDeleteVersion() {
 	}
 }
 
+// TestPublish 测试发布特定提示版本的功能
 func (s *PromptTestSuite) TestPublish() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -568,6 +580,7 @@ func (s *PromptTestSuite) TestPublish() {
 	}
 }
 
+// TestFork 测试复制（fork）提示版本的功能
 func (s *PromptTestSuite) TestFork() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
@@ -652,6 +665,8 @@ func (s *PromptTestSuite) TestFork() {
 	}
 }
 
+// Result 定义了统一的返回结果格式
+// 用于测试中解析 HTTP 响应结果
 type Result[T any] struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`

@@ -23,16 +23,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// GraphTestSuite 是一个测试套件，用于测试图相关的所有操作
+// 包括节点、边、图的保存、删除、查询等业务逻辑
 type GraphTestSuite struct {
 	suite.Suite
 	db     *gorm.DB
 	server *gin.Engine
 }
 
+// TestNode 运行关于节点操作的测试用例
 func TestNode(t *testing.T) {
 	suite.Run(t, new(GraphTestSuite))
 }
 
+// SetupSuite 初始化测试环境，配置数据库连接和表结构
 func (n *GraphTestSuite) SetupSuite() {
 	dbConfig := config.NewConfig(
 		config.WithDBName("ai_gateway_platform"),
@@ -56,6 +60,7 @@ func (n *GraphTestSuite) SetupSuite() {
 	n.server = server
 }
 
+// TearDownTest 每个测试用例执行后清理数据
 func (n *GraphTestSuite) TearDownTest() {
 	err := n.db.Exec("TRUNCATE TABLE edges").Error
 	require.NoError(n.T(), err)
@@ -65,6 +70,7 @@ func (n *GraphTestSuite) TearDownTest() {
 	require.NoError(n.T(), err)
 }
 
+// TestSaveNode 测试节点的保存功能（新增和更新）
 func (n *GraphTestSuite) TestSaveNode() {
 	t := n.T()
 
@@ -141,6 +147,7 @@ func (n *GraphTestSuite) TestSaveNode() {
 	}
 }
 
+// TestSaveEdge 测试边的保存功能（新增和更新）
 func (n *GraphTestSuite) TestSaveEdge() {
 	t := n.T()
 
@@ -222,6 +229,7 @@ func (n *GraphTestSuite) TestSaveEdge() {
 	}
 }
 
+// TestGetGraph 测试获取图信息的功能
 func (n *GraphTestSuite) TestGetGraph() {
 	t := n.T()
 
@@ -274,6 +282,7 @@ func (n *GraphTestSuite) TestGetGraph() {
 	}
 }
 
+// TestDeleteNode 测试删除节点的功能
 func (n *GraphTestSuite) TestDeleteNode() {
 	t := n.T()
 	ctrl := gomock.NewController(t)
@@ -320,6 +329,7 @@ func (n *GraphTestSuite) TestDeleteNode() {
 	}
 }
 
+// TestDeleteEdge 测试删除边的功能
 func (n *GraphTestSuite) TestDeleteEdge() {
 	t := n.T()
 	ctrl := gomock.NewController(t)

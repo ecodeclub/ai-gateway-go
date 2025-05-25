@@ -21,6 +21,8 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// LLMRequest is a request message for invoking LLM services.
+// Contains optional id and text parameters for processing.
 type LLMRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -29,6 +31,8 @@ type LLMRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
+// Reset resets the LLMRequest to its zero value state.
+// This clears all fields and resets internal protobuf state.
 func (x *LLMRequest) Reset() {
 	*x = LLMRequest{}
 	mi := &file_ai_v1_ai_proto_msgTypes[0]
@@ -36,12 +40,17 @@ func (x *LLMRequest) Reset() {
 	ms.StoreMessageInfo(mi)
 }
 
+// String returns the string representation of the LLMRequest message.
+// Implements the Stringer interface for LLMRequest.
 func (x *LLMRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// ProtoMessage marks LLMRequest as implementing the protobuf Message interface.
 func (*LLMRequest) ProtoMessage() {}
 
+// ProtoReflect returns the protobuf reflection information for this message.
+// Provides access to the message descriptor and implementation details.
 func (x *LLMRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_ai_v1_ai_proto_msgTypes[0]
 	if x != nil {
@@ -54,11 +63,13 @@ func (x *LLMRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LLMRequest.ProtoReflect.Descriptor instead.
+// Descriptor returns the raw protobuf descriptor for this message type.
+// Deprecated: Use ProtoReflect.Descriptor instead.
 func (*LLMRequest) Descriptor() ([]byte, []int) {
 	return file_ai_v1_ai_proto_rawDescGZIP(), []int{0}
 }
 
+// GetId returns the Id field value, or an empty string if the field is not set.
 func (x *LLMRequest) GetId() string {
 	if x != nil {
 		return x.Id
@@ -66,6 +77,7 @@ func (x *LLMRequest) GetId() string {
 	return ""
 }
 
+// GetText returns the Text field value, or an empty string if the field is not set.
 func (x *LLMRequest) GetText() string {
 	if x != nil {
 		return x.Text
@@ -73,6 +85,8 @@ func (x *LLMRequest) GetText() string {
 	return ""
 }
 
+// StreamEvent represents a streaming event in the LLM service communication.
+// Contains status flags and content data for streaming responses.
 type StreamEvent struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Final            bool                   `protobuf:"varint,1,opt,name=final,proto3" json:"final,omitempty"`
@@ -83,6 +97,8 @@ type StreamEvent struct {
 	sizeCache        protoimpl.SizeCache
 }
 
+// Reset resets the StreamEvent to its zero value state.
+// This clears all fields and resets internal protobuf state.
 func (x *StreamEvent) Reset() {
 	*x = StreamEvent{}
 	mi := &file_ai_v1_ai_proto_msgTypes[1]
@@ -90,12 +106,17 @@ func (x *StreamEvent) Reset() {
 	ms.StoreMessageInfo(mi)
 }
 
+// String returns the string representation of the StreamEvent message.
+// Implements the Stringer interface for StreamEvent.
 func (x *StreamEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// ProtoMessage marks StreamEvent as implementing the protobuf Message interface.
 func (*StreamEvent) ProtoMessage() {}
 
+// ProtoReflect returns the protobuf reflection information for this message.
+// Provides access to the message descriptor and implementation details.
 func (x *StreamEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_ai_v1_ai_proto_msgTypes[1]
 	if x != nil {
@@ -108,11 +129,13 @@ func (x *StreamEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamEvent.ProtoReflect.Descriptor instead.
+// Descriptor returns the raw protobuf descriptor for this message type.
+// Deprecated: Use ProtoReflect.Descriptor instead.
 func (*StreamEvent) Descriptor() ([]byte, []int) {
 	return file_ai_v1_ai_proto_rawDescGZIP(), []int{1}
 }
 
+// GetFinal returns whether this stream event is the final message in the stream.
 func (x *StreamEvent) GetFinal() bool {
 	if x != nil {
 		return x.Final
@@ -120,6 +143,8 @@ func (x *StreamEvent) GetFinal() bool {
 	return false
 }
 
+// GetReasoningContent returns the reasoning content from the stream event,
+// or an empty string if the field is not set.
 func (x *StreamEvent) GetReasoningContent() string {
 	if x != nil {
 		return x.ReasoningContent
@@ -127,6 +152,8 @@ func (x *StreamEvent) GetReasoningContent() string {
 	return ""
 }
 
+// GetContent returns the content from the stream event,
+// or an empty string if the field is not set.
 func (x *StreamEvent) GetContent() string {
 	if x != nil {
 		return x.Content
@@ -134,6 +161,8 @@ func (x *StreamEvent) GetContent() string {
 	return ""
 }
 
+// GetErr returns any error message associated with the stream event,
+// or an empty string if no error occurred.
 func (x *StreamEvent) GetErr() string {
 	if x != nil {
 		return x.Err
@@ -141,6 +170,8 @@ func (x *StreamEvent) GetErr() string {
 	return ""
 }
 
+// LLMResponse represents a complete response from the LLM service.
+// Contains processed content and reasoning information.
 type LLMResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	ReasoningContent string                 `protobuf:"bytes,1,opt,name=reasoningContent,proto3" json:"reasoningContent,omitempty"`
@@ -149,6 +180,8 @@ type LLMResponse struct {
 	sizeCache        protoimpl.SizeCache
 }
 
+// Reset resets the LLMResponse to its zero value state.
+// This clears all fields and resets internal protobuf state.
 func (x *LLMResponse) Reset() {
 	*x = LLMResponse{}
 	mi := &file_ai_v1_ai_proto_msgTypes[2]
@@ -156,12 +189,17 @@ func (x *LLMResponse) Reset() {
 	ms.StoreMessageInfo(mi)
 }
 
+// String returns the string representation of the LLMResponse message.
+// Implements the Stringer interface for LLMResponse.
 func (x *LLMResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
+// ProtoMessage marks LLMResponse as implementing the protobuf Message interface.
 func (*LLMResponse) ProtoMessage() {}
 
+// ProtoReflect returns the protobuf reflection information for this message.
+// Provides access to the message descriptor and implementation details.
 func (x *LLMResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_ai_v1_ai_proto_msgTypes[2]
 	if x != nil {
@@ -174,11 +212,14 @@ func (x *LLMResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LLMResponse.ProtoReflect.Descriptor instead.
+// Descriptor returns the raw protobuf descriptor for this message type.
+// Deprecated: Use ProtoReflect.Descriptor instead.
 func (*LLMResponse) Descriptor() ([]byte, []int) {
 	return file_ai_v1_ai_proto_rawDescGZIP(), []int{2}
 }
 
+// GetReasoningContent returns the reasoning content from the response,
+// or an empty string if the field is not set.
 func (x *LLMResponse) GetReasoningContent() string {
 	if x != nil {
 		return x.ReasoningContent
@@ -186,6 +227,8 @@ func (x *LLMResponse) GetReasoningContent() string {
 	return ""
 }
 
+// GetContent returns the content from the response,
+// or an empty string if the field is not set.
 func (x *LLMResponse) GetContent() string {
 	if x != nil {
 		return x.Content
@@ -220,6 +263,8 @@ var (
 	file_ai_v1_ai_proto_rawDescData []byte
 )
 
+// file_ai_v1_ai_proto_rawDescGZIP returns the GZIP-compressed raw descriptor
+// for the ai/v1/ai.proto file. This contains the complete protobuf schema.
 func file_ai_v1_ai_proto_rawDescGZIP() []byte {
 	file_ai_v1_ai_proto_rawDescOnce.Do(func() {
 		file_ai_v1_ai_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_ai_v1_ai_proto_rawDesc), len(file_ai_v1_ai_proto_rawDesc)))
@@ -245,7 +290,12 @@ var file_ai_v1_ai_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
+// init initializes the file descriptor for ai/v1/ai.proto.
+// This sets up the protobuf metadata for all messages defined in this file.
 func init() { file_ai_v1_ai_proto_init() }
+
+// file_ai_v1_ai_proto_init performs the actual initialization of the file descriptor.
+// It creates the type information for all messages and services defined in ai/v1/ai.proto.
 func file_ai_v1_ai_proto_init() {
 	if File_ai_v1_ai_proto != nil {
 		return

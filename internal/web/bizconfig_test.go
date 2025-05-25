@@ -17,6 +17,8 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// fakeAuthMiddleware 创建一个假的身份验证中间件
+// 用于在测试中模拟 JWT 认证流程
 func fakeAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 获取JWT Bearer令牌
@@ -30,6 +32,8 @@ func fakeAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// generateJWT 生成一个用于测试的 JWT 令牌
+// secret 是签名密钥
 func generateJWT(secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"iat": time.Now().Unix(),
@@ -39,6 +43,8 @@ func generateJWT(secret string) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
+// TestBizConfigHandler_Create 是针对业务配置创建功能的测试用例
+// 检查创建业务配置时的正常行为以及返回结果是否符合预期
 func TestBizConfigHandler_Create(t *testing.T) {
 	const createUrl = "/api/v1/biz-configs/create"
 	secret := "VGhpcyBpcyBhIHNlY3JldCB0aGF0IG5vYm9keSBjYW4gZ3Vlc3M=" // 你的 Secret

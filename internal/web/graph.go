@@ -11,14 +11,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// GraphHandler 处理与图相关的 HTTP 请求
+// 提供保存、删除、查询图信息的功能
 type GraphHandler struct {
-	svc *service.NodeService
+	svc *service.NodeService // 图相关业务逻辑接口
 }
 
+// NewGraphHandler 创建一个新的 GraphHandler 实例
 func NewGraphHandler(nodeSvc *service.NodeService) *GraphHandler {
 	return &GraphHandler{svc: nodeSvc}
 }
 
+// PrivateRoutes 注册私有路由（需要身份验证）
 func (h *GraphHandler) PrivateRoutes(engine *gin.Engine) {
 	graph := engine.Group("/graph")
 	graph.POST("/save", ginx.BS[SaveGraphReq](h.SaveGraph))
@@ -34,10 +38,12 @@ func (h *GraphHandler) PrivateRoutes(engine *gin.Engine) {
 	edge.POST("/delete", ginx.BS[DeleteReq](h.DeleteEdge))
 }
 
+// PublicRoutes 注册公共路由（不需要身份验证）
 func (h *GraphHandler) PublicRoutes(engine *gin.Engine) {
 
 }
 
+// GetGraph 处理获取图信息的 HTTP 请求
 func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, sess session.Session) (ginx.Result, error) {
 	graph, err := h.svc.GetGraph(ctx, req.ID)
 	if err != nil {
@@ -47,6 +53,7 @@ func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, sess session.Sess
 	return ginx.Result{Msg: "OK", Data: newGetNodeVO(graph)}, err
 }
 
+// SaveGraph 处理保存图信息的 HTTP 请求
 func (h *GraphHandler) SaveGraph(ctx *ginx.Context, req SaveGraphReq, sess session.Session) (ginx.Result, error) {
 	graph := domain.Graph{
 		ID: req.ID,
@@ -61,6 +68,7 @@ func (h *GraphHandler) SaveGraph(ctx *ginx.Context, req SaveGraphReq, sess sessi
 	return ginx.Result{Msg: "OK", Data: id}, nil
 }
 
+// SaveNode 处理保存节点信息的 HTTP 请求
 func (h *GraphHandler) SaveNode(ctx *ginx.Context, req Node, sess session.Session) (ginx.Result, error) {
 	node := domain.Node{
 		ID:       req.ID,
@@ -78,6 +86,7 @@ func (h *GraphHandler) SaveNode(ctx *ginx.Context, req Node, sess session.Sessio
 	return ginx.Result{Data: id}, nil
 }
 
+// SaveEdge 处理保存边信息的 HTTP 请求
 func (h *GraphHandler) SaveEdge(ctx *ginx.Context, req Edge, sess session.Session) (ginx.Result, error) {
 	edge := domain.Edge{
 		ID:       req.ID,
@@ -98,6 +107,7 @@ func (h *GraphHandler) SaveEdge(ctx *ginx.Context, req Edge, sess session.Sessio
 	}, nil
 }
 
+// DeleteNode 处理删除节点的 HTTP 请求
 func (h *GraphHandler) DeleteNode(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
 	id := req.ID
 
@@ -111,6 +121,7 @@ func (h *GraphHandler) DeleteNode(ctx *ginx.Context, req DeleteReq, sess session
 	}, nil
 }
 
+// DeleteEdge 处理删除边的 HTTP 请求
 func (h *GraphHandler) DeleteEdge(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
 	id := req.ID
 	err := h.svc.DeleteEdge(ctx, id)
@@ -123,6 +134,7 @@ func (h *GraphHandler) DeleteEdge(ctx *ginx.Context, req DeleteReq, sess session
 	}, nil
 }
 
+// DeleteGraph 处理删除整个图的 HTTP 请求
 func (h *GraphHandler) DeleteGraph(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
 	id := req.ID
 	err := h.svc.DeleteGraph(ctx, id)

@@ -9,14 +9,22 @@ import (
 	"time"
 )
 
+// Handler 是一个结构体，包含一个 deepseek.Client 的指针
 type Handler struct {
 	client *deepseek.Client
 }
 
+// NewHandler 创建一个新的 Handler 实例
+// 参数 client 是 *deepseek.Client 类型，用于与 DeepSeek API 通信
+// 返回值是 *Handler 类型
 func NewHandler(client *deepseek.Client) *Handler {
 	return &Handler{client: client}
 }
 
+// Handle 处理普通的 LLM 请求
+// 参数 ctx 是上下文，用于控制请求的生命周期
+// 参数 req 是 domain.LLMRequest 类型，表示客户端的请求
+// 返回值是 domain.LLMResponse 类型，表示处理结果，以及可能发生的错误
 func (h *Handler) Handle(ctx context.Context, req domain.LLMRequest) (domain.LLMResponse, error) {
 	request := &deepseek.ChatCompletionRequest{
 		Model: deepseek.DeepSeekChat,
@@ -34,6 +42,10 @@ func (h *Handler) Handle(ctx context.Context, req domain.LLMRequest) (domain.LLM
 	return domain.LLMResponse{Content: response.Choices[0].Message.Content}, nil
 }
 
+// StreamHandle 处理流式 LLM 请求
+// 参数 ctx 是上下文，用于控制请求的生命周期
+// 参数 req 是 domain.LLMRequest 类型，表示客户端的请求
+// 返回值是一个 channel，用于返回 stream 事件，以及可能发生的错误
 func (h *Handler) StreamHandle(ctx context.Context, req domain.LLMRequest) (chan domain.StreamEvent, error) {
 	request := deepseek.StreamChatCompletionRequest{
 		Model: deepseek.DeepSeekChat,
@@ -67,6 +79,9 @@ func (h *Handler) StreamHandle(ctx context.Context, req domain.LLMRequest) (chan
 	return events, nil
 }
 
+// recv 方法负责接收并处理来自 DeepSeek 流式响应的数据
+// 参数 eventCh 是用于发送事件的 channel
+// 参数 stream 是 deepseek.ChatCompletionStream 类型，表示 DeepSeek 的流式响应
 func (h *Handler) recv(eventCh chan domain.StreamEvent, stream deepseek.ChatCompletionStream) {
 	for {
 		chunk, err := stream.Recv()

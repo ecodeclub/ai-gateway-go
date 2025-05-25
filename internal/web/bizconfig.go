@@ -11,14 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// BizConfigHandler 处理与业务配置相关的 HTTP 请求
+// 提供创建、获取、更新和删除业务配置的功能
 type BizConfigHandler struct {
-	svc service.BizConfigService
+	svc service.BizConfigService // 业务逻辑层接口
 }
 
+// NewBizConfigHandler 创建一个新的 BizConfigHandler 实例
 func NewBizConfigHandler(svc service.BizConfigService) *BizConfigHandler {
 	return &BizConfigHandler{svc: svc}
 }
 
+// RegisterRoutes 注册业务配置相关的路由
 func (h *BizConfigHandler) RegisterRoutes(server *gin.Engine) {
 	bg := server.Group("/api/v1/biz-configs")
 
@@ -28,6 +32,7 @@ func (h *BizConfigHandler) RegisterRoutes(server *gin.Engine) {
 	bg.POST("/delete", ginx.BS[DeleteBizConfigReq](h.DeleteBizConfig))
 }
 
+// CreateBizConfigReq 定义创建业务配置的请求结构体
 type CreateBizConfigReq struct {
 	ID        int64  `json:"id"`
 	OwnerId   int64  `json:"owner_id"`
@@ -35,6 +40,7 @@ type CreateBizConfigReq struct {
 	Config    string `json:"config"`
 }
 
+// CreateBizConfig 处理创建业务配置的 HTTP 请求
 func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfigReq, sess session.Session) (ginx.Result, error) {
 	config := domain.BizConfig{
 		ID:        req.ID,
@@ -57,10 +63,12 @@ func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfi
 	}, nil
 }
 
+// GetBizConfigReq 定义获取业务配置的请求结构体
 type GetBizConfigReq struct {
 	ID int64 `json:"id"`
 }
 
+// GetBizConfig 处理获取业务配置的 HTTP 请求
 func (h *BizConfigHandler) GetBizConfig(ctx *ginx.Context, req GetBizConfigReq, sess session.Session) (ginx.Result, error) {
 	config, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err == errs.ErrBizConfigNotFound {
@@ -76,6 +84,7 @@ func (h *BizConfigHandler) GetBizConfig(ctx *ginx.Context, req GetBizConfigReq, 
 	}, nil
 }
 
+// UpdateBizConfigReq 定义更新业务配置的请求结构体
 type UpdateBizConfigReq struct {
 	ID        int64  `json:"id"`
 	OwnerId   int64  `json:"owner_id"`
@@ -83,6 +92,7 @@ type UpdateBizConfigReq struct {
 	Config    string `json:"config"`
 }
 
+// UpdateBizConfig 处理更新业务配置的 HTTP 请求
 func (h *BizConfigHandler) UpdateBizConfig(ctx *ginx.Context, req UpdateBizConfigReq, sess session.Session) (ginx.Result, error) {
 	existing, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err == errs.ErrBizConfigNotFound {
@@ -112,10 +122,12 @@ func (h *BizConfigHandler) UpdateBizConfig(ctx *ginx.Context, req UpdateBizConfi
 	}, nil
 }
 
+// DeleteBizConfigReq 定义删除业务配置的请求结构体
 type DeleteBizConfigReq struct {
 	ID int64 `json:"id"`
 }
 
+// DeleteBizConfig 处理删除业务配置的 HTTP 请求
 func (h *BizConfigHandler) DeleteBizConfig(ctx *ginx.Context, req DeleteBizConfigReq, sess session.Session) (ginx.Result, error) {
 	idStr := strconv.FormatInt(req.ID, 10)
 	if err := h.svc.Delete(ctx.Request.Context(), idStr); err != nil {
@@ -129,6 +141,7 @@ func (h *BizConfigHandler) DeleteBizConfig(ctx *ginx.Context, req DeleteBizConfi
 	}, nil
 }
 
+// toResponse 将领域模型转换为响应格式
 func (h *BizConfigHandler) toResponse(config domain.BizConfig) map[string]any {
 	return map[string]any{
 		"id":         config.ID,

@@ -14,14 +14,19 @@ import (
 	"testing"
 )
 
+// ServerTestSuite 是一个测试套件，用于测试服务器端流式处理和调用功能
+// 包含了流式事件和普通调用的测试用例
 type ServerTestSuite struct {
 	suite.Suite
 }
 
+// TestServer 运行关于服务器端流式处理和调用的测试用例
 func TestServer(t *testing.T) {
 	suite.Run(t, &ServerTestSuite{})
 }
 
+// TestStream 测试流式处理功能
+// 验证服务器能否正确处理并返回多个流式事件
 func (s *ServerTestSuite) TestStream() {
 	t := s.T()
 
@@ -63,6 +68,8 @@ func (s *ServerTestSuite) TestStream() {
 	}
 }
 
+// TestInvoke 测试普通调用功能
+// 验证服务器能否正确处理单次请求并返回结果
 func (s *ServerTestSuite) TestInvoke() {
 	t := s.T()
 

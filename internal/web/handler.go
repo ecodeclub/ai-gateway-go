@@ -8,14 +8,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Handler 处理与提示相关的 HTTP 请求
+// 提供添加、获取、更新、删除提示及其版本管理的功能
 type Handler struct {
-	svc *service.PromptService
+	svc *service.PromptService // 提示相关业务逻辑接口
 }
 
+// NewHandler 创建一个新的 Handler 实例
 func NewHandler(svc *service.PromptService) *Handler {
 	return &Handler{svc: svc}
 }
 
+// PrivateRoutes 注册私有路由（需要身份验证）
 func (h *Handler) PrivateRoutes(server *gin.Engine) {
 	prompt := server.Group("/prompt")
 	prompt.POST("/add", ginx.BS(h.Add))
@@ -28,8 +32,10 @@ func (h *Handler) PrivateRoutes(server *gin.Engine) {
 	prompt.POST("/fork", ginx.B(h.Fork))
 }
 
+// PublicRoutes 注册公共路由（不需要身份验证）
 func (h *Handler) PublicRoutes(server *gin.Engine) {}
 
+// Add 处理添加新提示及其初始版本的 HTTP 请求
 func (h *Handler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
 	// 这里我假设 owner_type 也存储在 jwt token 里
@@ -59,6 +65,7 @@ func (h *Handler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx
 	}, nil
 }
 
+// Get 处理获取提示信息的 HTTP 请求
 func (h *Handler) Get(ctx *ginx.Context) (ginx.Result, error) {
 	id, err := ctx.Param("id").AsInt64()
 	if err != nil {
@@ -73,7 +80,7 @@ func (h *Handler) Get(ctx *ginx.Context) (ginx.Result, error) {
 	}, nil
 }
 
-// Delete 删除整个 prompt
+// Delete 处理删除整个提示（软删除）的 HTTP 请求
 func (h *Handler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) {
 	err := h.svc.Delete(ctx, req.ID)
 	if err != nil {
@@ -84,6 +91,7 @@ func (h *Handler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) 
 	}, nil
 }
 
+// DeleteVersion 处理删除特定提示版本的 HTTP 请求
 func (h *Handler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.Result, error) {
 	err := h.svc.DeleteVersion(ctx, req.VersionID)
 	if err != nil {
@@ -94,7 +102,7 @@ func (h *Handler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.R
 	}, nil
 }
 
-// UpdatePrompt 更新 prompt 的基本信息
+// UpdatePrompt 处理更新提示基本信息的 HTTP 请求
 func (h *Handler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Result, error) {
 	prompt := domain.Prompt{
 		ID:          req.ID,
@@ -110,6 +118,7 @@ func (h *Handler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Res
 	}, nil
 }
 
+// UpdateVersion 处理更新提示版本信息的 HTTP 请求
 func (h *Handler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.Result, error) {
 	version := domain.PromptVersion{
 		ID:            req.VersionID,
@@ -128,6 +137,7 @@ func (h *Handler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.R
 	}, nil
 }
 
+// Publish 处理发布特定提示版本的 HTTP 请求
 func (h *Handler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error) {
 	err := h.svc.Publish(ctx, req.VersionID, req.Label)
 	if err != nil {
@@ -138,7 +148,7 @@ func (h *Handler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error
 	}, nil
 }
 
-// Fork 新增一个版本
+// Fork 处理复制（fork）提示版本的 HTTP 请求
 func (h *Handler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Result, error) {
 	err := h.svc.Fork(ctx, req.VersionID)
 	if err != nil {

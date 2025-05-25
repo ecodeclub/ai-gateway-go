@@ -1,25 +1,36 @@
+// 指定proto3语法版本
 syntax = "proto3";
+
+// 定义包名
 package ai.v1;
+
+// 指定生成的Go包路径和名称
 option go_package = "ai/v1;aiv1";
 
+// AI服务定义
 service AIService {
+  // 同步调用接口
   rpc Invoke(LLMRequest) returns (LLMResponse);
+  // 流式调用接口
   rpc Stream(LLMRequest) returns (stream StreamEvent);
 }
 
+// LLM请求消息
 message LLMRequest {
-  string id = 1;
-  string text = 2;
+  string id = 1;      // 请求ID
+  string text = 2;    // 输入文本
 }
 
+// 流式事件消息
 message StreamEvent {
-  bool final = 1;
-  string reasoningContent = 2;
-  string content = 3;
-  string err = 4;
+  bool final = 1;             // 是否为最终事件
+  string reasoningContent = 2; // 推理过程内容
+  string content = 3;         // 输出内容
+  string err = 4;             // 错误信息
 }
 
+// LLM响应消息
 message LLMResponse {
-  string reasoningContent = 1;
-  string content = 2;
+  string reasoningContent = 1; // 推理过程内容
+  string content = 2;         // 输出内容
 }

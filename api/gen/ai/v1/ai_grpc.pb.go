@@ -27,7 +27,24 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AIServiceClient interface {
+	// Invoke 方法用于执行一个同步的gRPC调用。
+	// 参数:
+	//   - ctx: 上下文对象，用于控制请求的生命周期
+	//   - in: 请求参数，类型为LLMRequest
+	//   - opts: 可选的调用选项，类型为grpc.CallOption
+	// 返回值:
+	//   - *LLMResponse: 响应结果，类型为LLMResponse的指针
+	//   - error: 如果调用过程中发生错误，返回相应的错误信息
 	Invoke(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (*LLMResponse, error)
+
+	// Stream 方法用于创建一个服务器流式gRPC连接。
+	// 参数:
+	//   - ctx: 上下文对象，用于控制请求的生命周期
+	//   - in: 请求参数，类型为LLMRequest
+	//   - opts: 可选的调用选项，类型为grpc.CallOption
+	// 返回值:
+	//   - grpc.ServerStreamingClient[StreamEvent]: 服务器流式客户端接口
+	//   - error: 如果创建流式连接过程中发生错误，返回相应的错误信息
 	Stream(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 }
 
@@ -35,10 +52,25 @@ type aIServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
+// NewAIServiceClient 创建一个新的AIService客户端实例。
+// 参数:
+//   - cc: 客户端连接接口，类型为grpc.ClientConnInterface
+//
+// 返回值:
+//   - AIServiceClient: 返回一个实现了AIServiceClient接口的实例
 func NewAIServiceClient(cc grpc.ClientConnInterface) AIServiceClient {
 	return &aIServiceClient{cc}
 }
 
+// Invoke 方法用于执行一个同步的gRPC调用。
+// 参数:
+//   - ctx: 上下文对象，用于控制请求的生命周期
+//   - in: 请求参数，类型为LLMRequest
+//   - opts: 可选的调用选项，类型为grpc.CallOption
+//
+// 返回值:
+//   - *LLMResponse: 响应结果，类型为LLMResponse的指针
+//   - error: 如果调用过程中发生错误，返回相应的错误信息
 func (c *aIServiceClient) Invoke(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (*LLMResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LLMResponse)
@@ -77,21 +109,39 @@ type AIServiceServer interface {
 	mustEmbedUnimplementedAIServiceServer()
 }
 
-// UnimplementedAIServiceServer must be embedded to have
-// forward compatible implementations.
+// UnimplementedAIServiceServer 必须被嵌入以实现向前兼容的接口。
 //
-// NOTE: this should be embedded by value instead of pointer to avoid a nil
-// pointer dereference when methods are called.
+// NOTE: 这个结构体应该通过值而不是指针来嵌入，以避免在方法调用时出现nil指针解引用。
 type UnimplementedAIServiceServer struct{}
 
+// Invoke 方法返回一个未实现的错误。
+// 参数:
+//   - context.Context: 上下文对象，用于控制请求的生命周期
+//   - *LLMRequest: 请求参数，类型为LLMRequest
+//
+// 返回值:
+//   - *LLMResponse: 响应结果，类型为LLMResponse的指针
+//   - error: 返回一个表示该方法未实现的错误信息
 func (UnimplementedAIServiceServer) Invoke(context.Context, *LLMRequest) (*LLMResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Invoke not implemented")
 }
+
+// Stream 方法返回一个未实现的错误。
+// 参数:
+//   - *LLMRequest: 请求参数，类型为LLMRequest
+//   - grpc.ServerStreamingServer[StreamEvent]: 服务器流式接口
+//
+// 返回值:
+//   - error: 返回一个表示该方法未实现的错误信息
 func (UnimplementedAIServiceServer) Stream(*LLMRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
 }
+
+// mustEmbedUnimplementedAIServiceServer 方法用于确保UnimplementedAIServiceServer被正确嵌入。
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
-func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
+
+// testEmbeddedByValue 方法用于测试UnimplementedAIServiceServer是否通过值嵌入。
+func (UnimplementedAIServiceServer) testEmbeddedByValue() {}
 
 // UnsafeAIServiceServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to AIServiceServer will
@@ -100,6 +150,11 @@ type UnsafeAIServiceServer interface {
 	mustEmbedUnimplementedAIServiceServer()
 }
 
+// RegisterAIServiceServer 注册AIService服务到gRPC服务注册器。
+//
+// 参数:
+//   - s: gRPC服务注册器接口
+//   - srv: AIService服务的实现
 func RegisterAIServiceServer(s grpc.ServiceRegistrar, srv AIServiceServer) {
 	// If the following call pancis, it indicates UnimplementedAIServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
@@ -111,6 +166,17 @@ func RegisterAIServiceServer(s grpc.ServiceRegistrar, srv AIServiceServer) {
 	s.RegisterService(&AIService_ServiceDesc, srv)
 }
 
+// _AIService_Invoke_Handler 是Invoke方法的gRPC处理程序。
+//
+// 参数:
+//   - srv: 服务实例
+//   - ctx: 上下文对象，用于控制请求的生命周期
+//   - dec: 解码函数，用于将请求消息解码为具体类型
+//   - interceptor: 拦截器，用于处理Unary RPC的拦截逻辑
+//
+// 返回值:
+//   - interface{}: 处理结果
+//   - error: 如果处理过程中发生错误，返回相应的错误信息
 func _AIService_Invoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LLMRequest)
 	if err := dec(in); err != nil {
@@ -129,6 +195,14 @@ func _AIService_Invoke_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+// _AIService_Stream_Handler 是Stream方法的gRPC处理程序。
+//
+// 参数:
+//   - srv: 服务实例
+//   - stream: gRPC服务器流接口
+//
+// 返回值:
+//   - error: 如果处理过程中发生错误，返回相应的错误信息
 func _AIService_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(LLMRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -140,9 +214,9 @@ func _AIService_Stream_Handler(srv interface{}, stream grpc.ServerStream) error 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AIService_StreamServer = grpc.ServerStreamingServer[StreamEvent]
 
-// AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
+// AIService_ServiceDesc 是AIService服务的gRPC服务描述符。
+//
+// 这个描述符用于将服务注册到gRPC服务器，不应该被直接检查或修改。
 var AIService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "ai.v1.AIService",
 	HandlerType: (*AIServiceServer)(nil),

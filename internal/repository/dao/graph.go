@@ -8,39 +8,45 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// Node 结构体定义
+// 表示图中的一个节点
 type Node struct {
-	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Type     string `gorm:"column:type"`
-	GraphID  int64  `gorm:"column:graph_id;index"`
-	Status   string `gorm:"column:status"`
-	Metadata string `gorm:"column:metadata"`
-	Ctime    int64  `gorm:"column:ctime"`
-	Utime    int64  `gorm:"column:utime"`
+	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"` // 节点的唯一标识符
+	Type     string `gorm:"column:type"`                        // 节点类型
+	GraphID  int64  `gorm:"column:graph_id;index"`              // 所属图的ID
+	Status   string `gorm:"column:status"`                      // 节点状态
+	Metadata string `gorm:"column:metadata"`                    // 节点元数据，存储为JSON格式字符串
+	Ctime    int64  `gorm:"column:ctime"`                       // 创建时间戳（毫秒）
+	Utime    int64  `gorm:"column:utime"`                       // 最后更新时间戳（毫秒）
 }
 
 func (Node) TableName() string {
 	return "nodes"
 }
 
+// Edge 结构体定义
+// 表示图中的一个边（连接）
 type Edge struct {
-	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	GraphID  int64  `gorm:"column:graph_id;index"`
-	SourceID int64  `gorm:"column:source_id;index:idx_source_target"`
-	TargetID int64  `gorm:"column:target_id;index:idx_source_target"`
-	Metadata string `gorm:"column:metadata;"`
-	Ctime    int64  `gorm:"column:ctime"`
-	Utime    int64  `gorm:"column:utime"`
+	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`       // 边的唯一标识符
+	GraphID  int64  `gorm:"column:graph_id;index"`                    // 所属图的ID
+	SourceID int64  `gorm:"column:source_id;index:idx_source_target"` // 源节点ID
+	TargetID int64  `gorm:"column:target_id;index:idx_source_target"` // 目标节点ID
+	Metadata string `gorm:"column:metadata;"`                         // 边的元数据，存储为JSON格式字符串
+	Ctime    int64  `gorm:"column:ctime"`                             // 创建时间戳（毫秒）
+	Utime    int64  `gorm:"column:utime"`                             // 最后更新时间戳（毫秒）
 }
 
 func (Edge) TableName() string {
 	return "edges"
 }
 
+// Graph 结构体定义
+// 表示一个完整的图结构
 type Graph struct {
-	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Metadata string `gorm:"column:metadata"`
-	Ctime    int64  `gorm:"column:ctime"`
-	Utime    int64  `gorm:"column:utime"`
+	ID       int64  `gorm:"column:id;primaryKey;autoIncrement"` // 图的唯一标识符
+	Metadata string `gorm:"column:metadata"`                    // 图的元数据，存储为JSON格式字符串
+	Ctime    int64  `gorm:"column:ctime"`                       // 创建时间戳（毫秒）
+	Utime    int64  `gorm:"column:utime"`                       // 最后更新时间戳（毫秒）
 }
 
 func (Graph) TableName() string {
