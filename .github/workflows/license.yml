@@ -21,7 +21,7 @@ on:
       - '.docs/**'
       - '**.md'
       - '*.pb.go'
-      - '*mock_*.go'
+      - '*mock*.go'
 
 jobs:
   check-license-lines:
