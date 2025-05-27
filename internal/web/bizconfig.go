@@ -1,6 +1,21 @@
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package web
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/ecodeclub/ai-gateway-go/errs"
@@ -35,7 +50,7 @@ type CreateBizConfigReq struct {
 	Config    string `json:"config"`
 }
 
-func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfigReq, sess session.Session) (ginx.Result, error) {
+func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfigReq, _ session.Session) (ginx.Result, error) {
 	config := domain.BizConfig{
 		ID:        req.ID,
 		OwnerID:   req.OwnerId,
@@ -61,7 +76,7 @@ type GetBizConfigReq struct {
 	ID int64 `json:"id"`
 }
 
-func (h *BizConfigHandler) GetBizConfig(ctx *ginx.Context, req GetBizConfigReq, sess session.Session) (ginx.Result, error) {
+func (h *BizConfigHandler) GetBizConfig(ctx *ginx.Context, req GetBizConfigReq, _ session.Session) (ginx.Result, error) {
 	config, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
 	if err == errs.ErrBizConfigNotFound {
 		return ginx.Result{Code: 404, Msg: "biz config not found"}, nil
@@ -83,9 +98,9 @@ type UpdateBizConfigReq struct {
 	Config    string `json:"config"`
 }
 
-func (h *BizConfigHandler) UpdateBizConfig(ctx *ginx.Context, req UpdateBizConfigReq, sess session.Session) (ginx.Result, error) {
+func (h *BizConfigHandler) UpdateBizConfig(ctx *ginx.Context, req UpdateBizConfigReq, _ session.Session) (ginx.Result, error) {
 	existing, err := h.svc.GetByID(ctx.Request.Context(), req.ID)
-	if err == errs.ErrBizConfigNotFound {
+	if errors.Is(err, errs.ErrBizConfigNotFound) {
 		return ginx.Result{Code: 404, Msg: "biz config not found"}, nil
 	} else if err != nil {
 		return ginx.Result{Code: 500, Msg: "failed to fetch biz config"}, err
@@ -116,7 +131,7 @@ type DeleteBizConfigReq struct {
 	ID int64 `json:"id"`
 }
 
-func (h *BizConfigHandler) DeleteBizConfig(ctx *ginx.Context, req DeleteBizConfigReq, sess session.Session) (ginx.Result, error) {
+func (h *BizConfigHandler) DeleteBizConfig(ctx *ginx.Context, req DeleteBizConfigReq, _ session.Session) (ginx.Result, error) {
 	idStr := strconv.FormatInt(req.ID, 10)
 	if err := h.svc.Delete(ctx.Request.Context(), idStr); err != nil {
 		return ginx.Result{Code: 500, Msg: "failed to delete biz config"}, err

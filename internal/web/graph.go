@@ -1,3 +1,17 @@
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package web
 
 import (
@@ -34,11 +48,11 @@ func (h *GraphHandler) PrivateRoutes(engine *gin.Engine) {
 	edge.POST("/delete", ginx.BS[DeleteReq](h.DeleteEdge))
 }
 
-func (h *GraphHandler) PublicRoutes(engine *gin.Engine) {
+func (h *GraphHandler) PublicRoutes(_ *gin.Engine) {
 
 }
 
-func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, _ session.Session) (ginx.Result, error) {
 	graph, err := h.svc.GetGraph(ctx, req.ID)
 	if err != nil {
 		elog.Error("获取graph 失败", elog.Int64("ID", req.ID), elog.Any("err", err))
@@ -47,7 +61,7 @@ func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, sess session.Sess
 	return ginx.Result{Msg: "OK", Data: newGetNodeVO(graph)}, err
 }
 
-func (h *GraphHandler) SaveGraph(ctx *ginx.Context, req SaveGraphReq, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) SaveGraph(ctx *ginx.Context, req SaveGraphReq, _ session.Session) (ginx.Result, error) {
 	graph := domain.Graph{
 		ID: req.ID,
 	}
@@ -61,7 +75,7 @@ func (h *GraphHandler) SaveGraph(ctx *ginx.Context, req SaveGraphReq, sess sessi
 	return ginx.Result{Msg: "OK", Data: id}, nil
 }
 
-func (h *GraphHandler) SaveNode(ctx *ginx.Context, req Node, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) SaveNode(ctx *ginx.Context, req Node, _ session.Session) (ginx.Result, error) {
 	node := domain.Node{
 		ID:       req.ID,
 		GraphID:  req.GraphID,
@@ -78,7 +92,7 @@ func (h *GraphHandler) SaveNode(ctx *ginx.Context, req Node, sess session.Sessio
 	return ginx.Result{Data: id}, nil
 }
 
-func (h *GraphHandler) SaveEdge(ctx *ginx.Context, req Edge, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) SaveEdge(ctx *ginx.Context, req Edge, _ session.Session) (ginx.Result, error) {
 	edge := domain.Edge{
 		ID:       req.ID,
 		GraphID:  req.GraphID,
@@ -98,7 +112,7 @@ func (h *GraphHandler) SaveEdge(ctx *ginx.Context, req Edge, sess session.Sessio
 	}, nil
 }
 
-func (h *GraphHandler) DeleteNode(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) DeleteNode(ctx *ginx.Context, req DeleteReq, _ session.Session) (ginx.Result, error) {
 	id := req.ID
 
 	err := h.svc.DeleteNode(ctx, id)
@@ -111,7 +125,7 @@ func (h *GraphHandler) DeleteNode(ctx *ginx.Context, req DeleteReq, sess session
 	}, nil
 }
 
-func (h *GraphHandler) DeleteEdge(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) DeleteEdge(ctx *ginx.Context, req DeleteReq, _ session.Session) (ginx.Result, error) {
 	id := req.ID
 	err := h.svc.DeleteEdge(ctx, id)
 	if err != nil {
@@ -123,7 +137,7 @@ func (h *GraphHandler) DeleteEdge(ctx *ginx.Context, req DeleteReq, sess session
 	}, nil
 }
 
-func (h *GraphHandler) DeleteGraph(ctx *ginx.Context, req DeleteReq, sess session.Session) (ginx.Result, error) {
+func (h *GraphHandler) DeleteGraph(ctx *ginx.Context, req DeleteReq, _ session.Session) (ginx.Result, error) {
 	id := req.ID
 	err := h.svc.DeleteGraph(ctx, id)
 	if err != nil {
