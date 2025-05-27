@@ -21,6 +21,7 @@ e2e:
 	@go	test -race -v -failfast ./...
 	@docker compose -f ./.script/docker-compose.yaml down
 
+
 .PHONY:	fmt
 fmt:
 	@goimports -l -w $$(find . -type f -name '*.go' -not -path "./.idea/*")
