@@ -5,11 +5,16 @@ services:
     restart: always
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      # 数据库密码
       MYSQL_ROOT_PASSWORD: root
     volumes:
-      # 设置初始化脚本
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      #      设置初始化脚本
+      - ./script/mysql/:/docker-entrypoint-initdb.d/
     ports:
-      # 端口映射
-      - "13316:3306"
+      #      注意这里我映射为了 13306 端口
+      - "13306:3306"
+  redis:
+    image: 'bitnami/redis:latest'
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - '6379:6379'
