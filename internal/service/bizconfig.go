@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 )
