@@ -20,6 +20,8 @@ on:
     paths-ignore:
       - '.docs/**'
       - '**.md'
+      - '*.pb.go'
+      - '*mock_*.go'
 
 jobs:
   check-license-lines:
