@@ -16,7 +16,7 @@ name: Post Coverage by Codecov
 
 on:
   push:
-    branches: [ main,dev ]
+    branches: [ main,dev,ci ]
     paths-ignore:
       - '.docs/**'
       - '**.md'
