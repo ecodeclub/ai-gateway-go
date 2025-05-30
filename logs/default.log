@@ -1,2 +1,0 @@
-{"lv":"error","ts":1744715751,"msg":"GetBizConfig: get failed","error":"sql: Scan error on column index 7, name \"created_at\": unsupported Scan, storing driver.Value type []uint8 into type *time.Time","id":"b5f32238-d9d0-47ea-8b78-2063646a38a6"}
-{"lv":"error","ts":1744715762,"msg":"GetBizConfig: get failed","error":"sql: Scan error on column index 7, name \"created_at\": unsupported Scan, storing driver.Value type []uint8 into type *time.Time","id":"b5f32238-d9d0-47ea-8b78-2063646a38a6"}
