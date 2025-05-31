@@ -6,8 +6,12 @@ toolchain go1.23.5
 
 require (
 	github.com/cohesion-org/deepseek-go v1.2.7
+	github.com/ecodeclub/ecache v0.0.0-20240111145855-75679834beca
+	github.com/ecodeclub/ekit v0.0.8-0.20240211141809-d8a351a335b5
 	github.com/ecodeclub/ginx v0.0.1
 	github.com/gin-gonic/gin v1.10.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang/mock v1.4.4
 	github.com/gotomicro/ego v1.2.3
 	github.com/redis/go-redis/v9 v9.2.1
 	github.com/stretchr/testify v1.10.0
@@ -31,7 +35,6 @@ require (
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/ecodeclub/ekit v0.0.8-0.20240211141809-d8a351a335b5 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.0.0 // indirect
@@ -43,7 +46,6 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gotomicro/logrotate v0.0.0-20211108034117-46d53eedc960 // indirect
