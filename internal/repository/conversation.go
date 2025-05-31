@@ -1,3 +1,17 @@
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package repository
 
 import (
@@ -22,16 +36,7 @@ func NewConversationRepo(d *dao.ConversationDao, c *cache.ConversationCache) *Co
 }
 
 func (repo *ConversationRepo) Create(ctx context.Context, conversation domain.Conversation) (string, error) {
-	var id int
-	if conversation.Sn != "" {
-		id, _ = strconv.Atoi(conversation.Sn)
-	} else {
-		id = 0
-	}
-
-	res, err := repo.dao.Create(ctx, dao.Conversation{
-		ID: int64(id),
-	})
+	res, err := repo.dao.Create(ctx, dao.Conversation{})
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +50,7 @@ func (repo *ConversationRepo) Create(ctx context.Context, conversation domain.Co
 		// 写到 redis 中
 		err = repo.cache.AddMessages(ctx, strconv.Itoa(int(res.ID)), repo.toCacheMessage(conversation.Messages))
 		if err != nil {
-			elog.Error(fmt.Sprintf("写入redis 失败: %d", id), elog.Any("err", err))
+			elog.Error(fmt.Sprintf("写入redis 失败: %d", res.ID), elog.Any("err", err))
 		}
 	}
 	return strconv.Itoa(int(res.ID)), nil
