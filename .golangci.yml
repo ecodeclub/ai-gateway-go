@@ -12,23 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: '3.0'
-services:
-  mysql8:
-    image: mysql:8.0.29
-    restart: always
-    command: --default-authentication-plugin=mysql_native_password
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-    volumes:
-      #      设置初始化脚本
-      - ./mysql/:/docker-entrypoint-initdb.d/
-    ports:
-      #      注意这里我映射为了 13306 端口
-      - "13306:3306"
-  redis:
-    image: 'bitnami/redis:latest'
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    ports:
-      - '6379:6379'
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - cyclop
+    - gocritic
+    - gosec
+    - ineffassign
+    - misspell
+    - prealloc
+    - unconvert
+    - unparam
+    - whitespace
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

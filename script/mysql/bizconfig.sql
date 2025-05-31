@@ -1,1 +1,0 @@
-create database ai_gateway_platform;
