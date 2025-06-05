@@ -37,31 +37,57 @@ func (dao *ConversationDao) Create(ctx context.Context, c Conversation) (Convers
 		return Conversation{}, err
 	}
 
-	return Conversation{}, nil
+	return c, nil
 }
 
-func (dao *ConversationDao) GetMessages(ctx context.Context, id int64) ([]Message, error) {
-	var msgs []Message
-	err := dao.db.WithContext(ctx).Where("cid = ?", id).Find(&msgs).Error
+func (dao *ConversationDao) GetByUid(ctx context.Context, uid string, limit int64, offset int64) ([]Conversation, error) {
+	var conversations []Conversation
+	err := dao.db.WithContext(ctx).Model(&Conversation{}).Where("uid = ?", uid).
+		Order("id DESC").
+		Offset(int(offset)).
+		Limit(int(limit)).
+		Find(&conversations).Error
+	if err != nil {
+		return conversations, err
+	}
+	return conversations, nil
+}
+
+func (dao *ConversationDao) GetById(ctx context.Context, id int64) (Conversation, error) {
+	var conversation Conversation
+	err := dao.db.WithContext(ctx).Model(&Conversation{}).Where("id = ?", id).First(&conversation).Error
+	if err != nil {
+		return conversation, err
+	}
+	return conversation, nil
+}
+
+func (dao *ConversationDao) GetMessages(ctx context.Context, id int64, limit int64, offset int64) ([]Message, error) {
+	var messages []Message
+	err := dao.db.WithContext(ctx).Where("cid = ?", id).
+		Order("id DESC").
+		Offset(int(offset)).
+		Limit(int(limit)).
+		Find(&messages).Error
 	if err != nil {
 		return []Message{}, err
 	}
-	return msgs, nil
+	return messages, nil
 }
 
-func (dao *ConversationDao) CreateMsgs(ctx context.Context, msgs []Message) error {
+func (dao *ConversationDao) CreateMessages(ctx context.Context, messages []Message) error {
 	now := time.Now().Unix()
-	for _, msg := range msgs {
+	for _, msg := range messages {
 		msg.Ctime = now
 		msg.Utime = now
 	}
 
-	return dao.db.WithContext(ctx).Create(&msgs).Error
+	return dao.db.WithContext(ctx).Create(&messages).Error
 }
 
 type Conversation struct {
 	ID    int64  `gorm:"primary_key;column:id"`
-	Uid   int64  `gorm:"column:uid;index"`
+	Uid   string `gorm:"column:uid;index"`
 	Title string `gorm:"column:title"`
 	Ctime int64  `gorm:"column:ctime"`
 	Utime int64  `gorm:"column:utime"`

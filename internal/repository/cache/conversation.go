@@ -24,20 +24,19 @@ import (
 )
 
 const (
-	NameSpace         = "conversation:%s"
+	NameSpace         = "conversation:%s:%s"
 	DefaultExpiration = 24 * time.Hour
 )
 
 type ConversationCache struct {
-	rdb    redis.Cmdable
-	length int64
+	rdb redis.Cmdable
 }
 
-func NewConversationCache(rdb redis.Cmdable, length int64) *ConversationCache {
-	return &ConversationCache{rdb: rdb, length: length}
+func NewConversationCache(rdb redis.Cmdable) *ConversationCache {
+	return &ConversationCache{rdb: rdb}
 }
 
-func (c *ConversationCache) AddMessages(ctx context.Context, id string, messages []Message) error {
+func (c *ConversationCache) AddMessages(ctx context.Context, id string, uid string, messages []Message) error {
 	pipe := c.rdb.Pipeline()
 
 	for _, msg := range messages {
@@ -45,28 +44,31 @@ func (c *ConversationCache) AddMessages(ctx context.Context, id string, messages
 		if err != nil {
 			return err
 		}
-		pipe.RPush(ctx, fmt.Sprintf(NameSpace, id), jsonMsg)
+		pipe.RPush(ctx, c.key(uid, id), jsonMsg)
 	}
 	_, err := pipe.Exec(ctx)
 
-	pipe.Expire(ctx, fmt.Sprintf(NameSpace, id), DefaultExpiration)
+	pipe.Expire(ctx, fmt.Sprintf(NameSpace, id, uid), DefaultExpiration)
 	return err
 }
 
-func (c *ConversationCache) GetMessage(ctx context.Context, id string) ([]Message, error) {
-	length, err := c.rdb.LLen(ctx, fmt.Sprintf(NameSpace, id)).Result()
+func (c *ConversationCache) GetMessage(ctx context.Context, id string, uid string, limit int64, offset int64) ([]Message, error) {
+	length, err := c.rdb.LLen(ctx, c.key(uid, id)).Result()
 	if err != nil {
 		return []Message{}, err
 	}
 
-	start := length
-	if length > c.length {
-		start = length - 20
-	} else {
-		start = 0
+	start := offset
+	end := offset + limit - 1
+	if end >= length {
+		end = length - 1
 	}
 
-	messagesJSON, err := c.rdb.LRange(ctx, id, start, -1).Result()
+	if start >= length {
+		return []Message{}, nil
+	}
+
+	messagesJSON, err := c.rdb.LRange(ctx, id, start, end).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +83,10 @@ func (c *ConversationCache) GetMessage(ctx context.Context, id string) ([]Messag
 	}
 
 	return messages, nil
+}
+
+func (c *ConversationCache) key(uid string, cid string) string {
+	return fmt.Sprintf(NameSpace, uid, cid)
 }
 
 type Message struct {

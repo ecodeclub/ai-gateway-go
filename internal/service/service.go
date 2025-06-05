@@ -22,17 +22,17 @@ import (
 )
 
 type AIService struct {
-	handler llm.LLMHandler
+	handler llm.Handler
 }
 
-func NewAIService(handler llm.LLMHandler) *AIService {
+func NewAIService(handler llm.Handler) *AIService {
 	return &AIService{handler: handler}
 }
 
-func (svc *AIService) Stream(ctx context.Context, req domain.LLMRequest) (chan domain.StreamEvent, error) {
-	return svc.handler.StreamHandle(ctx, req)
+func (svc *AIService) Stream(ctx context.Context, req domain.Message) (chan domain.StreamEvent, error) {
+	return svc.handler.StreamHandle(ctx, []domain.Message{req})
 }
 
-func (svc *AIService) Invoke(ctx context.Context, req domain.LLMRequest) (domain.LLMResponse, error) {
-	return svc.handler.Handle(ctx, req)
+func (svc *AIService) Invoke(ctx context.Context, req domain.Message) (domain.ChatResponse, error) {
+	return svc.handler.Handle(ctx, []domain.Message{req})
 }

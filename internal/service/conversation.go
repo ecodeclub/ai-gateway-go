@@ -16,23 +16,105 @@ package service
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
+	"github.com/gotomicro/ego/core/elog"
 )
 
 type ConversationService struct {
-	repo *repository.ConversationRepo
+	repo   *repository.ConversationRepo
+	handle llm.Handler
 }
 
-func NewConversationService(repo *repository.ConversationRepo) *ConversationService {
-	return &ConversationService{repo: repo}
+func NewConversationService(repo *repository.ConversationRepo, handler llm.Handler) *ConversationService {
+	return &ConversationService{repo: repo, handle: handler}
 }
 
 func (c *ConversationService) Create(ctx context.Context, conversation domain.Conversation) (string, error) {
 	return c.repo.Create(ctx, conversation)
 }
 
-func (c *ConversationService) List(ctx context.Context, id string) ([]domain.Message, error) {
-	return c.repo.GetList(ctx, id)
+func (c *ConversationService) List(ctx context.Context, uid string, limit int64, offset int64) ([]domain.Conversation, error) {
+	return c.repo.GetByUid(ctx, uid, limit, offset)
+}
+
+func (c *ConversationService) Chat(ctx context.Context, conversation domain.Conversation) (domain.ChatResponse, error) {
+	err := c.repo.CreateMessages(ctx, conversation)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+
+	id, _ := strconv.Atoi(conversation.Sn)
+	cs, err := c.repo.GetById(ctx, int64(id), 20, 0)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+
+	response, err := c.handle.Handle(ctx, cs.Messages)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+
+	resp := domain.ChatResponse{Sn: conversation.Sn, Response: response.Response}
+
+	// 将返回结果写入repo
+	err = c.repo.CreateMessages(ctx, domain.Conversation{Sn: conversation.Sn, Messages: []domain.Message{response.Response}})
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+
+	return resp, nil
+}
+
+func (c *ConversationService) Stream(ctx context.Context, conversation domain.Conversation) (chan domain.StreamEvent, error) {
+	ch := make(chan domain.StreamEvent, 10)
+
+	err := c.repo.CreateMessages(ctx, conversation)
+	if err != nil {
+		return ch, err
+	}
+
+	id, _ := strconv.Atoi(conversation.Sn)
+	cs, err := c.repo.GetById(ctx, int64(id), 20, 0)
+	if err != nil {
+		return ch, err
+	}
+
+	event, err := c.handle.StreamHandle(ctx, cs.Messages)
+	if err != nil {
+		return ch, err
+	}
+
+	go func() {
+		var message domain.Message
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case value, ok := <-event:
+				if !ok || value.Done {
+					err = c.repo.CreateMessages(ctx, domain.Conversation{Sn: conversation.Sn, Messages: []domain.Message{message}})
+					if err != nil {
+						elog.Error("写入数据库失败", elog.FieldErr(err))
+					}
+					ch <- domain.StreamEvent{Done: true}
+					return
+				}
+
+				if value.ReasoningContent != "" {
+					message.Content += value.ReasoningContent
+				}
+
+				if value.Content != "" {
+					message.ReasoningContent += value.Content
+				}
+				ch <- value
+			}
+		}
+	}()
+	return ch, err
 }
