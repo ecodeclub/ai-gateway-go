@@ -1,8 +1,6 @@
 module github.com/ecodeclub/ai-gateway-go
 
-go 1.23.2
-
-toolchain go1.24.2
+go 1.24.2
 
 require (
 	github.com/cohesion-org/deepseek-go v1.2.7
@@ -10,7 +8,6 @@ require (
 	github.com/ecodeclub/ginx v0.0.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/golang/mock v1.4.4
 	github.com/gotomicro/ego v1.2.3
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.10.0
