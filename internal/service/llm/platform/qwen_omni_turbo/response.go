@@ -12,11 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package qwen_omni_turbo
 
-import (
-	"errors"
-)
-
-var ErrBizConfigNotFound = errors.New("biz config not found")
-var ErrApiNotSupport = errors.New("api not support")
+type StreamResponse struct {
+	Choices []struct {
+		Delta struct {
+			Content string `json:"content"`
+			Audio   struct {
+				Transcript string `json:"transcript"`
+			} `json:"audio"`
+		} `json:"delta"`
+		FinishReason *string `json:"finish_reason"`
+		Index        int     `json:"index"`
+	} `json:"choices"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	Model   string `json:"model"`
+	ID      string `json:"id"`
+}

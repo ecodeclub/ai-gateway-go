@@ -6,8 +6,8 @@ managed:
       value: github.com/ecodeclub/ai-gateway-go/api/proto/gen
 plugins:
   - remote: buf.build/protocolbuffers/go
-    out: ./api/proto/gen
+    out: ./api/gen
     opt: paths=source_relative
   - remote: buf.build/grpc/go
-    out: ./api/proto/gen
+    out: ./api/gen
     opt: paths=source_relative
