@@ -34,7 +34,7 @@ func NewServer(svc *service.AIService) *Server {
 func (server *Server) Invoke(ctx context.Context, r *ai.LLMRequest) (*ai.LLMResponse, error) {
 	resp, err := server.svc.Invoke(
 		ctx,
-		domain.LLMRequest{Id: r.GetId(), Text: r.GetText()})
+		domain.LLMRequest{Id: r.GetId(), Text: r.GetText(), ContentType: domain.ContentType(r.GetContentType())})
 
 	if err != nil {
 		return &ai.LLMResponse{}, err
@@ -48,7 +48,7 @@ func (server *Server) Stream(r *ai.LLMRequest, resp ai.AIService_StreamServer) e
 
 	ch, err := server.svc.Stream(
 		ctx,
-		domain.LLMRequest{Id: r.GetId(), Text: r.GetText()})
+		domain.LLMRequest{Id: r.GetId(), Text: r.GetText(), ContentType: domain.ContentType(r.GetContentType())})
 
 	if err != nil {
 		return err
