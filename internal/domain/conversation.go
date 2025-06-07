@@ -14,9 +14,35 @@
 
 package domain
 
-type StreamEvent struct {
-	ReasoningContent string
+import (
+	"github.com/ecodeclub/ekit"
+)
+
+const (
+	UNKNOWN = iota
+	USER
+	ASSISTANT
+	SYSTEM
+	TOOL
+)
+
+type Conversation struct {
+	Sn       string
+	Uid      string
+	Title    string
+	Messages []Message
+	Time     string
+}
+type Message struct {
+	ID               int64
+	CID              int64
+	Role             int64
 	Content          string
-	Done             bool
-	Error            error
+	ReasoningContent string
+}
+
+type ChatResponse struct {
+	Sn       string
+	Response Message
+	Metadata ekit.AnyValue
 }

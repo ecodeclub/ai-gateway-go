@@ -21,7 +21,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/web"
 	"github.com/ecodeclub/ai-gateway-go/internal/web/infra"
 
-	//"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

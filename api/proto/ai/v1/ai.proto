@@ -17,13 +17,8 @@ package ai.v1;
 option go_package = "ai/v1;aiv1";
 
 service AIService {
-  rpc Invoke(LLMRequest) returns (LLMResponse);
-  rpc Stream(LLMRequest) returns (stream StreamEvent);
-}
-
-message LLMRequest {
-  string id = 1;
-  string text = 2;
+  rpc Chat(Message) returns (ChatResponse);
+  rpc Stream(Message) returns (stream StreamEvent);
 }
 
 message StreamEvent {
@@ -33,7 +28,54 @@ message StreamEvent {
   string err = 4;
 }
 
-message LLMResponse {
-  string reasoningContent = 1;
-  string content = 2;
+service ConversationService {
+  rpc Create(Conversation) returns (Conversation);
+  rpc List(ListReq) returns(ListResp);
+  rpc Chat(LLMRequest) returns(ChatResponse);
+  rpc Stream(LLMRequest) returns(stream StreamEvent);
+}
+
+message Conversation {
+  string sn = 1;
+  string uid = 2;
+  string title = 3;
+  repeated Message message = 4;
+  string ctime = 5;
+}
+
+message ListReq {
+  string uid = 1;
+  int64 offset = 2;
+  int64 limit = 3;
+}
+
+message ListResp {
+  repeated Conversation conversations = 1;
+}
+
+message LLMRequest {
+  string sn = 1;
+  repeated Message message = 2;
+}
+
+
+enum Role {
+  UNKNOWN = 0;
+  USER = 1;
+  ASSISTANT = 2;
+  SYSTEM = 3;
+  TOOL = 4;
+}
+
+message Message {
+  string id = 1;
+  Role role = 2;
+  string content = 3;
+  string reasoningContent = 4;
+}
+
+message ChatResponse {
+  string sn = 1;
+  Message response = 2;
+  string metadata = 3;
 }
