@@ -88,21 +88,12 @@ func (c *ConversationServer) stream(ctx context.Context, ch chan domain.StreamEv
 	}
 }
 
-func (c *ConversationServer) toMessage(messages []domain.Message) []*ai.Message {
-	return slice.Map(messages, func(idx int, src domain.Message) *ai.Message {
-		return &ai.Message{
-			Role:             ai.Role(src.Role),
-			Content:          src.Content,
-			ReasoningContent: src.Content,
-		}
-	})
-}
-
 func (c *ConversationServer) toConversation(conversations []domain.Conversation) []*ai.Conversation {
 	return slice.Map(conversations, func(idx int, src domain.Conversation) *ai.Conversation {
 		return &ai.Conversation{
 			Sn:    src.Sn,
 			Title: src.Title,
+			Uid:   src.Uid,
 		}
 	})
 }
