@@ -17,6 +17,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -314,7 +315,7 @@ func (n *GraphTestSuite) TestDeleteNode() {
 			after: func() {
 				var node dao.Node
 				err := n.db.Where("id = ?", 1).First(&node).Error
-				require.Equal(t, err, gorm.ErrRecordNotFound)
+				require.True(t, errors.Is(err, gorm.ErrRecordNotFound))
 			},
 			reqBody: `{"id": 1}`,
 		},
@@ -356,7 +357,7 @@ func (n *GraphTestSuite) TestDeleteEdge() {
 				err := n.db.Create(&dao.Edge{GraphID: 1, SourceID: 1, TargetID: 2, Ctime: time.Now().UnixMilli(), Utime: time.Now().UnixMilli()}).Error
 				require.NoError(t, err)
 				var edge1 dao.Edge
-				err = n.db.Where("id = ?", 1).First(&edge1).Error
+				n.db.Create(&edge1)
 				require.NoError(t, err)
 			},
 			after: func() {
