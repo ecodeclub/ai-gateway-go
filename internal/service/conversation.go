@@ -16,7 +16,6 @@ package service
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
@@ -41,27 +40,26 @@ func (c *ConversationService) List(ctx context.Context, uid string, limit int64,
 	return c.repo.GetByUid(ctx, uid, limit, offset)
 }
 
-func (c *ConversationService) Chat(ctx context.Context, conversation domain.Conversation) (domain.ChatResponse, error) {
-	err := c.repo.CreateMessages(ctx, conversation)
+func (c *ConversationService) Chat(ctx context.Context, sn string, messages []domain.Message) (domain.ChatResponse, error) {
+	err := c.repo.AddMessages(ctx, sn, messages)
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
 
-	id, _ := strconv.Atoi(conversation.Sn)
-	cs, err := c.repo.GetById(ctx, int64(id), 20, 0)
+	messageList, err := c.repo.GetMessageList(ctx, sn, 20, 0)
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
 
-	response, err := c.handle.Handle(ctx, cs.Messages)
+	response, err := c.handle.Handle(ctx, messageList)
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
 
-	resp := domain.ChatResponse{Sn: conversation.Sn, Response: response.Response}
+	resp := domain.ChatResponse{Sn: sn, Response: response.Response}
 
 	// 将返回结果写入repo
-	err = c.repo.CreateMessages(ctx, domain.Conversation{Sn: conversation.Sn, Messages: []domain.Message{response.Response}})
+	err = c.repo.AddMessages(ctx, sn, []domain.Message{response.Response})
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
@@ -69,21 +67,20 @@ func (c *ConversationService) Chat(ctx context.Context, conversation domain.Conv
 	return resp, nil
 }
 
-func (c *ConversationService) Stream(ctx context.Context, conversation domain.Conversation) (chan domain.StreamEvent, error) {
+func (c *ConversationService) Stream(ctx context.Context, sn string, messages []domain.Message) (chan domain.StreamEvent, error) {
 	ch := make(chan domain.StreamEvent, 10)
 
-	err := c.repo.CreateMessages(ctx, conversation)
+	err := c.repo.AddMessages(ctx, sn, messages)
 	if err != nil {
 		return ch, err
 	}
 
-	id, _ := strconv.Atoi(conversation.Sn)
-	cs, err := c.repo.GetById(ctx, int64(id), 20, 0)
+	cs, err := c.repo.GetMessageList(ctx, sn, 20, 0)
 	if err != nil {
 		return ch, err
 	}
 
-	event, err := c.handle.StreamHandle(ctx, cs.Messages)
+	event, err := c.handle.StreamHandle(ctx, cs)
 	if err != nil {
 		return ch, err
 	}
@@ -97,7 +94,7 @@ func (c *ConversationService) Stream(ctx context.Context, conversation domain.Co
 				return
 			case value, ok := <-event:
 				if !ok || value.Done {
-					err = c.repo.CreateMessages(ctx, domain.Conversation{Sn: conversation.Sn, Messages: []domain.Message{message}})
+					err = c.repo.AddMessages(ctx, sn, []domain.Message{message})
 					if err != nil {
 						elog.Error("写入数据库失败", elog.FieldErr(err))
 					}
@@ -105,13 +102,8 @@ func (c *ConversationService) Stream(ctx context.Context, conversation domain.Co
 					return
 				}
 
-				if value.ReasoningContent != "" {
-					message.Content += value.ReasoningContent
-				}
-
-				if value.Content != "" {
-					message.ReasoningContent += value.Content
-				}
+				message.ReasoningContent += value.ReasoningContent
+				message.ReasoningContent += value.Content
 				ch <- value
 			}
 		}

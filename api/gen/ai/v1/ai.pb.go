@@ -338,6 +338,58 @@ func (x *ListResp) GetConversations() []*Conversation {
 	return nil
 }
 
+type LLMRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sn            string                 `protobuf:"bytes,1,opt,name=sn,proto3" json:"sn,omitempty"`
+	Message       []*Message             `protobuf:"bytes,2,rep,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LLMRequest) Reset() {
+	*x = LLMRequest{}
+	mi := &file_ai_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LLMRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LLMRequest) ProtoMessage() {}
+
+func (x *LLMRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LLMRequest.ProtoReflect.Descriptor instead.
+func (*LLMRequest) Descriptor() ([]byte, []int) {
+	return file_ai_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LLMRequest) GetSn() string {
+	if x != nil {
+		return x.Sn
+	}
+	return ""
+}
+
+func (x *LLMRequest) GetMessage() []*Message {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
 type Message struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -350,7 +402,7 @@ type Message struct {
 
 func (x *Message) Reset() {
 	*x = Message{}
-	mi := &file_ai_proto_msgTypes[4]
+	mi := &file_ai_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -362,7 +414,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_proto_msgTypes[4]
+	mi := &file_ai_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -375,7 +427,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_ai_proto_rawDescGZIP(), []int{4}
+	return file_ai_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Message) GetId() string {
@@ -417,7 +469,7 @@ type ChatResponse struct {
 
 func (x *ChatResponse) Reset() {
 	*x = ChatResponse{}
-	mi := &file_ai_proto_msgTypes[5]
+	mi := &file_ai_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -429,7 +481,7 @@ func (x *ChatResponse) String() string {
 func (*ChatResponse) ProtoMessage() {}
 
 func (x *ChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_proto_msgTypes[5]
+	mi := &file_ai_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -442,7 +494,7 @@ func (x *ChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatResponse.ProtoReflect.Descriptor instead.
 func (*ChatResponse) Descriptor() ([]byte, []int) {
-	return file_ai_proto_rawDescGZIP(), []int{5}
+	return file_ai_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ChatResponse) GetSn() string {
@@ -487,7 +539,11 @@ const file_ai_proto_rawDesc = "" +
 	"\x06offset\x18\x02 \x01(\x03R\x06offset\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x03R\x05limit\"E\n" +
 	"\bListResp\x129\n" +
-	"\rconversations\x18\x01 \x03(\v2\x13.ai.v1.ConversationR\rconversations\"\x80\x01\n" +
+	"\rconversations\x18\x01 \x03(\v2\x13.ai.v1.ConversationR\rconversations\"F\n" +
+	"\n" +
+	"LLMRequest\x12\x0e\n" +
+	"\x02sn\x18\x01 \x01(\tR\x02sn\x12(\n" +
+	"\amessage\x18\x02 \x03(\v2\x0e.ai.v1.MessageR\amessage\"\x80\x01\n" +
 	"\aMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\x04role\x18\x02 \x01(\x0e2\v.ai.v1.RoleR\x04role\x12\x18\n" +
@@ -506,12 +562,12 @@ const file_ai_proto_rawDesc = "" +
 	"\x04TOOL\x10\x042h\n" +
 	"\tAIService\x12+\n" +
 	"\x04Chat\x12\x0e.ai.v1.Message\x1a\x13.ai.v1.ChatResponse\x12.\n" +
-	"\x06Stream\x12\x0e.ai.v1.Message\x1a\x12.ai.v1.StreamEvent0\x012\xd9\x01\n" +
+	"\x06Stream\x12\x0e.ai.v1.Message\x1a\x12.ai.v1.StreamEvent0\x012\xd5\x01\n" +
 	"\x13ConversationService\x122\n" +
 	"\x06Create\x12\x13.ai.v1.Conversation\x1a\x13.ai.v1.Conversation\x12'\n" +
-	"\x04List\x12\x0e.ai.v1.ListReq\x1a\x0f.ai.v1.ListResp\x120\n" +
-	"\x04Chat\x12\x13.ai.v1.Conversation\x1a\x13.ai.v1.ChatResponse\x123\n" +
-	"\x06Stream\x12\x13.ai.v1.Conversation\x1a\x12.ai.v1.StreamEvent0\x01Bz\n" +
+	"\x04List\x12\x0e.ai.v1.ListReq\x1a\x0f.ai.v1.ListResp\x12.\n" +
+	"\x04Chat\x12\x11.ai.v1.LLMRequest\x1a\x13.ai.v1.ChatResponse\x121\n" +
+	"\x06Stream\x12\x11.ai.v1.LLMRequest\x1a\x12.ai.v1.StreamEvent0\x01Bz\n" +
 	"\tcom.ai.v1B\aAiProtoP\x01Z/github.com/ecodeclub/ai-gateway-go/api/gen;aiv1\xa2\x02\x03AXX\xaa\x02\x05Ai.V1\xca\x02\x05Ai\\V1\xe2\x02\x11Ai\\V1\\GPBMetadata\xea\x02\x06Ai::V1b\x06proto3"
 
 var (
@@ -527,38 +583,40 @@ func file_ai_proto_rawDescGZIP() []byte {
 }
 
 var file_ai_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_ai_proto_goTypes = []any{
 	(Role)(0),            // 0: ai.v1.Role
 	(*StreamEvent)(nil),  // 1: ai.v1.StreamEvent
 	(*Conversation)(nil), // 2: ai.v1.Conversation
 	(*ListReq)(nil),      // 3: ai.v1.ListReq
 	(*ListResp)(nil),     // 4: ai.v1.ListResp
-	(*Message)(nil),      // 5: ai.v1.Message
-	(*ChatResponse)(nil), // 6: ai.v1.ChatResponse
+	(*LLMRequest)(nil),   // 5: ai.v1.LLMRequest
+	(*Message)(nil),      // 6: ai.v1.Message
+	(*ChatResponse)(nil), // 7: ai.v1.ChatResponse
 }
 var file_ai_proto_depIdxs = []int32{
-	5,  // 0: ai.v1.Conversation.message:type_name -> ai.v1.Message
+	6,  // 0: ai.v1.Conversation.message:type_name -> ai.v1.Message
 	2,  // 1: ai.v1.ListResp.conversations:type_name -> ai.v1.Conversation
-	0,  // 2: ai.v1.Message.role:type_name -> ai.v1.Role
-	5,  // 3: ai.v1.ChatResponse.response:type_name -> ai.v1.Message
-	5,  // 4: ai.v1.AIService.Chat:input_type -> ai.v1.Message
-	5,  // 5: ai.v1.AIService.Stream:input_type -> ai.v1.Message
-	2,  // 6: ai.v1.ConversationService.Create:input_type -> ai.v1.Conversation
-	3,  // 7: ai.v1.ConversationService.List:input_type -> ai.v1.ListReq
-	2,  // 8: ai.v1.ConversationService.Chat:input_type -> ai.v1.Conversation
-	2,  // 9: ai.v1.ConversationService.Stream:input_type -> ai.v1.Conversation
-	6,  // 10: ai.v1.AIService.Chat:output_type -> ai.v1.ChatResponse
-	1,  // 11: ai.v1.AIService.Stream:output_type -> ai.v1.StreamEvent
-	2,  // 12: ai.v1.ConversationService.Create:output_type -> ai.v1.Conversation
-	4,  // 13: ai.v1.ConversationService.List:output_type -> ai.v1.ListResp
-	6,  // 14: ai.v1.ConversationService.Chat:output_type -> ai.v1.ChatResponse
-	1,  // 15: ai.v1.ConversationService.Stream:output_type -> ai.v1.StreamEvent
-	10, // [10:16] is the sub-list for method output_type
-	4,  // [4:10] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	6,  // 2: ai.v1.LLMRequest.message:type_name -> ai.v1.Message
+	0,  // 3: ai.v1.Message.role:type_name -> ai.v1.Role
+	6,  // 4: ai.v1.ChatResponse.response:type_name -> ai.v1.Message
+	6,  // 5: ai.v1.AIService.Chat:input_type -> ai.v1.Message
+	6,  // 6: ai.v1.AIService.Stream:input_type -> ai.v1.Message
+	2,  // 7: ai.v1.ConversationService.Create:input_type -> ai.v1.Conversation
+	3,  // 8: ai.v1.ConversationService.List:input_type -> ai.v1.ListReq
+	5,  // 9: ai.v1.ConversationService.Chat:input_type -> ai.v1.LLMRequest
+	5,  // 10: ai.v1.ConversationService.Stream:input_type -> ai.v1.LLMRequest
+	7,  // 11: ai.v1.AIService.Chat:output_type -> ai.v1.ChatResponse
+	1,  // 12: ai.v1.AIService.Stream:output_type -> ai.v1.StreamEvent
+	2,  // 13: ai.v1.ConversationService.Create:output_type -> ai.v1.Conversation
+	4,  // 14: ai.v1.ConversationService.List:output_type -> ai.v1.ListResp
+	7,  // 15: ai.v1.ConversationService.Chat:output_type -> ai.v1.ChatResponse
+	1,  // 16: ai.v1.ConversationService.Stream:output_type -> ai.v1.StreamEvent
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ai_proto_init() }
@@ -572,7 +630,7 @@ func file_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_proto_rawDesc), len(file_ai_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

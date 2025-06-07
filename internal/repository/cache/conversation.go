@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	NameSpace         = "conversation:%s:%s"
+	NameSpace         = "conversation:%s"
 	DefaultExpiration = 24 * time.Hour
 )
 
@@ -36,7 +36,7 @@ func NewConversationCache(rdb redis.Cmdable) *ConversationCache {
 	return &ConversationCache{rdb: rdb}
 }
 
-func (c *ConversationCache) AddMessages(ctx context.Context, id string, uid string, messages []Message) error {
+func (c *ConversationCache) AddMessages(ctx context.Context, sn string, messages []Message) error {
 	pipe := c.rdb.Pipeline()
 
 	for _, msg := range messages {
@@ -44,16 +44,16 @@ func (c *ConversationCache) AddMessages(ctx context.Context, id string, uid stri
 		if err != nil {
 			return err
 		}
-		pipe.RPush(ctx, c.key(uid, id), jsonMsg)
+		pipe.RPush(ctx, c.key(sn), jsonMsg)
 	}
 	_, err := pipe.Exec(ctx)
 
-	pipe.Expire(ctx, fmt.Sprintf(NameSpace, id, uid), DefaultExpiration)
+	pipe.Expire(ctx, fmt.Sprintf(NameSpace, sn), DefaultExpiration)
 	return err
 }
 
-func (c *ConversationCache) GetMessage(ctx context.Context, id string, uid string, limit int64, offset int64) ([]Message, error) {
-	length, err := c.rdb.LLen(ctx, c.key(uid, id)).Result()
+func (c *ConversationCache) GetMessage(ctx context.Context, sn string, limit int64, offset int64) ([]Message, error) {
+	length, err := c.rdb.LLen(ctx, c.key(sn)).Result()
 	if err != nil {
 		return []Message{}, err
 	}
@@ -64,11 +64,7 @@ func (c *ConversationCache) GetMessage(ctx context.Context, id string, uid strin
 		end = length - 1
 	}
 
-	if start >= length {
-		return []Message{}, nil
-	}
-
-	messagesJSON, err := c.rdb.LRange(ctx, id, start, end).Result()
+	messagesJSON, err := c.rdb.LRange(ctx, sn, start, end).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +81,8 @@ func (c *ConversationCache) GetMessage(ctx context.Context, id string, uid strin
 	return messages, nil
 }
 
-func (c *ConversationCache) key(uid string, cid string) string {
-	return fmt.Sprintf(NameSpace, uid, cid)
+func (c *ConversationCache) key(sn string) string {
+	return fmt.Sprintf(NameSpace, sn)
 }
 
 type Message struct {

@@ -31,8 +31,8 @@ message StreamEvent {
 service ConversationService {
   rpc Create(Conversation) returns (Conversation);
   rpc List(ListReq) returns(ListResp);
-  rpc Chat(Conversation) returns(ChatResponse);
-  rpc Stream(Conversation) returns(stream StreamEvent);
+  rpc Chat(LLMRequest) returns(ChatResponse);
+  rpc Stream(LLMRequest) returns(stream StreamEvent);
 }
 
 message Conversation {
@@ -51,6 +51,11 @@ message ListReq {
 
 message ListResp {
   repeated Conversation conversations = 1;
+}
+
+message LLMRequest {
+  string sn = 1;
+  repeated Message message = 2;
 }
 
 

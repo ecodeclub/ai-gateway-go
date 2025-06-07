@@ -189,8 +189,8 @@ const (
 type ConversationServiceClient interface {
 	Create(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (*Conversation, error)
 	List(ctx context.Context, in *ListReq, opts ...grpc.CallOption) (*ListResp, error)
-	Chat(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (*ChatResponse, error)
-	Stream(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
+	Chat(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (*ChatResponse, error)
+	Stream(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 }
 
 type conversationServiceClient struct {
@@ -221,7 +221,7 @@ func (c *conversationServiceClient) List(ctx context.Context, in *ListReq, opts 
 	return out, nil
 }
 
-func (c *conversationServiceClient) Chat(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (*ChatResponse, error) {
+func (c *conversationServiceClient) Chat(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (*ChatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChatResponse)
 	err := c.cc.Invoke(ctx, ConversationService_Chat_FullMethodName, in, out, cOpts...)
@@ -231,13 +231,13 @@ func (c *conversationServiceClient) Chat(ctx context.Context, in *Conversation, 
 	return out, nil
 }
 
-func (c *conversationServiceClient) Stream(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
+func (c *conversationServiceClient) Stream(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &ConversationService_ServiceDesc.Streams[0], ConversationService_Stream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[Conversation, StreamEvent]{ClientStream: stream}
+	x := &grpc.GenericClientStream[LLMRequest, StreamEvent]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -256,8 +256,8 @@ type ConversationService_StreamClient = grpc.ServerStreamingClient[StreamEvent]
 type ConversationServiceServer interface {
 	Create(context.Context, *Conversation) (*Conversation, error)
 	List(context.Context, *ListReq) (*ListResp, error)
-	Chat(context.Context, *Conversation) (*ChatResponse, error)
-	Stream(*Conversation, grpc.ServerStreamingServer[StreamEvent]) error
+	Chat(context.Context, *LLMRequest) (*ChatResponse, error)
+	Stream(*LLMRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -274,10 +274,10 @@ func (UnimplementedConversationServiceServer) Create(context.Context, *Conversat
 func (UnimplementedConversationServiceServer) List(context.Context, *ListReq) (*ListResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
-func (UnimplementedConversationServiceServer) Chat(context.Context, *Conversation) (*ChatResponse, error) {
+func (UnimplementedConversationServiceServer) Chat(context.Context, *LLMRequest) (*ChatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Chat not implemented")
 }
-func (UnimplementedConversationServiceServer) Stream(*Conversation, grpc.ServerStreamingServer[StreamEvent]) error {
+func (UnimplementedConversationServiceServer) Stream(*LLMRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
@@ -338,7 +338,7 @@ func _ConversationService_List_Handler(srv interface{}, ctx context.Context, dec
 }
 
 func _ConversationService_Chat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Conversation)
+	in := new(LLMRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -350,17 +350,17 @@ func _ConversationService_Chat_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: ConversationService_Chat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConversationServiceServer).Chat(ctx, req.(*Conversation))
+		return srv.(ConversationServiceServer).Chat(ctx, req.(*LLMRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ConversationService_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Conversation)
+	m := new(LLMRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ConversationServiceServer).Stream(m, &grpc.GenericServerStream[Conversation, StreamEvent]{ServerStream: stream})
+	return srv.(ConversationServiceServer).Stream(m, &grpc.GenericServerStream[LLMRequest, StreamEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.

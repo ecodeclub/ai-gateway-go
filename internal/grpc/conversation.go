@@ -39,18 +39,15 @@ func (c *ConversationServer) List(ctx context.Context, req *ai.ListReq) (*ai.Lis
 	return &ai.ListResp{Conversations: c.toConversation(conversation)}, nil
 }
 
-func (c *ConversationServer) Chat(ctx context.Context, conversation *ai.Conversation) (*ai.ChatResponse, error) {
-	response, err := c.svc.Chat(ctx, domain.Conversation{
-		Sn:       conversation.Sn,
-		Messages: c.toDomainMessage(conversation.Message),
-	})
+func (c *ConversationServer) Chat(ctx context.Context, request *ai.LLMRequest) (*ai.ChatResponse, error) {
+	response, err := c.svc.Chat(ctx, request.Sn, c.toDomainMessage(request.Message))
 
 	if err != nil {
 		return &ai.ChatResponse{}, err
 	}
 
 	return &ai.ChatResponse{
-		Sn: conversation.Sn,
+		Sn: request.Sn,
 		Response: &ai.Message{
 			Role:             ai.Role(response.Response.Role),
 			Content:          response.Response.Content,
@@ -59,12 +56,9 @@ func (c *ConversationServer) Chat(ctx context.Context, conversation *ai.Conversa
 	}, nil
 }
 
-func (c *ConversationServer) Stream(conversation *ai.Conversation, resp ai.ConversationService_StreamServer) error {
+func (c *ConversationServer) Stream(request *ai.LLMRequest, resp ai.ConversationService_StreamServer) error {
 	ctx := resp.Context()
-	ch, err := c.svc.Stream(ctx, domain.Conversation{
-		Sn:       conversation.Sn,
-		Messages: c.toDomainMessage(conversation.Message),
-	})
+	ch, err := c.svc.Stream(ctx, request.Sn, c.toDomainMessage(request.Message))
 	if err != nil {
 		return err
 	}

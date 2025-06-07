@@ -41,24 +41,23 @@ func (repo *ConversationRepo) Create(ctx context.Context, conversation domain.Co
 		return "", err
 	}
 
-	return strconv.Itoa(int(res.ID)), nil
+	return res.Sn, nil
 }
 
-func (repo *ConversationRepo) CreateMessages(ctx context.Context, conversation domain.Conversation) error {
-	cid, _ := strconv.Atoi(conversation.Sn)
-
-	err := repo.dao.CreateMessages(ctx, repo.toDaoMessage(int64(cid), conversation.Messages))
+func (repo *ConversationRepo) AddMessages(ctx context.Context, sn string, messages []domain.Message) error {
+	err := repo.dao.AddMessages(ctx, repo.toDaoMessage(sn, messages))
 	if err != nil {
 		return err
 	}
 
-	err = repo.cache.AddMessages(ctx, conversation.Sn, conversation.Uid, repo.toCacheMessage(conversation.Messages))
+	err = repo.cache.AddMessages(ctx, sn, repo.toCacheMessage(messages))
 	if err != nil {
-		elog.Error(fmt.Sprintf("用户 %s 写入redis 失败: %s", conversation.Uid, conversation.Sn), elog.Any("err", err))
+		elog.Error(fmt.Sprintf("写入redis 失败: %s", sn), elog.Any("err", err))
 	}
 	return nil
 }
 
+// GetByUid 根据 uid 获取对话列表
 func (repo *ConversationRepo) GetByUid(ctx context.Context, uid string, limit int64, offset int64) ([]domain.Conversation, error) {
 	conversation, err := repo.dao.GetByUid(ctx, uid, limit, offset)
 	if err != nil {
@@ -67,46 +66,30 @@ func (repo *ConversationRepo) GetByUid(ctx context.Context, uid string, limit in
 	return repo.toConversation(conversation), nil
 }
 
-// GetById 用来每次对话时候获取对话的消息
-func (repo *ConversationRepo) GetById(ctx context.Context, id int64, limit int64, offset int64) (domain.Conversation, error) {
-	conversation, err := repo.dao.GetById(ctx, id)
+// GetMessageList 用来获取历史消息列表
+func (repo *ConversationRepo) GetMessageList(ctx context.Context, sn string, limit int64, offset int64) ([]domain.Message, error) {
+	messageCache, err := repo.cache.GetMessage(ctx, sn, limit, offset)
 	if err != nil {
-		return domain.Conversation{}, err
-	}
-
-	cid := strconv.Itoa(int(conversation.ID))
-	list, err := repo.getMessageList(ctx, strconv.Itoa(int(id)), cid, limit, offset)
-	if err != nil {
-		return domain.Conversation{}, err
-	}
-
-	return domain.Conversation{Sn: cid, Title: conversation.Title, Messages: list}, nil
-}
-
-func (repo *ConversationRepo) getMessageList(ctx context.Context, cid string, uid string, limit int64, offset int64) ([]domain.Message, error) {
-	messageCache, err := repo.cache.GetMessage(ctx, cid, uid, limit, offset)
-	if err != nil {
-		ID, _ := strconv.Atoi(cid)
-		messages, err := repo.dao.GetMessages(ctx, int64(ID), limit, offset)
+		messages, err := repo.dao.GetMessages(ctx, sn, limit, offset)
 		if err != nil {
 			return []domain.Message{}, err
 		}
 
 		domainMessages := repo.toDomainMessage(messages)
-		err = repo.cache.AddMessages(ctx, cid, uid, repo.toCacheMessage(domainMessages))
+		err = repo.cache.AddMessages(ctx, sn, repo.toCacheMessage(domainMessages))
 		if err != nil {
-			elog.Error(fmt.Sprintf("用户 %s 的消息写入redis 失败: %s", uid, cid), elog.Any("err", err))
+			elog.Error(fmt.Sprintf("消息写入redis 失败: %s", sn), elog.Any("err", err))
 		}
 		return repo.toDomainMessage(messages), nil
 	}
 	return repo.toMessage(messageCache), nil
 }
 
-func (repo *ConversationRepo) toDaoMessage(id int64, messages []domain.Message) []dao.Message {
+func (repo *ConversationRepo) toDaoMessage(sn string, messages []domain.Message) []dao.Message {
 	return slice.Map[domain.Message, dao.Message](messages, func(idx int, src domain.Message) dao.Message {
 		return dao.Message{
 			ID:            src.ID,
-			CID:           id,
+			Sn:            sn,
 			Role:          src.Role,
 			Content:       src.Content,
 			ReasonContent: src.ReasoningContent,
@@ -118,7 +101,6 @@ func (repo *ConversationRepo) toDomainMessage(messages []dao.Message) []domain.M
 	return slice.Map[dao.Message, domain.Message](messages, func(idx int, src dao.Message) domain.Message {
 		return domain.Message{
 			ID:               src.ID,
-			CID:              src.CID,
 			Role:             src.Role,
 			Content:          src.Content,
 			ReasoningContent: src.ReasonContent,

@@ -26,6 +26,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/test/mocks"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,6 +66,9 @@ func (c *ConversationSuite) SetupTest() {
 	)
 
 	rdb := config.NewCache(cacheConfig)
+
+	err = dao.InitConversation(db)
+	require.NoError(c.T(), err)
 	c.db = db
 	c.cache = rdb
 }
@@ -81,13 +85,13 @@ func (c *ConversationSuite) TestCreate() {
 	testcases := []struct {
 		name   string
 		before func()
-		after  func()
+		after  func(sn string)
 	}{
 		{
 			name: "创建对应的 conversation",
-			after: func() {
+			after: func(sn string) {
 				var conversation dao.Conversation
-				err := c.db.Where("id = ?", 1).First(&conversation).Error
+				err := c.db.Where("sn = ?", sn).First(&conversation).Error
 				require.NoError(t, err)
 				assert.Equal(t, "test", conversation.Title)
 			},
@@ -106,8 +110,8 @@ func (c *ConversationSuite) TestCreate() {
 
 			res, err := server.Create(context.Background(), &aiv1.Conversation{Title: "test"})
 			require.NoError(t, err)
-			assert.Equal(t, "1", res.Sn)
-			tc.after()
+			assert.NotEmpty(t, res.Sn)
+			tc.after(res.Sn)
 		})
 	}
 }
@@ -116,15 +120,13 @@ func (c *ConversationSuite) TestGetList() {
 	t := c.T()
 	testcases := []struct {
 		name   string
-		before func()
-		after  func()
+		before func(sn string)
 	}{
 		{
 			name: "获取conversation list",
-			before: func() {
+			before: func(sn string) {
 				err := c.db.Create([]dao.Conversation{
-					{Title: "test1", Uid: "123"},
-					{Title: "test2", Uid: "123"},
+					{Title: "test1", Uid: "123", Sn: sn},
 				}).Error
 				require.NoError(t, err)
 			},
@@ -133,7 +135,8 @@ func (c *ConversationSuite) TestGetList() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.before()
+			sn := uuid.New().String()
+			tc.before(sn)
 			conversationDao := dao.NewConversationDao(c.db)
 			conversationCache := cache.NewConversationCache(c.cache)
 			repo := repository.NewConversationRepo(conversationDao, conversationCache)
@@ -143,7 +146,7 @@ func (c *ConversationSuite) TestGetList() {
 			server := grpc.NewConversationServer(conversationService)
 			res, err := server.List(context.Background(), &aiv1.ListReq{Uid: "123", Offset: 0, Limit: 2})
 			require.NoError(t, err)
-			assert.Equal(t, len(res.Conversations), 2)
+			assert.Equal(t, len(res.Conversations), 1)
 		})
 	}
 }
@@ -152,29 +155,30 @@ func (c *ConversationSuite) TestChat() {
 	t := c.T()
 	testcases := []struct {
 		name   string
-		before func(handler *mocks.MockHandler)
-		after  func()
+		before func(handler *mocks.MockHandler, sn string)
+		after  func(sn string)
 	}{
 		{
 			name: "与大模型chat",
-			before: func(handler *mocks.MockHandler) {
-				err := c.db.Create(&dao.Conversation{Title: "test1", Uid: "123"}).Error
+			before: func(handler *mocks.MockHandler, sn string) {
+				err := c.db.Create(&dao.Conversation{Title: "test1", Uid: "123", Sn: sn}).Error
 				require.NoError(t, err)
 				resp := domain.ChatResponse{Response: domain.Message{Content: "event1"}}
 				handler.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(resp, nil)
 			},
-			after: func() {
+			after: func(sn string) {
 				//以数据库的数据为准
-				var message []dao.Message
-				err := c.db.Find(&message).Where("cid = ?", 1).Error
+				var messages []dao.Message
+				err := c.db.Find(&messages).Where("sn = ?", sn).Error
 				require.NoError(t, err)
-				assert.Equal(t, 3, len(message))
+				assert.Equal(t, 3, len(messages))
 			},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			sn := uuid.New().String()
 			conversationDao := dao.NewConversationDao(c.db)
 			conversationCache := cache.NewConversationCache(c.cache)
 			repo := repository.NewConversationRepo(conversationDao, conversationCache)
@@ -183,16 +187,17 @@ func (c *ConversationSuite) TestChat() {
 			conversationService := service.NewConversationService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 
-			tc.before(handler)
-			chat, err := server.Chat(context.Background(), &aiv1.Conversation{Sn: "1", Uid: "123",
+			tc.before(handler, sn)
+			chat, err := server.Chat(context.Background(), &aiv1.LLMRequest{
+				Sn: sn,
 				Message: []*aiv1.Message{
-					{Content: "content1"},
-					{Content: "content2"},
+					{Content: "content1", Role: aiv1.Role_SYSTEM},
+					{Content: "content2", Role: aiv1.Role_USER},
 				}})
 			require.NoError(t, err)
-			assert.Equal(t, chat.Sn, "1")
+			assert.Equal(t, chat.Sn, sn)
 			assert.Equal(t, chat.Response.Content, "event1")
-			tc.after()
+			tc.after(sn)
 		})
 	}
 }
@@ -217,7 +222,6 @@ func (c *ConversationSuite) TestStream() {
 				require.NoError(t, err)
 			},
 			after: func() {
-				//以数据库的数据为准
 				var message []dao.Message
 				err := c.db.Find(&message).Where("cid = ?", 1).Error
 				require.NoError(t, err)
@@ -238,7 +242,7 @@ func (c *ConversationSuite) TestStream() {
 			server := grpc.NewConversationServer(conversationService)
 			tc.before(handler)
 			mockStream := &mocks.MockStreamServer{Ctx: context.Background()}
-			err := server.Stream(&aiv1.Conversation{Sn: "1", Uid: "123",
+			err := server.Stream(&aiv1.LLMRequest{Sn: "1",
 				Message: []*aiv1.Message{
 					{Content: "content1"},
 					{Content: "content2"},

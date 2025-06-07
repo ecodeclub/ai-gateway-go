@@ -18,6 +18,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -32,6 +33,7 @@ func NewConversationDao(db *gorm.DB) *ConversationDao {
 func (dao *ConversationDao) Create(ctx context.Context, c Conversation) (Conversation, error) {
 	c.Utime = time.Now().Unix()
 	c.Ctime = time.Now().Unix()
+	c.Sn = uuid.New().String()
 	err := dao.db.WithContext(ctx).Create(&c).Error
 	if err != nil {
 		return Conversation{}, err
@@ -62,9 +64,9 @@ func (dao *ConversationDao) GetById(ctx context.Context, id int64) (Conversation
 	return conversation, nil
 }
 
-func (dao *ConversationDao) GetMessages(ctx context.Context, id int64, limit int64, offset int64) ([]Message, error) {
+func (dao *ConversationDao) GetMessages(ctx context.Context, sn string, limit int64, offset int64) ([]Message, error) {
 	var messages []Message
-	err := dao.db.WithContext(ctx).Where("cid = ?", id).
+	err := dao.db.WithContext(ctx).Where("sn = ?", sn).
 		Order("id DESC").
 		Offset(int(offset)).
 		Limit(int(limit)).
@@ -75,7 +77,7 @@ func (dao *ConversationDao) GetMessages(ctx context.Context, id int64, limit int
 	return messages, nil
 }
 
-func (dao *ConversationDao) CreateMessages(ctx context.Context, messages []Message) error {
+func (dao *ConversationDao) AddMessages(ctx context.Context, messages []Message) error {
 	now := time.Now().Unix()
 	for _, msg := range messages {
 		msg.Ctime = now
@@ -86,7 +88,8 @@ func (dao *ConversationDao) CreateMessages(ctx context.Context, messages []Messa
 }
 
 type Conversation struct {
-	ID    int64  `gorm:"primary_key;column:id"`
+	ID    int64  `gorm:"primary_key;autoIncrement"`
+	Sn    string `gorm:"uniqueIndex;column:sn;size:36"`
 	Uid   string `gorm:"column:uid;index"`
 	Title string `gorm:"column:title"`
 	Ctime int64  `gorm:"column:ctime"`
@@ -95,7 +98,7 @@ type Conversation struct {
 
 type Message struct {
 	ID            int64  `gorm:"primary_key;column:id"`
-	CID           int64  `gorm:"column:cid;index"`
+	Sn            string `gorm:"column:sn;size:36;index"`
 	Content       string `gorm:"column:content"`
 	ReasonContent string `gorm:"column:reason_content"`
 	Role          int64  `gorm:"column:role"`
