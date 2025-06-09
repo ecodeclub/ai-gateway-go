@@ -27,12 +27,6 @@ linters:
     - unparam
     - whitespace
 
-linters-settings:  # 注意这个是顶级键，不是嵌套在 linters 下
-  cyclop:
-    max-complexity: 15
-    skip-tests: true
-
-
 formatters:
   enable:
     - gofumpt

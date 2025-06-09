@@ -153,6 +153,7 @@ func (h *Handler) doRequest(req *http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("非200响应: %s", resp.Status)
 }
 
+//nolint:cyclop
 func (h *Handler) recv(ctx context.Context, eventCh chan domain.StreamEvent, stream io.ReadCloser) {
 	reader := bufio.NewReader(stream)
 	for {
@@ -173,7 +174,7 @@ func (h *Handler) recv(ctx context.Context, eventCh chan domain.StreamEvent, str
 
 		lineStr := string(line)
 		if len(lineStr) <= 6 || !strings.HasPrefix(lineStr, "data: ") {
-			eventCh <- domain.StreamEvent{Error: fmt.Errorf("解析数据 %s", lineStr)}
+			eventCh <- domain.StreamEvent{Error: fmt.Errorf("解析数据异常 %s ", lineStr)}
 			return
 		}
 
