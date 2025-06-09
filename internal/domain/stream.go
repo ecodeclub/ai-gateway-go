@@ -14,9 +14,19 @@
 
 package domain
 
+type ContentType string
+
+const (
+	ContentTypeText  ContentType = "text"
+	ContentTypeVideo ContentType = "video_url"
+	ContentTypeImage ContentType = "image_url"
+	ContentTypeAudio ContentType = "audio_url"
+)
+
 type LLMRequest struct {
-	Id   string
-	Text string
+	Id          string
+	Text        string
+	ContentType ContentType
 }
 type StreamEvent struct {
 	ReasoningContent string

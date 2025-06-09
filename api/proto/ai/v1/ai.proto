@@ -24,6 +24,7 @@ service AIService {
 message LLMRequest {
   string id = 1;
   string text = 2;
+  string contentType=3;
 }
 
 message StreamEvent {
