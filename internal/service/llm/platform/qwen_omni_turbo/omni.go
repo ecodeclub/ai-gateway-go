@@ -68,7 +68,7 @@ func (h *Handler) StreamHandle(ctx context.Context, llmRequest domain.LLMRequest
 	go func() {
 		defer close(events)
 		// 创建可取消的上下文（支持超时控制）
-		ctx, cancel := context.WithTimeout(ctx, h.config.Timeout)
+		ctx1, cancel := context.WithTimeout(ctx, h.config.Timeout)
 		defer cancel()
 
 		cs := h.buildContent(llmRequest)
@@ -81,7 +81,7 @@ func (h *Handler) StreamHandle(ctx context.Context, llmRequest domain.LLMRequest
 			return
 		}
 
-		req, err := h.buildRequest(ctx, marshal)
+		req, err := h.buildRequest(ctx1, marshal)
 		if err != nil {
 			events <- domain.StreamEvent{Error: fmt.Errorf("创建请求失败: %v", err)}
 			return
@@ -173,7 +173,8 @@ func (h *Handler) recv(ctx context.Context, eventCh chan domain.StreamEvent, str
 
 		lineStr := string(line)
 		if len(lineStr) <= 6 || !strings.HasPrefix(lineStr, "data: ") {
-			continue
+			eventCh <- domain.StreamEvent{Error: fmt.Errorf("解析数据 %s", lineStr)}
+			return
 		}
 
 		if strings.Contains(lineStr, "data: [DONE]") {
