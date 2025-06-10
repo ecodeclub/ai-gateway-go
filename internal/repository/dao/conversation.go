@@ -101,7 +101,7 @@ type Message struct {
 	Sn            string `gorm:"column:sn;size:36;index"`
 	Content       string `gorm:"column:content"`
 	ReasonContent string `gorm:"column:reason_content"`
-	Role          int64  `gorm:"column:role"`
+	Role          int32  `gorm:"column:role"`
 	Ctime         int64  `gorm:"column:ctime"`
 	Utime         int64  `gorm:"column:utime"`
 }

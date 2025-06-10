@@ -167,7 +167,7 @@ func (c *ConversationSuite) TestChat() {
 				handler.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(resp, nil)
 			},
 			after: func(sn string) {
-				//以数据库的数据为准
+				// 以数据库的数据为准
 				var messages []dao.Message
 				err := c.db.Find(&messages).Where("sn = ?", sn).Error
 				require.NoError(t, err)

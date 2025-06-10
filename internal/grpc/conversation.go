@@ -115,7 +115,7 @@ func (c *ConversationServer) toConversation(conversations []domain.Conversation)
 func (c *ConversationServer) toDomainMessage(messages []*ai.Message) []domain.Message {
 	return slice.Map(messages, func(idx int, src *ai.Message) domain.Message {
 		return domain.Message{
-			Role:    int64(src.Role),
+			Role:    int32(src.Role),
 			Content: src.Content,
 		}
 	})

@@ -36,7 +36,7 @@ type Conversation struct {
 type Message struct {
 	ID               int64
 	CID              int64
-	Role             int64
+	Role             int32
 	Content          string
 	ReasoningContent string
 }

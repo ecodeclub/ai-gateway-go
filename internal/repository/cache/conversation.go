@@ -86,7 +86,7 @@ func (c *ConversationCache) key(sn string) string {
 }
 
 type Message struct {
-	Role          int64  `json:"role"`
+	Role          int32  `json:"role"`
 	Content       string `json:"content"`
 	ReasonContent string `json:"reason_content"`
 }

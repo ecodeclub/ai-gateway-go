@@ -94,7 +94,7 @@ func (h *Handler) recv(eventCh chan domain.StreamEvent, stream deepseek.ChatComp
 	}
 }
 
-func (h *Handler) getRole(role int64) string {
+func (h *Handler) getRole(role int32) string {
 	switch role {
 	case domain.SYSTEM:
 		return deepseek.ChatMessageRoleSystem
@@ -109,7 +109,7 @@ func (h *Handler) getRole(role int64) string {
 	}
 }
 
-func (h *Handler) toDomainRole(role string) int64 {
+func (h *Handler) toDomainRole(role string) int32 {
 	switch role {
 	case deepseek.ChatMessageRoleSystem:
 		return domain.SYSTEM
