@@ -16,6 +16,7 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -31,25 +32,31 @@ func NewServer(svc *service.AIService) *Server {
 	return &Server{svc: svc}
 }
 
-func (server *Server) Invoke(ctx context.Context, r *ai.LLMRequest) (*ai.LLMResponse, error) {
+func (server *Server) Chat(ctx context.Context, r *ai.Message) (*ai.ChatResponse, error) {
+	id, _ := strconv.Atoi(r.Id)
 	resp, err := server.svc.Invoke(
 		ctx,
-		domain.LLMRequest{Id: r.GetId(), Text: r.GetText()})
-
+		domain.Message{ID: int64(id), Content: r.GetContent()})
 	if err != nil {
-		return &ai.LLMResponse{}, err
+		return &ai.ChatResponse{}, err
 	}
 
-	return &ai.LLMResponse{Content: resp.Content}, nil
+	return &ai.ChatResponse{
+		Sn: resp.Sn,
+		Response: &ai.Message{
+			Role:             ai.Role(resp.Response.Role),
+			Content:          resp.Response.Content,
+			ReasoningContent: resp.Response.ReasoningContent,
+		},
+	}, nil
 }
 
-func (server *Server) Stream(r *ai.LLMRequest, resp ai.AIService_StreamServer) error {
+func (server *Server) Stream(r *ai.Message, resp ai.AIService_StreamServer) error {
 	ctx := resp.Context()
-
+	id, _ := strconv.Atoi(r.Id)
 	ch, err := server.svc.Stream(
 		ctx,
-		domain.LLMRequest{Id: r.GetId(), Text: r.GetText()})
-
+		domain.Message{ID: int64(id), Content: r.GetContent()})
 	if err != nil {
 		return err
 	}

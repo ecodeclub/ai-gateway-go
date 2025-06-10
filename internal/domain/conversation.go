@@ -12,11 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package domain
 
-var SystemError = ErrorCode{Code: 501001, Msg: "系统错误"}
+import (
+	"github.com/ecodeclub/ekit"
+)
 
-type ErrorCode struct {
-	Code int
-	Msg  string
+const (
+	UNKNOWN = iota
+	USER
+	ASSISTANT
+	SYSTEM
+	TOOL
+)
+
+type Conversation struct {
+	Sn       string
+	Uid      string
+	Title    string
+	Messages []Message
+	Time     string
+}
+type Message struct {
+	ID               int64
+	CID              int64
+	Role             int32
+	Content          string
+	ReasoningContent string
+}
+
+type ChatResponse struct {
+	Sn       string
+	Response Message
+	Metadata ekit.AnyValue
 }

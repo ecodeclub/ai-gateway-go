@@ -23,10 +23,10 @@ import (
 	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/test/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 )
 
 type ServerTestSuite struct {
@@ -42,19 +42,19 @@ func (s *ServerTestSuite) TestStream() {
 
 	testcases := []struct {
 		name   string
-		before func(handler *mocks.MockLLMHandler)
+		before func(handler *mocks.MockHandler)
 		want   []domain.StreamEvent
 	}{
 		{
 			name: "stream event",
-			before: func(handler *mocks.MockLLMHandler) {
+			before: func(handler *mocks.MockHandler) {
 				streamChan := make(chan domain.StreamEvent, 2)
-				streamChan <- domain.StreamEvent{Content: "event1"}
-				streamChan <- domain.StreamEvent{Content: "event2"}
+				streamChan <- domain.StreamEvent{Content: "event1", ReasoningContent: "reason1"}
+				streamChan <- domain.StreamEvent{Content: "event2", ReasoningContent: "reason1"}
 				close(streamChan)
 				handler.EXPECT().StreamHandle(gomock.Any(), gomock.Any()).Return(streamChan, nil)
 			},
-			want: []domain.StreamEvent{{Content: "event1"}, {Content: "event2"}},
+			want: []domain.StreamEvent{{Content: "event1", ReasoningContent: "reason1"}, {Content: "event2", ReasoningContent: "reason2"}},
 		},
 	}
 	for _, tc := range testcases {
@@ -62,13 +62,13 @@ func (s *ServerTestSuite) TestStream() {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			handler := mocks.NewMockLLMHandler(ctrl)
+			handler := mocks.NewMockHandler(ctrl)
 			svc := service.NewAIService(handler)
 			server := igrpc.NewServer(svc)
 
 			tc.before(handler)
 			mockStream := &mocks.MockStreamServer{Ctx: context.Background()}
-			err := server.Stream(&ai.LLMRequest{}, mockStream)
+			err := server.Stream(&ai.Message{}, mockStream)
 			require.NoError(t, err)
 
 			for i, event := range tc.want {
@@ -83,29 +83,29 @@ func (s *ServerTestSuite) TestInvoke() {
 
 	testcases := []struct {
 		name   string
-		before func(handler *mocks.MockLLMHandler)
-		want   domain.LLMResponse
+		before func(handler *mocks.MockHandler)
+		want   domain.ChatResponse
 	}{
 		{
 			name: "stream event",
-			before: func(handler *mocks.MockLLMHandler) {
-				resp := domain.LLMResponse{Content: "event1"}
+			before: func(handler *mocks.MockHandler) {
+				resp := domain.ChatResponse{Response: domain.Message{Content: "event1"}}
 				handler.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(resp, nil)
 			},
-			want: domain.LLMResponse{Content: "event1"},
+			want: domain.ChatResponse{Response: domain.Message{Content: "event1"}},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			handler := mocks.NewMockLLMHandler(ctrl)
+			handler := mocks.NewMockHandler(ctrl)
 			svc := service.NewAIService(handler)
 			server := igrpc.NewServer(svc)
 			tc.before(handler)
-			invoke, err := server.Invoke(context.Background(), &ai.LLMRequest{Id: "1", Text: "hello"})
+			invoke, err := server.Chat(context.Background(), &ai.Message{Id: "1", Content: "hello"})
 			require.NoError(t, err)
-			require.Equal(t, tc.want.Content, invoke.Content)
+			require.Equal(t, tc.want.Response.Content, invoke.Response.Content)
 		})
 	}
 }

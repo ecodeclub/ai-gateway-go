@@ -19,9 +19,7 @@ import (
 	"github.com/ecodeclub/ginx"
 )
 
-var (
-	systemErrorResult = ginx.Result{
-		Code: errs.SystemError.Code,
-		Msg:  errs.SystemError.Msg,
-	}
-)
+var systemErrorResult = ginx.Result{
+	Code: errs.SystemError.Code,
+	Msg:  errs.SystemError.Msg,
+}
