@@ -94,8 +94,8 @@ func (c *ConversationService) Stream(ctx context.Context, sn string, messages []
 				return
 			case value, ok := <-event:
 				if !ok || value.Done {
-					err = c.repo.AddMessages(ctx, sn, []domain.Message{message})
-					if err != nil {
+					err1 := c.repo.AddMessages(ctx, sn, []domain.Message{message})
+					if err1 != nil {
 						elog.Error("写入数据库失败", elog.FieldErr(err))
 					}
 					ch <- domain.StreamEvent{Done: true}
