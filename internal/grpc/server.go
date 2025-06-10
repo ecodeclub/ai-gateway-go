@@ -37,7 +37,6 @@ func (server *Server) Chat(ctx context.Context, r *ai.Message) (*ai.ChatResponse
 	resp, err := server.svc.Invoke(
 		ctx,
 		domain.Message{ID: int64(id), Content: r.GetContent()})
-
 	if err != nil {
 		return &ai.ChatResponse{}, err
 	}
@@ -48,7 +47,8 @@ func (server *Server) Chat(ctx context.Context, r *ai.Message) (*ai.ChatResponse
 			Role:             ai.Role(resp.Response.Role),
 			Content:          resp.Response.Content,
 			ReasoningContent: resp.Response.ReasoningContent,
-		}}, nil
+		},
+	}, nil
 }
 
 func (server *Server) Stream(r *ai.Message, resp ai.AIService_StreamServer) error {
@@ -57,7 +57,6 @@ func (server *Server) Stream(r *ai.Message, resp ai.AIService_StreamServer) erro
 	ch, err := server.svc.Stream(
 		ctx,
 		domain.Message{ID: int64(id), Content: r.GetContent()})
-
 	if err != nil {
 		return err
 	}

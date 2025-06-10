@@ -49,7 +49,6 @@ func (h *GraphHandler) PrivateRoutes(engine *gin.Engine) {
 }
 
 func (h *GraphHandler) PublicRoutes(_ *gin.Engine) {
-
 }
 
 func (h *GraphHandler) GetGraph(ctx *ginx.Context, req GetReq, _ session.Session) (ginx.Result, error) {

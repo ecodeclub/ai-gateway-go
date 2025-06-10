@@ -68,7 +68,6 @@ func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan 
 		newCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
 		defer cancel()
 		stream, err := h.client.CreateChatCompletionStream(newCtx, &request)
-
 		if err != nil {
 			events <- domain.StreamEvent{Error: err}
 			return

@@ -118,7 +118,7 @@ func TestBizConfigHandler_Create(t *testing.T) {
 			server.ServeHTTP(recorder, req)
 
 			assert.Equal(t, tc.wantCode, recorder.Code)
-			//assert.Equal(t, tc.wantBody, recorder.Body.String())
+			// assert.Equal(t, tc.wantBody, recorder.Body.String())
 			assert.JSONEq(t, tc.wantBody, recorder.Body.String())
 		})
 	}

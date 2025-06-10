@@ -193,7 +193,8 @@ func (c *ConversationSuite) TestChat() {
 				Message: []*aiv1.Message{
 					{Content: "content1", Role: aiv1.Role_SYSTEM},
 					{Content: "content2", Role: aiv1.Role_USER},
-				}})
+				},
+			})
 			require.NoError(t, err)
 			assert.Equal(t, chat.Sn, sn)
 			assert.Equal(t, chat.Response.Content, "event1")
@@ -242,11 +243,13 @@ func (c *ConversationSuite) TestStream() {
 			server := grpc.NewConversationServer(conversationService)
 			tc.before(handler)
 			mockStream := &mocks.MockStreamServer{Ctx: context.Background()}
-			err := server.Stream(&aiv1.LLMRequest{Sn: "1",
+			err := server.Stream(&aiv1.LLMRequest{
+				Sn: "1",
 				Message: []*aiv1.Message{
 					{Content: "content1"},
 					{Content: "content2"},
-				}}, mockStream)
+				},
+			}, mockStream)
 			require.NoError(t, err)
 			for i, event := range tc.want {
 				assert.Equal(t, event.Content, mockStream.Events[i].Content)

@@ -38,7 +38,6 @@ func (c *ConversationServer) Create(ctx context.Context, conversation *ai.Conver
 		Title: conversation.Title,
 		Uid:   conversation.Uid,
 	})
-
 	if err != nil {
 		return &ai.Conversation{}, err
 	}
@@ -55,7 +54,6 @@ func (c *ConversationServer) List(ctx context.Context, req *ai.ListReq) (*ai.Lis
 
 func (c *ConversationServer) Chat(ctx context.Context, request *ai.LLMRequest) (*ai.ChatResponse, error) {
 	response, err := c.svc.Chat(ctx, request.Sn, c.toDomainMessage(request.Message))
-
 	if err != nil {
 		return &ai.ChatResponse{}, err
 	}
