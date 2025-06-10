@@ -86,15 +86,18 @@ func (c *ConversationService) Stream(ctx context.Context, sn string, messages []
 	}
 
 	go func() {
-		var message domain.Message
-
+		conent := ""
+		reasoningContent := ""
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case value, ok := <-event:
 				if !ok || value.Done {
-					err1 := c.repo.AddMessages(ctx, sn, []domain.Message{message})
+					err1 := c.repo.AddMessages(ctx, sn, []domain.Message{{
+						Content:          conent,
+						ReasoningContent: reasoningContent,
+					}})
 					if err1 != nil {
 						elog.Error("写入数据库失败", elog.FieldErr(err))
 					}
@@ -102,8 +105,8 @@ func (c *ConversationService) Stream(ctx context.Context, sn string, messages []
 					return
 				}
 
-				message.ReasoningContent += value.ReasoningContent
-				message.ReasoningContent += value.Content
+				reasoningContent += value.ReasoningContent
+				conent += value.Content
 				ch <- value
 			}
 		}
