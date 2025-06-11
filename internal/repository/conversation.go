@@ -66,8 +66,8 @@ func (repo *ConversationRepo) GetByUid(ctx context.Context, uid string, limit in
 	return repo.toConversation(conversation), nil
 }
 
-// GetMessageList 用来获取历史消息列表
-func (repo *ConversationRepo) GetMessageList(ctx context.Context, sn string, limit int64, offset int64) ([]domain.Message, error) {
+// GetHistoryMessageList 用来获取历史消息列表
+func (repo *ConversationRepo) GetHistoryMessageList(ctx context.Context, sn string, limit int64, offset int64) ([]domain.Message, error) {
 	messageCache, err := repo.cache.GetMessage(ctx, sn, limit, offset)
 	if err != nil {
 		messages, err := repo.dao.GetMessages(ctx, sn, limit, offset)
@@ -83,6 +83,14 @@ func (repo *ConversationRepo) GetMessageList(ctx context.Context, sn string, lim
 		return repo.toDomainMessage(messages), nil
 	}
 	return repo.toMessage(messageCache), nil
+}
+
+func (repo *ConversationRepo) GetMessageList(ctx context.Context, sn string, limit int64, offset int64) ([]domain.Message, error) {
+	messages, err := repo.dao.GetMessages(ctx, sn, limit, offset)
+	if err != nil {
+		return []domain.Message{}, err
+	}
+	return repo.toDomainMessage(messages), nil
 }
 
 func (repo *ConversationRepo) toDaoMessage(sn string, messages []domain.Message) []dao.Message {

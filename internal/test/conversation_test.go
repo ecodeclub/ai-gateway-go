@@ -258,3 +258,42 @@ func (c *ConversationSuite) TestStream() {
 		})
 	}
 }
+
+func (c *ConversationSuite) TestDetail() {
+	t := c.T()
+
+	testcases := []struct {
+		name   string
+		before func()
+	}{
+		{
+			name: "获取当前对话的列表的消息",
+			before: func() {
+				err := c.db.WithContext(context.Background()).Create([]dao.Message{
+					{Sn: "1", Content: "user1", Role: int32(aiv1.Role_USER)},
+					{Sn: "1", Content: "llm1", Role: int32(aiv1.Role_ASSISTANT)},
+				}).Error
+				require.NoError(t, err)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			conversationDao := dao.NewConversationDao(c.db)
+			conversationCache := cache.NewConversationCache(c.cache)
+			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			ctrl := gomock.NewController(t)
+			handler := mocks.NewMockHandler(ctrl)
+			conversationService := service.NewConversationService(repo, handler)
+			server := grpc.NewConversationServer(conversationService)
+			tc.before()
+			detail, err := server.Detail(context.Background(), &aiv1.MsgListReq{Sn: "1"})
+			require.NoError(t, err)
+			assert.ElementsMatch(t, detail.Message, []*aiv1.Message{
+				{Role: aiv1.Role_USER, Content: "user1"},
+				{Role: aiv1.Role_ASSISTANT, Content: "llm1"},
+			})
+		})
+	}
+}

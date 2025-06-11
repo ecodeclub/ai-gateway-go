@@ -32,6 +32,7 @@ service ConversationService {
   rpc Create(Conversation) returns (Conversation);
   rpc List(ListReq) returns(ListResp);
   rpc Chat(LLMRequest) returns(ChatResponse);
+  rpc Detail(MsgListReq) returns(MsgListResp);
   rpc Stream(LLMRequest) returns(stream StreamEvent);
 }
 
@@ -55,6 +56,14 @@ message ListResp {
 
 message LLMRequest {
   string sn = 1;
+  repeated Message message = 2;
+}
+
+message MsgListReq {
+  string sn = 1;
+}
+
+message MsgListResp {
   repeated Message message = 2;
 }
 
