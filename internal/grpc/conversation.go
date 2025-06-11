@@ -54,7 +54,6 @@ func (c *ConversationServer) List(ctx context.Context, req *ai.ListReq) (*ai.Lis
 
 func (c *ConversationServer) Detail(ctx context.Context, req *ai.MsgListReq) (*ai.MsgListResp, error) {
 	detail, err := c.svc.Detail(ctx, req.Sn)
-
 	if err != nil {
 		return &ai.MsgListResp{}, err
 	}
