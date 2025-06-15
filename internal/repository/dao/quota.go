@@ -25,7 +25,7 @@ type TempQuota struct {
 }
 
 type Quota struct {
-	ID     int64  `gorm:"primaryKey;autoIncrement;colum:id"`
+	ID     int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	UID    string `gorm:"column:uid"`
 	Amount int64  `gorm:"colum:amount"`
 	Ctime  int64  `gorm:"column:ctime"`
