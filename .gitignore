@@ -29,3 +29,4 @@ go.work.sum
 logs
 .log
 .sys
+**/local.yaml

@@ -13,18 +13,24 @@
 # limitations under the License.
 
 version: v2
-modules:
-  - path: api/proto
-lint:
-  use:
-    - DEFAULT
-  except:
-    - FIELD_NOT_REQUIRED
-    - PACKAGE_NO_IMPORT_CYCLE
-  disallow_comment_ignores: true
+deps:
+  - buf.build/googleapis/googleapis
 breaking:
   use:
     - FILE
+lint:
+  use:
+    - STANDARD  # Omit all Buf categories if you don't want to use Buf's built-in rules
   except:
-    - EXTENSION_NO_DELETE
-    - FIELD_SAME_DEFAULT
+    - ENUM_VALUE_PREFIX
+    - ENUM_ZERO_VALUE_SUFFIX
+  ignore:
+    - google/type/datetime.proto
+    - google/protobuf/empty.proto
+    - google/protobuf/timestamp.proto
+  disallow_comment_ignores: false # The default behavior of this key has changed from v1
+  enum_zero_value_suffix: _UNSPECIFIED
+  rpc_allow_same_request_response: false
+  rpc_allow_google_protobuf_empty_requests: false
+  rpc_allow_google_protobuf_empty_responses: false
+  service_suffix: Service
