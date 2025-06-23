@@ -14,7 +14,8 @@
 
 syntax = "proto3";
 package ai.v1;
-option go_package = "ai/v1;aiv1";
+
+option go_package = "v1/ai;aiv1";
 
 service AIService {
   rpc Chat(Message) returns (ChatResponse);
@@ -30,9 +31,9 @@ message StreamEvent {
 
 service ConversationService {
   rpc Create(Conversation) returns (Conversation);
-  rpc List(ListReq) returns(ListResp);
-  rpc Chat(LLMRequest) returns(ChatResponse);
-  rpc Stream(LLMRequest) returns(stream StreamEvent);
+  rpc List(ListReq) returns (ListResp);
+  rpc Chat(LLMRequest) returns (ChatResponse);
+  rpc Stream(LLMRequest) returns (stream StreamEvent);
 }
 
 message Conversation {
@@ -57,7 +58,6 @@ message LLMRequest {
   string sn = 1;
   repeated Message message = 2;
 }
-
 
 enum Role {
   UNKNOWN = 0;
