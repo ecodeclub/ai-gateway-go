@@ -52,6 +52,14 @@ func (c *ConversationServer) List(ctx context.Context, req *ai.ListReq) (*ai.Lis
 	return &ai.ListResp{Conversations: c.toConversation(conversation)}, nil
 }
 
+func (c *ConversationServer) Detail(ctx context.Context, req *ai.MsgListReq) (*ai.MsgListResp, error) {
+	detail, err := c.svc.Detail(ctx, req.Sn)
+	if err != nil {
+		return &ai.MsgListResp{}, err
+	}
+	return &ai.MsgListResp{Message: c.toMessage(detail)}, nil
+}
+
 func (c *ConversationServer) Chat(ctx context.Context, request *ai.LLMRequest) (*ai.ChatResponse, error) {
 	response, err := c.svc.Chat(ctx, request.Sn, c.toDomainMessage(request.Message))
 	if err != nil {
@@ -115,6 +123,16 @@ func (c *ConversationServer) toDomainMessage(messages []*ai.Message) []domain.Me
 		return domain.Message{
 			Role:    int32(src.Role),
 			Content: src.Content,
+		}
+	})
+}
+
+func (c *ConversationServer) toMessage(messages []domain.Message) []*ai.Message {
+	return slice.Map(messages, func(idx int, src domain.Message) *ai.Message {
+		return &ai.Message{
+			Role:             ai.Role(src.Role),
+			Content:          src.Content,
+			ReasoningContent: src.ReasoningContent,
 		}
 	})
 }

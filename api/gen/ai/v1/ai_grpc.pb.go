@@ -180,6 +180,7 @@ const (
 	ConversationService_Create_FullMethodName = "/ai.v1.ConversationService/Create"
 	ConversationService_List_FullMethodName   = "/ai.v1.ConversationService/List"
 	ConversationService_Chat_FullMethodName   = "/ai.v1.ConversationService/Chat"
+	ConversationService_Detail_FullMethodName = "/ai.v1.ConversationService/Detail"
 	ConversationService_Stream_FullMethodName = "/ai.v1.ConversationService/Stream"
 )
 
@@ -190,6 +191,7 @@ type ConversationServiceClient interface {
 	Create(ctx context.Context, in *Conversation, opts ...grpc.CallOption) (*Conversation, error)
 	List(ctx context.Context, in *ListReq, opts ...grpc.CallOption) (*ListResp, error)
 	Chat(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (*ChatResponse, error)
+	Detail(ctx context.Context, in *MsgListReq, opts ...grpc.CallOption) (*MsgListResp, error)
 	Stream(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 }
 
@@ -231,6 +233,16 @@ func (c *conversationServiceClient) Chat(ctx context.Context, in *LLMRequest, op
 	return out, nil
 }
 
+func (c *conversationServiceClient) Detail(ctx context.Context, in *MsgListReq, opts ...grpc.CallOption) (*MsgListResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MsgListResp)
+	err := c.cc.Invoke(ctx, ConversationService_Detail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *conversationServiceClient) Stream(ctx context.Context, in *LLMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &ConversationService_ServiceDesc.Streams[0], ConversationService_Stream_FullMethodName, cOpts...)
@@ -257,6 +269,7 @@ type ConversationServiceServer interface {
 	Create(context.Context, *Conversation) (*Conversation, error)
 	List(context.Context, *ListReq) (*ListResp, error)
 	Chat(context.Context, *LLMRequest) (*ChatResponse, error)
+	Detail(context.Context, *MsgListReq) (*MsgListResp, error)
 	Stream(*LLMRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	mustEmbedUnimplementedConversationServiceServer()
 }
@@ -276,6 +289,9 @@ func (UnimplementedConversationServiceServer) List(context.Context, *ListReq) (*
 }
 func (UnimplementedConversationServiceServer) Chat(context.Context, *LLMRequest) (*ChatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Chat not implemented")
+}
+func (UnimplementedConversationServiceServer) Detail(context.Context, *MsgListReq) (*MsgListResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Detail not implemented")
 }
 func (UnimplementedConversationServiceServer) Stream(*LLMRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
@@ -355,6 +371,24 @@ func _ConversationService_Chat_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_Detail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgListReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).Detail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_Detail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).Detail(ctx, req.(*MsgListReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ConversationService_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(LLMRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -384,6 +418,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Chat",
 			Handler:    _ConversationService_Chat_Handler,
+		},
+		{
+			MethodName: "Detail",
+			Handler:    _ConversationService_Detail_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
