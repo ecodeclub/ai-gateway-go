@@ -14,6 +14,9 @@ func NewQuotaRepo(quota *dao.Quota) *QuotaRepo {
 	return &QuotaRepo{quota: quota}
 }
 
-func (q *QuotaRepo) Get(ctx context.Context) {
+func (q *QuotaRepo) Get(ctx context.Context) error {
+	return nil
+}
 
+func (q *QuotaRepo) Deduct(ctx context.Context) error {
 }
