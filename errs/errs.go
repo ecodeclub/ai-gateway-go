@@ -18,4 +18,7 @@ import (
 	"errors"
 )
 
-var ErrBizConfigNotFound = errors.New("biz config not found")
+var (
+	ErrNoAmount          = errors.New("余额不足")
+	ErrBizConfigNotFound = errors.New("biz config not found")
+)

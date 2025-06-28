@@ -16,33 +16,29 @@ package dao
 
 import (
 	"context"
-	"errors"
 	"time"
 
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"gorm.io/gorm"
 )
 
-var (
-	ErrNoAmount error = errors.New("余额不足")
-)
-
 type TempQuota struct {
-	ID        int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	UID       string `gorm:"column:uid"`
-	Amount    int64  `gorm:"column:amount"`
-	StartTime int64  `gorm:"column:start_time"`
-	EndTime   int64  `gorm:"column:end_time"`
-	Ctime     int64  `gorm:"column:ctime"`
-	Utime     int64  `gorm:"column:utime"`
+	ID        int64 `gorm:"primaryKey;autoIncrement;column:id"`
+	UID       int64 `gorm:"column:uid"`
+	Amount    int64 `gorm:"column:amount"`
+	StartTime int64 `gorm:"column:start_time"`
+	EndTime   int64 `gorm:"column:end_time"`
+	Ctime     int64 `gorm:"column:ctime"`
+	Utime     int64 `gorm:"column:utime"`
 }
 
 type Quota struct {
-	ID            int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	UID           string `gorm:"column:uid"`
-	Amount        int64  `gorm:"column:amount"`
-	LastClearTime int64  `gorm:"column:last_clear_time"`
-	Ctime         int64  `gorm:"column:ctime"`
-	Utime         int64  `gorm:"column:utime"`
+	ID            int64 `gorm:"primaryKey;autoIncrement;column:id"`
+	UID           int64 `gorm:"column:uid"`
+	Amount        int64 `gorm:"column:amount"`
+	LastClearTime int64 `gorm:"column:last_clear_time"`
+	Ctime         int64 `gorm:"column:ctime"`
+	Utime         int64 `gorm:"column:utime"`
 }
 
 type QuotaDao struct {
@@ -65,20 +61,41 @@ func (dao *QuotaDao) CreateTempQuota(ctx context.Context, quota TempQuota) error
 func (dao *QuotaDao) Create(ctx context.Context, quota Quota) error {
 	now := time.Now().Unix()
 	quota.Ctime = now
-	quota.Ctime = now
+	quota.Utime = now
 	return dao.db.WithContext(ctx).Create(&quota).Error
 }
 
-func (dao *QuotaDao) GetQuotaByUid(ctx context.Context, uid string) error {
-	return dao.db.WithContext(ctx).Where("uid = ?", uid).Error
+func (dao *QuotaDao) UpdateQuota(ctx context.Context, quota Quota) error {
+	now := time.Now().Unix()
+	quota.Utime = now
+
+	return dao.db.WithContext(ctx).Where("uid = ?", quota.UID).Updates(map[string]any{
+		"amount": quota.Amount,
+		"utime":  quota.Utime,
+	}).Error
 }
 
-func (dao *QuotaDao) GetTempQuotaByUid(ctx context.Context, uid string) error {
-	return dao.db.WithContext(ctx).Where("uid = ?", uid).Error
+func (dao *QuotaDao) GetQuotaByUid(ctx context.Context, uid int64) (Quota, error) {
+	var quota Quota
+	err := dao.db.WithContext(ctx).Where("uid = ? and end_time >= ?", uid).First(&quota).Error
+	if err != nil {
+		return Quota{}, err
+	}
+	return quota, nil
+}
+
+func (dao *QuotaDao) GetTempQuotaByUidAndTime(ctx context.Context, uid int64) ([]TempQuota, error) {
+	now := time.Now().Unix()
+	var quota []TempQuota
+	err := dao.db.WithContext(ctx).Where("uid = ? and end_time >= ?", uid, now).Find(&quota).Error
+	if err != nil {
+		return nil, err
+	}
+	return quota, nil
 }
 
 // Deduct 扣减
-func (dao *QuotaDao) Deduct(ctx context.Context, uid string, amount int64) error {
+func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64) error {
 	now := time.Now().Unix()
 	// 首先扣除temp 的, 然后扣除 quota的
 	err := dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -87,7 +104,6 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid string, amount int64) error
 		err := tx.Where("uid = ? AND end_time >= ?", uid, now).
 			Order("end_time ASC").
 			Find(&tempQuotas).Error
-
 		if err != nil {
 			return err
 		}
@@ -107,9 +123,11 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid string, amount int64) error
 				amount -= deduct
 			}
 			tq.Amount -= deduct
-			tq.Utime = now
 			// 然后更新
-			err = tx.Model(tq).Select("amount", "utime").Updates(tq).Error
+			err = tx.Model(&TempQuota{}).Where("uid = ?", uid).Updates(map[string]any{
+				"amount": tq.Amount,
+				"utime":  now,
+			}).Error
 			if err != nil {
 				return err
 			}
@@ -128,21 +146,20 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid string, amount int64) error
 
 		// 扣完了发现还不够扣的, 从 quota 中扣
 		if quota.Amount < amount {
-			return ErrNoAmount
+			return errs.ErrNoAmount
 		}
 		quota.Amount -= amount
 		quota.Utime = now
 		quota.LastClearTime = now
 
-		//更新
-		err = tx.Model(&Quota{}).Updates(map[string]any{
+		// 更新
+		err = tx.Model(&Quota{}).Where("uid = ?", uid).Updates(map[string]any{
 			"amount":          quota.Amount,
 			"utime":           quota.Utime,
 			"last_clear_time": quota.LastClearTime,
 		}).Error
-
 		if err != nil {
-			return ErrNoAmount
+			return errs.ErrNoAmount
 		}
 
 		return nil
