@@ -16,13 +16,18 @@ package domain
 
 type Quota struct {
 	Amount        int64
+	Key           string
 	Uid           int64
 	LastClearTime int64
 }
 
 type TempQuota struct {
 	Amount    int64
+	Key       string
 	StartTime int64
 	EndTime   int64
 	Uid       int64
+}
+
+type Record struct {
 }

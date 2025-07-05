@@ -30,16 +30,12 @@ func NewQuotaRepo(dao *dao.QuotaDao) *QuotaRepo {
 	return &QuotaRepo{dao: dao}
 }
 
-func (q *QuotaRepo) CreateQuota(ctx context.Context, quota domain.Quota) error {
-	return q.dao.Create(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount})
+func (q *QuotaRepo) SaveQuota(ctx context.Context, quota domain.Quota) error {
+	return q.dao.SaveQuota(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount, Key: quota.Key})
 }
 
-func (q *QuotaRepo) UpdateQuota(ctx context.Context, quota domain.Quota) error {
-	return q.dao.UpdateQuota(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount})
-}
-
-func (q *QuotaRepo) CreateTempQuota(ctx context.Context, quota domain.TempQuota) error {
-	return q.dao.CreateTempQuota(ctx, dao.TempQuota{Amount: quota.Amount, StartTime: quota.StartTime, EndTime: quota.EndTime})
+func (q *QuotaRepo) SaveTempQuota(ctx context.Context, quota domain.TempQuota) error {
+	return q.dao.SaveTempQuota(ctx, dao.TempQuota{Amount: quota.Amount, StartTime: quota.StartTime, EndTime: quota.EndTime, Key: quota.Key})
 }
 
 func (q *QuotaRepo) GetQuota(ctx context.Context, uid int64) (domain.Quota, error) {
@@ -56,10 +52,6 @@ func (q *QuotaRepo) GetTempQuota(ctx context.Context, uid int64) ([]domain.TempQ
 		return nil, err
 	}
 	return q.toDomainTempQuota(tempQuotaList), nil
-}
-
-func (q *QuotaRepo) Deduct(ctx context.Context, uid int64, amount int64) error {
-	return q.dao.Deduct(ctx, uid, amount)
 }
 
 func (q *QuotaRepo) toDomainTempQuota(tmpQuotaList []dao.TempQuota) []domain.TempQuota {

@@ -33,20 +33,23 @@ func NewQuotaHandler(svc *service.QuotaService) *QuotaHandler {
 	return &QuotaHandler{svc: svc}
 }
 
-func (q *QuotaHandler) PrivateRoutes(_ *gin.Engine) {}
+func (q *QuotaHandler) PublicRoutes(_ *gin.Engine) {}
 
-func (q *QuotaHandler) PublicRoutes(server *gin.Engine) {
+func (q *QuotaHandler) PrivateRoutes(server *gin.Engine) {
 	group := server.Group("/quota")
-	group.POST("/create", ginx.BS(q.CreateTempQuota))
-	group.POST("/create_tmp", ginx.BS(q.CreateTempQuota))
-	group.POST("/deduct", ginx.BS(q.Deduct))
+	group.POST("/save", ginx.BS(q.SaveQuota))
 	group.POST("/get", ginx.S(q.GetQuota))
-	group.POST("/get_tmp", ginx.S(q.GetTempQuota))
+
+	tmp := server.Group("/tmp")
+	tmp.POST("/save", ginx.BS(q.SaveTempQuota))
+	tmp.POST("/get", ginx.S(q.GetTempQuota))
+
+	server.POST("/deduct", ginx.BS(q.Deduct))
 }
 
-func (q *QuotaHandler) CreateQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
+func (q *QuotaHandler) SaveQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
-	err := q.svc.CreateQuota(ctx, domain.Quota{Amount: req.Amount, Uid: uid})
+	err := q.svc.SaveQuota(ctx, domain.Quota{Amount: req.Amount, Uid: uid, Key: req.Key})
 	if err != nil {
 		return systemErrorResult, nil
 	}
@@ -55,7 +58,7 @@ func (q *QuotaHandler) CreateQuota(ctx *ginx.Context, req QuotaRequest, sess ses
 	}, nil
 }
 
-func (q *QuotaHandler) CreateTempQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
+func (q *QuotaHandler) SaveTempQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
 
 	if req.StartTime == "" || req.EndTime == "" {
@@ -65,7 +68,7 @@ func (q *QuotaHandler) CreateTempQuota(ctx *ginx.Context, req QuotaRequest, sess
 	start, _ := q.toTimestamp(req.StartTime)
 	end, _ := q.toTimestamp(req.EndTime)
 
-	err := q.svc.CreateTempQuota(ctx, domain.TempQuota{Amount: req.Amount, Uid: uid, StartTime: start, EndTime: end})
+	err := q.svc.SaveTempQuota(ctx, domain.TempQuota{Amount: req.Amount, Uid: uid, StartTime: start, EndTime: end})
 	if err != nil {
 		return systemErrorResult, nil
 	}
@@ -99,22 +102,9 @@ func (q *QuotaHandler) GetTempQuota(ctx *ginx.Context, sees session.Session) (gi
 	}, nil
 }
 
-func (q *QuotaHandler) UpdateQuota(ctx *ginx.Context, req QuotaRequest, sees session.Session) (ginx.Result, error) {
-	uid := sees.Claims().Uid
-
-	err := q.svc.UpdateQuota(ctx, domain.Quota{Uid: uid, Amount: req.Amount})
-	if err != nil {
-		return systemErrorResult, nil
-	}
-
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
 func (q *QuotaHandler) Deduct(ctx *ginx.Context, req QuotaRequest, sees session.Session) (ginx.Result, error) {
 	uid := sees.Claims().Uid
-	err := q.svc.Deduct(ctx, uid, req.Amount)
+	err := q.svc.Deduct(ctx, uid, req.Amount, req.Key)
 	if err != nil {
 		return systemErrorResult, nil
 	}
@@ -142,12 +132,14 @@ func (q *QuotaHandler) toQuotaResponse(tempQuotaList []domain.TempQuota) []Quota
 
 type QuotaRequest struct {
 	Amount    int64  `json:"amount,omitempty"`
+	Key       string `json:"key,omitempty"`
 	StartTime string `json:"start_time,omitempty"`
 	EndTime   string `json:"end_time,omitempty"`
 }
 
 type QuotaResponse struct {
 	Amount    int64  `json:"amount,omitempty"`
+	Key       string `json:"key"`
 	StartTime string `json:"start_time,omitempty"`
 	EndTime   string `json:"end_time,omitempty"`
 }

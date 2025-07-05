@@ -16,7 +16,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 )
@@ -29,16 +31,12 @@ func NewQuotaService(repo *repository.QuotaRepo) *QuotaService {
 	return &QuotaService{repo: repo}
 }
 
-func (q *QuotaService) CreateQuota(ctx context.Context, quota domain.Quota) error {
-	return q.repo.CreateQuota(ctx, quota)
+func (q *QuotaService) SaveQuota(ctx context.Context, quota domain.Quota) error {
+	return q.repo.SaveQuota(ctx, quota)
 }
 
-func (q *QuotaService) CreateTempQuota(ctx context.Context, quota domain.TempQuota) error {
-	return q.repo.CreateTempQuota(ctx, quota)
-}
-
-func (q *QuotaService) UpdateQuota(ctx context.Context, quota domain.Quota) error {
-	return q.repo.UpdateQuota(ctx, quota)
+func (q *QuotaService) SaveTempQuota(ctx context.Context, quota domain.TempQuota) error {
+	return q.repo.SaveTempQuota(ctx, quota)
 }
 
 func (q *QuotaService) GetTempQuota(ctx context.Context, uid int64) ([]domain.TempQuota, error) {
@@ -49,6 +47,54 @@ func (q *QuotaService) GetQuota(ctx context.Context, uid int64) (domain.Quota, e
 	return q.repo.GetQuota(ctx, uid)
 }
 
-func (q *QuotaService) Deduct(ctx context.Context, uid int64, amount int64) error {
-	return q.repo.Deduct(ctx, uid, amount)
+func (q *QuotaService) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
+	key1 := fmt.Sprintf("temp_%s", key)
+	key2 := fmt.Sprintf("quota_%s", key)
+	tempQuotaList, err := q.repo.GetTempQuota(ctx, uid)
+	if err != nil {
+		return err
+	}
+	// 1. 优先扣减临时表
+	for i := range tempQuotaList {
+		tq := tempQuotaList[i]
+		if amount <= 0 {
+			break
+		}
+		deduct := int64(0)
+		if tq.Amount >= amount {
+			deduct = amount
+			amount = 0
+		} else {
+			deduct = tq.Amount
+			amount -= deduct
+		}
+		tq.Amount -= deduct
+		err = q.SaveTempQuota(ctx, domain.TempQuota{
+			Uid:    uid,
+			Amount: tq.Amount,
+			Key:    key1,
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+	// 扣减完成了
+	if amount <= 0 {
+		return nil
+	}
+
+	quota, err := q.GetQuota(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if quota.Amount < amount {
+		return errs.ErrNoAmount
+	}
+
+	return q.SaveQuota(ctx, domain.Quota{
+		Uid:    uid,
+		Amount: amount,
+		Key:    key2,
+	})
 }
