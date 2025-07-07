@@ -90,7 +90,6 @@ func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan 
 	request := openai.ChatCompletionNewParams{
 		Model:    h.model,
 		Messages: h.toMessage(req),
-		//Stream:   true,
 	}
 	events := make(chan domain.StreamEvent, 10)
 
