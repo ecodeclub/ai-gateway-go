@@ -87,7 +87,6 @@ func (h *Handler) Handle(ctx context.Context, req []domain.Message) (domain.Chat
 }
 
 func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error) {
-
 	request := openai.ChatCompletionNewParams{
 		Model:    h.model,
 		Messages: h.toMessage(req),
@@ -121,7 +120,7 @@ func (h *Handler) recv(eventCh chan domain.StreamEvent, stream *ssestream.Stream
 		}
 
 		node := stream.Current()
-		if node.Choices == nil || len(node.Choices) == 0 {
+		if len(node.Choices) == 0 {
 			continue
 		}
 
