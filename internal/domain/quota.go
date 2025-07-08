@@ -29,5 +29,4 @@ type TempQuota struct {
 	Uid       int64
 }
 
-type Record struct {
-}
+type Record struct{}

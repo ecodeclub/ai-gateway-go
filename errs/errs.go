@@ -19,6 +19,6 @@ import (
 )
 
 var (
-	ErrNoAmount          = errors.New("余额不足")
+	DeductAmount         = errors.New("扣减失败")
 	ErrBizConfigNotFound = errors.New("biz config not found")
 )

@@ -16,9 +16,7 @@ package service
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/ecodeclub/ai-gateway-go/errs"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 )
@@ -48,53 +46,5 @@ func (q *QuotaService) GetQuota(ctx context.Context, uid int64) (domain.Quota, e
 }
 
 func (q *QuotaService) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
-	key1 := fmt.Sprintf("temp_%s", key)
-	key2 := fmt.Sprintf("quota_%s", key)
-	tempQuotaList, err := q.repo.GetTempQuota(ctx, uid)
-	if err != nil {
-		return err
-	}
-	// 1. 优先扣减临时表
-	for i := range tempQuotaList {
-		tq := tempQuotaList[i]
-		if amount <= 0 {
-			break
-		}
-		deduct := int64(0)
-		if tq.Amount >= amount {
-			deduct = amount
-			amount = 0
-		} else {
-			deduct = tq.Amount
-			amount -= deduct
-		}
-		tq.Amount -= deduct
-		err = q.SaveTempQuota(ctx, domain.TempQuota{
-			Uid:    uid,
-			Amount: tq.Amount,
-			Key:    key1,
-		})
-
-		if err != nil {
-			return err
-		}
-	}
-	// 扣减完成了
-	if amount <= 0 {
-		return nil
-	}
-
-	quota, err := q.GetQuota(ctx, uid)
-	if err != nil {
-		return err
-	}
-	if quota.Amount < amount {
-		return errs.ErrNoAmount
-	}
-
-	return q.SaveQuota(ctx, domain.Quota{
-		Uid:    uid,
-		Amount: amount,
-		Key:    key2,
-	})
+	return q.repo.Deduct(ctx, uid, amount, key)
 }

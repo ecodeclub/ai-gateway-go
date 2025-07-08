@@ -54,6 +54,10 @@ func (q *QuotaRepo) GetTempQuota(ctx context.Context, uid int64) ([]domain.TempQ
 	return q.toDomainTempQuota(tempQuotaList), nil
 }
 
+func (q *QuotaRepo) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
+	return q.dao.Deduct(ctx, uid, amount, key)
+}
+
 func (q *QuotaRepo) toDomainTempQuota(tmpQuotaList []dao.TempQuota) []domain.TempQuota {
 	return slice.Map[dao.TempQuota, domain.TempQuota](tmpQuotaList, func(idx int, src dao.TempQuota) domain.TempQuota {
 		return domain.TempQuota{

@@ -18,6 +18,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -74,38 +75,17 @@ func NewQuotaDao(db *gorm.DB) *QuotaDao {
 
 func (dao *QuotaDao) SaveTempQuota(ctx context.Context, quota TempQuota) error {
 	now := time.Now().Unix()
-	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		record := QuotaRecord{
-			Key:    quota.Key,
-			Uid:    quota.UID,
-			Amount: quota.Amount,
-			Ctime:  now,
-			Utime:  now,
-		}
-
-		result := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"amount": quota.Amount,
-				"utime":  now,
-			}),
-		}).Create(&record)
-		if result.Error != nil {
-			return result.Error
-		}
-		quota.Ctime = now
-		quota.Utime = now
-
-		return tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"amount":     quota.Amount,
-				"start_time": quota.StartTime,
-				"end_time":   quota.EndTime,
-				"utime":      now,
-			}),
-		}).Create(&quota).Error
-	})
+	quota.Ctime = now
+	quota.Utime = now
+	return dao.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "key"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"amount":     quota.Amount,
+			"start_time": quota.StartTime,
+			"end_time":   quota.EndTime,
+			"utime":      now,
+		}),
+	}).Create(&quota).Error
 }
 
 func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
@@ -122,11 +102,12 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 		}
 		result := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "key"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
+			DoUpdates: clause.Assignments(map[string]any{
 				"amount": quota.Amount,
 				"utime":  now,
 			}),
 		}).Create(&record)
+
 		if result.Error != nil {
 			return result.Error
 		}
@@ -163,6 +144,89 @@ func (dao *QuotaDao) GetTempQuotaByUidAndTime(ctx context.Context, uid int64) ([
 		return nil, err
 	}
 	return quota, nil
+}
+
+func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().Unix()
+		record := QuotaRecord{
+			Key:    key,
+			Uid:    uid,
+			Amount: amount,
+			Ctime:  now,
+			Utime:  now,
+		}
+		result := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "key"}},
+			DoNothing: true,
+		}).Create(&record)
+
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+		// 执行扣减程序
+		return dao.deduct(tx, uid, amount, now)
+	})
+}
+
+func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) error {
+	var tempQuotas []TempQuota
+	err := tx.Where("uid = ? AND end_time >= ? AND amount > 0", uid, now).
+		Order("end_time ASC").
+		Find(&tempQuotas).Error
+	if err != nil {
+		return err
+	}
+
+	remain := amount
+
+	// 先扣临时额度
+	for i := range tempQuotas {
+		if remain <= 0 {
+			break
+		}
+		tq := &tempQuotas[i]
+		deduct := tq.Amount
+		if deduct > remain {
+			deduct = remain
+		}
+		// 原子扣减，防止并发下超扣
+		update := tx.Model(&TempQuota{}).
+			Where("id = ? AND amount >= ?", tq.ID, deduct).
+			Updates(map[string]any{
+				"amount": gorm.Expr("amount - ?", deduct),
+				"utime":  now,
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected == 0 {
+			continue // 这条被其他并发扣完，跳过
+		}
+		remain -= deduct
+	}
+
+	// 如果还有剩余，从主额度扣
+	if remain > 0 {
+		result := tx.Model(&Quota{}).
+			Where("uid = ? AND amount >= ?", uid, remain).
+			Updates(map[string]any{
+				"amount":          gorm.Expr("amount - ?", remain),
+				"utime":           now,
+				"last_clear_time": now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errs.DeductAmount
+		}
+	}
+
+	return nil
 }
 
 func InitQuotaTable(db *gorm.DB) error {
