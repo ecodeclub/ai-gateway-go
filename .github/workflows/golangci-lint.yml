@@ -38,5 +38,3 @@ jobs:
         with:
           version: v2.0
           only-new-issues: true
-      - name: Generate Protobuf
-        run: buf generate
