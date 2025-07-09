@@ -112,6 +112,10 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 			return result.Error
 		}
 
+		if result.RowsAffected == 0 {
+			return nil
+		}
+
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "key"}},
 			DoUpdates: clause.Assignments(map[string]any{
@@ -184,16 +188,9 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 	remain := amount
 
 	// 先扣临时额度
-	for i := range tempQuotas {
-		if remain <= 0 {
-			break
-		}
-		tq := &tempQuotas[i]
-		deduct := tq.Amount
-		if deduct > remain {
-			deduct = remain
-		}
-		// 原子扣减，防止并发下超扣
+	for _, tq := range tempQuotas {
+		deduct := min(tq.Amount, remain)
+
 		update := tx.Model(&TempQuota{}).
 			Where("id = ? AND amount >= ?", tq.ID, deduct).
 			Updates(map[string]any{
@@ -204,26 +201,27 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 			return update.Error
 		}
 		if update.RowsAffected == 0 {
-			continue // 这条被其他并发扣完，跳过
+			continue
 		}
+
 		remain -= deduct
+		if remain <= 0 {
+			return nil
+		}
 	}
 
 	// 如果还有剩余，从主额度扣
-	if remain > 0 {
-		result := tx.Model(&Quota{}).
-			Where("uid = ? AND amount >= ?", uid, remain).
-			Updates(map[string]any{
-				"amount":          gorm.Expr("amount - ?", remain),
-				"utime":           now,
-				"last_clear_time": now,
-			})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return errs.DeductAmount
-		}
+	result := tx.Model(&Quota{}).
+		Where("uid = ? AND amount >= ?", uid, remain).
+		Updates(map[string]any{
+			"amount": gorm.Expr("amount - ?", remain),
+			"utime":  now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errs.ErrDeductAmountFailed
 	}
 
 	return nil

@@ -19,6 +19,7 @@ import (
 )
 
 var (
-	DeductAmount         = errors.New("扣减失败")
-	ErrBizConfigNotFound = errors.New("biz config not found")
+	ErrDeductAmountFailed = errors.New("deduct amount failed")
+	ErrInsufficientQuota  = errors.New("insufficient quota")
+	ErrBizConfigNotFound  = errors.New("biz config not found")
 )

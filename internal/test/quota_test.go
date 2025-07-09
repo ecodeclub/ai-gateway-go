@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
@@ -73,6 +74,8 @@ func (q *QuotaSuite) TearDownTest() {
 	require.NoError(q.T(), err)
 	err = q.db.Exec("TRUNCATE TABLE quota_records").Error
 	require.NoError(q.T(), err)
+	err = q.db.Exec("TRUNCATE TABLE temp_quotas").Error
+	require.NoError(q.T(), err)
 }
 
 func (q *QuotaSuite) TestQuotaSave() {
@@ -124,6 +127,128 @@ func (q *QuotaSuite) TestQuotaSave() {
 
 			assert.Equal(t, http.StatusOK, resp.Code)
 
+			tc.after()
+		})
+	}
+}
+
+func (q *QuotaSuite) TestSaveTempQuota() {
+	t := q.T()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testcases := []struct {
+		name    string
+		reqBody string
+		before  func()
+		after   func()
+	}{
+		{
+			name:    "save temp",
+			reqBody: `{"amount": 100000, "key": "23911", "start_time": "123", "end_time": "456"}`,
+			before: func() {
+				sess := mocks.NewMockSession(ctrl)
+				sess.EXPECT().Claims().Return(session.Claims{
+					Uid: 1,
+				}).AnyTimes()
+				provider := mocks.NewMockProvider(ctrl)
+				session.SetDefaultProvider(provider)
+				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
+			},
+			after: func() {
+				var quota dao.TempQuota
+				err := q.db.Where("id = ?", 1).First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(100000), quota.Amount)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before()
+			req, err := http.NewRequest(http.MethodPost, "/tmp/save", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			q.server.ServeHTTP(resp, req)
+
+			assert.Equal(t, http.StatusOK, resp.Code)
+
+			tc.after()
+		})
+	}
+}
+
+func (q *QuotaSuite) TestDeduct() {
+	t := q.T()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testcases := []struct {
+		name    string
+		reqBody string
+		before  func()
+		after   func()
+	}{
+		{
+			name:    "deduct quota",
+			reqBody: `{"amount": 10, "key": "23911"}`,
+			before: func() {
+				sess := mocks.NewMockSession(ctrl)
+				sess.EXPECT().Claims().Return(session.Claims{
+					Uid: 1,
+				}).AnyTimes()
+				provider := mocks.NewMockProvider(ctrl)
+				session.SetDefaultProvider(provider)
+				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
+
+				quota := dao.Quota{Amount: 20, Key: "23911", UID: 1}
+				q.db.Create(&quota)
+			},
+			after: func() {
+				var quota dao.Quota
+				err := q.db.Where("id = ?", 1).First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(10), quota.Amount)
+			},
+		},
+		{
+			name:    "deduct temp quota",
+			reqBody: `{"amount": 10, "key": "23921"}`,
+			before: func() {
+				sess := mocks.NewMockSession(ctrl)
+				sess.EXPECT().Claims().Return(session.Claims{
+					Uid: 1,
+				}).AnyTimes()
+				provider := mocks.NewMockProvider(ctrl)
+				session.SetDefaultProvider(provider)
+				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
+
+				quota := dao.TempQuota{Amount: 20, Key: "23921", UID: 1, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix()}
+				err := q.db.Create(&quota).Error
+				require.NoError(t, err)
+			},
+			after: func() {
+				var quota dao.TempQuota
+				err := q.db.Where("id = ?", 1).First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(10), quota.Amount)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before()
+			req, err := http.NewRequest(http.MethodPost, "/deduct", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			resp := httptest.NewRecorder()
+			q.server.ServeHTTP(resp, req)
+
+			assert.Equal(t, http.StatusOK, resp.Code)
 			tc.after()
 		})
 	}
