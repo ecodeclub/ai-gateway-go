@@ -17,7 +17,7 @@ package grpc
 import (
 	"context"
 
-	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ekit/slice"
@@ -50,6 +50,14 @@ func (c *ConversationServer) List(ctx context.Context, req *ai.ListReq) (*ai.Lis
 		return &ai.ListResp{}, err
 	}
 	return &ai.ListResp{Conversations: c.toConversation(conversation)}, nil
+}
+
+func (c *ConversationServer) Detail(ctx context.Context, req *ai.DetailRequest) (*ai.DetailResponse, error) {
+	detail, err := c.svc.Detail(ctx, req.Sn)
+	if err != nil {
+		return &ai.DetailResponse{}, err
+	}
+	return &ai.DetailResponse{Message: c.toMessage(detail)}, nil
 }
 
 func (c *ConversationServer) Chat(ctx context.Context, request *ai.LLMRequest) (*ai.ChatResponse, error) {
@@ -115,6 +123,16 @@ func (c *ConversationServer) toDomainMessage(messages []*ai.Message) []domain.Me
 		return domain.Message{
 			Role:    int32(src.Role),
 			Content: src.Content,
+		}
+	})
+}
+
+func (c *ConversationServer) toMessage(messages []domain.Message) []*ai.Message {
+	return slice.Map(messages, func(idx int, src domain.Message) *ai.Message {
+		return &ai.Message{
+			Role:             ai.Role(src.Role),
+			Content:          src.Content,
+			ReasoningContent: src.ReasoningContent,
 		}
 	})
 }

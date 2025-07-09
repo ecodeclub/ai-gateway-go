@@ -18,7 +18,7 @@ import (
 	"context"
 	"strconv"
 
-	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 )

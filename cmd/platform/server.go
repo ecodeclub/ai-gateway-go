@@ -16,7 +16,7 @@ package main
 
 import (
 	ds "github.com/cohesion-org/deepseek-go"
-	ai "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
 	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/deepseek"
@@ -36,6 +36,7 @@ func Server() server.Server {
 	return build
 }
 
+// --config=local.yaml，替换你的配置文件地址
 func main() {
 	if err := ego.New().Serve(Server()).Run(); err != nil {
 		elog.Panic("startup", elog.Any("err", err))

@@ -40,13 +40,17 @@ func (c *ConversationService) List(ctx context.Context, uid string, limit int64,
 	return c.repo.GetByUid(ctx, uid, limit, offset)
 }
 
+func (c *ConversationService) Detail(ctx context.Context, sn string) ([]domain.Message, error) {
+	return c.repo.GetMessageList(ctx, sn, -1, 0)
+}
+
 func (c *ConversationService) Chat(ctx context.Context, sn string, messages []domain.Message) (domain.ChatResponse, error) {
 	err := c.repo.AddMessages(ctx, sn, messages)
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
 
-	messageList, err := c.repo.GetMessageList(ctx, sn, 20, 0)
+	messageList, err := c.repo.GetHistoryMessageList(ctx, sn, 20, 0)
 	if err != nil {
 		return domain.ChatResponse{}, err
 	}
@@ -75,7 +79,7 @@ func (c *ConversationService) Stream(ctx context.Context, sn string, messages []
 		return ch, err
 	}
 
-	cs, err := c.repo.GetMessageList(ctx, sn, 20, 0)
+	cs, err := c.repo.GetHistoryMessageList(ctx, sn, 20, 0)
 	if err != nil {
 		return ch, err
 	}
