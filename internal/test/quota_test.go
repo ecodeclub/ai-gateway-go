@@ -189,13 +189,13 @@ func (q *QuotaSuite) TestDeduct() {
 	testcases := []struct {
 		name    string
 		reqBody string
-		before  func()
-		after   func()
+		before  func(db *gorm.DB, server *gin.Engine)
+		after   func(db *gorm.DB)
 	}{
 		{
 			name:    "deduct quota",
 			reqBody: `{"amount": 10, "key": "23911"}`,
-			before: func() {
+			before: func(db *gorm.DB, server *gin.Engine) {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
 					Uid: 1,
@@ -205,11 +205,11 @@ func (q *QuotaSuite) TestDeduct() {
 				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
 
 				quota := dao.Quota{Amount: 20, Key: "23911", UID: 1}
-				q.db.Create(&quota)
+				db.Create(&quota)
 			},
-			after: func() {
+			after: func(db *gorm.DB) {
 				var quota dao.Quota
-				err := q.db.Where("id = ?", 1).First(&quota).Error
+				err := db.Where("id = ?", 1).First(&quota).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(10), quota.Amount)
 			},
@@ -217,7 +217,7 @@ func (q *QuotaSuite) TestDeduct() {
 		{
 			name:    "deduct temp quota",
 			reqBody: `{"amount": 10, "key": "23921"}`,
-			before: func() {
+			before: func(db *gorm.DB, server *gin.Engine) {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
 					Uid: 1,
@@ -227,12 +227,12 @@ func (q *QuotaSuite) TestDeduct() {
 				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
 
 				quota := dao.TempQuota{Amount: 20, Key: "23921", UID: 1, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix()}
-				err := q.db.Create(&quota).Error
+				err := db.Create(&quota).Error
 				require.NoError(t, err)
 			},
-			after: func() {
+			after: func(db *gorm.DB) {
 				var quota dao.TempQuota
-				err := q.db.Where("id = ?", 1).First(&quota).Error
+				err := db.Where("id = ?", 1).First(&quota).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(10), quota.Amount)
 			},
@@ -241,15 +241,41 @@ func (q *QuotaSuite) TestDeduct() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.before()
+			// 独立初始化 DB 和 Gin Engine
+			dbConfig := config.NewConfig(
+				config.WithDBName("ai_gateway_platform"),
+				config.WithUserName("root"),
+				config.WithPassword("root"),
+				config.WithHost("127.0.0.1"),
+				config.WithPort("13306"),
+			)
+			db, err := config.NewDB(dbConfig)
+			require.NoError(t, err)
+			err = dao.InitQuotaTable(db)
+			require.NoError(t, err)
+
+			d := dao.NewQuotaDao(db)
+			repo := repository.NewQuotaRepo(d)
+			svc := service.NewQuotaService(repo)
+			handler := web.NewQuotaHandler(svc)
+			server := gin.Default()
+			handler.PrivateRoutes(server)
+
+			// 清理表
+			defer func() {
+				db.Exec("TRUNCATE TABLE quotas")
+				db.Exec("TRUNCATE TABLE quota_records")
+				db.Exec("TRUNCATE TABLE temp_quotas")
+			}()
+
+			tc.before(db, server)
 			req, err := http.NewRequest(http.MethodPost, "/deduct", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
-			q.server.ServeHTTP(resp, req)
-
+			server.ServeHTTP(resp, req)
 			assert.Equal(t, http.StatusOK, resp.Code)
-			tc.after()
+			tc.after(db)
 		})
 	}
 }
