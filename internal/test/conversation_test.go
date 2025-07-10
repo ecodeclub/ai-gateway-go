@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	aiv1 "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
+	aiv1 "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
@@ -67,7 +67,7 @@ func (c *ConversationSuite) SetupTest() {
 
 	rdb := config.NewCache(cacheConfig)
 
-	err = dao.InitConversation(db)
+	err = dao.InitTables(db)
 	require.NoError(c.T(), err)
 	c.db = db
 	c.cache = rdb
@@ -90,7 +90,7 @@ func (c *ConversationSuite) TestCreate() {
 		{
 			name: "创建对应的 conversation",
 			after: func(sn string) {
-				var conversation dao.Conversation
+				var conversation dao.Chat
 				err := c.db.Where("sn = ?", sn).First(&conversation).Error
 				require.NoError(t, err)
 				assert.Equal(t, "test", conversation.Title)
@@ -100,12 +100,12 @@ func (c *ConversationSuite) TestCreate() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			conversationDao := dao.NewConversationDao(c.db)
-			conversationCache := cache.NewConversationCache(c.cache)
-			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			conversationDao := dao.NewChatDAO(c.db)
+			conversationCache := cache.NewChatCache(c.cache)
+			repo := repository.NewChatRepo(conversationDao, conversationCache)
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
-			conversationService := service.NewConversationService(repo, handler)
+			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 
 			res, err := server.Create(context.Background(), &aiv1.Conversation{Title: "test"})
@@ -125,7 +125,7 @@ func (c *ConversationSuite) TestGetList() {
 		{
 			name: "获取conversation list",
 			before: func(sn string) {
-				err := c.db.Create([]dao.Conversation{
+				err := c.db.Create([]dao.Chat{
 					{Title: "test1", Uid: "123", Sn: sn},
 				}).Error
 				require.NoError(t, err)
@@ -137,12 +137,12 @@ func (c *ConversationSuite) TestGetList() {
 		t.Run(tc.name, func(t *testing.T) {
 			sn := uuid.New().String()
 			tc.before(sn)
-			conversationDao := dao.NewConversationDao(c.db)
-			conversationCache := cache.NewConversationCache(c.cache)
-			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			conversationDao := dao.NewChatDAO(c.db)
+			conversationCache := cache.NewChatCache(c.cache)
+			repo := repository.NewChatRepo(conversationDao, conversationCache)
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
-			conversationService := service.NewConversationService(repo, handler)
+			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 			res, err := server.List(context.Background(), &aiv1.ListReq{Uid: "123", Offset: 0, Limit: 2})
 			require.NoError(t, err)
@@ -161,7 +161,7 @@ func (c *ConversationSuite) TestChat() {
 		{
 			name: "与大模型chat",
 			before: func(handler *mocks.MockHandler, sn string) {
-				err := c.db.Create(&dao.Conversation{Title: "test1", Uid: "123", Sn: sn}).Error
+				err := c.db.Create(&dao.Chat{Title: "test1", Uid: "123", Sn: sn}).Error
 				require.NoError(t, err)
 				resp := domain.ChatResponse{Response: domain.Message{Content: "event1"}}
 				handler.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(resp, nil)
@@ -179,12 +179,12 @@ func (c *ConversationSuite) TestChat() {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			sn := uuid.New().String()
-			conversationDao := dao.NewConversationDao(c.db)
-			conversationCache := cache.NewConversationCache(c.cache)
-			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			conversationDao := dao.NewChatDAO(c.db)
+			conversationCache := cache.NewChatCache(c.cache)
+			repo := repository.NewChatRepo(conversationDao, conversationCache)
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
-			conversationService := service.NewConversationService(repo, handler)
+			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 
 			tc.before(handler, sn)
@@ -219,7 +219,7 @@ func (c *ConversationSuite) TestStream() {
 				streamChan <- domain.StreamEvent{Content: "event2", ReasoningContent: "reason1"}
 				close(streamChan)
 				handler.EXPECT().StreamHandle(gomock.Any(), gomock.Any()).Return(streamChan, nil)
-				err := c.db.Create(&dao.Conversation{Title: "test1", Uid: "123"}).Error
+				err := c.db.Create(&dao.Chat{Title: "test1", Uid: "123"}).Error
 				require.NoError(t, err)
 			},
 			after: func() {
@@ -234,12 +234,12 @@ func (c *ConversationSuite) TestStream() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			conversationDao := dao.NewConversationDao(c.db)
-			conversationCache := cache.NewConversationCache(c.cache)
-			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			conversationDao := dao.NewChatDAO(c.db)
+			conversationCache := cache.NewChatCache(c.cache)
+			repo := repository.NewChatRepo(conversationDao, conversationCache)
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
-			conversationService := service.NewConversationService(repo, handler)
+			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 			tc.before(handler)
 			mockStream := &mocks.MockStreamServer{Ctx: context.Background()}
@@ -280,12 +280,12 @@ func (c *ConversationSuite) TestDetail() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			conversationDao := dao.NewConversationDao(c.db)
-			conversationCache := cache.NewConversationCache(c.cache)
-			repo := repository.NewConversationRepo(conversationDao, conversationCache)
+			conversationDao := dao.NewChatDAO(c.db)
+			conversationCache := cache.NewChatCache(c.cache)
+			repo := repository.NewChatRepo(conversationDao, conversationCache)
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
-			conversationService := service.NewConversationService(repo, handler)
+			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 			tc.before()
 			detail, err := server.Detail(context.Background(), &aiv1.MsgListReq{Sn: "1"})

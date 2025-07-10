@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package llm
+package main
 
 import (
-	"context"
-
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
+	"github.com/ego-component/egorm"
 )
 
-type Handler interface {
-	StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error)
+func initDB() *egorm.Component {
+	db := egorm.Load("mysql").Build()
+	err := dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }

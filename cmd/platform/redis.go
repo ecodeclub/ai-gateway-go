@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,37 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package domain
+package main
 
 import (
-	"github.com/ecodeclub/ekit"
+	"github.com/gotomicro/ego/core/econf"
+	"github.com/redis/go-redis/v9"
 )
 
-const (
-	UNKNOWN = iota
-	USER
-	ASSISTANT
-	SYSTEM
-	TOOL
-)
-
-type Conversation struct {
-	Sn       string
-	Uid      string
-	Title    string
-	Messages []Message
-	Time     string
-}
-type Message struct {
-	ID               int64
-	CID              int64
-	Role             int32
-	Content          string
-	ReasoningContent string
-}
-
-type ChatResponse struct {
-	Sn       string
-	Response Message
-	Metadata ekit.AnyValue
+func initRedis() redis.Cmdable {
+	type Config struct {
+		Addr string
+	}
+	var cfg Config
+	err := econf.UnmarshalKey("redis", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	cmd := redis.NewClient(&redis.Options{
+		Addr: cfg.Addr,
+	})
+	return cmd
 }

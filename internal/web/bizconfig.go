@@ -72,6 +72,14 @@ func (h *BizConfigHandler) CreateBizConfig(ctx *ginx.Context, req CreateBizConfi
 	}, nil
 }
 
+type BizConfig struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	OwnerId   int64  `json:"ownerID"`
+	OwnerType string `json:"ownerType"`
+	Config    string `json:"config"`
+}
+
 type GetBizConfigReq struct {
 	ID int64 `json:"id"`
 }
@@ -153,4 +161,13 @@ func (h *BizConfigHandler) toResponse(config domain.BizConfig) map[string]any {
 		"ctime":      config.Ctime.Format("2006-01-02 15:04:05"),
 		"utime":      config.Utime.Format("2006-01-02 15:04:05"),
 	}
+}
+
+type ShardingExecution struct {
+	// 独立的
+	ExecID int64 // 任务 A 的执行 ID
+}
+
+type Execution struct {
+	ParentID int64 // 任务 A 的执行 ID
 }

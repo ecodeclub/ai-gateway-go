@@ -3,7 +3,7 @@ package mocks
 import (
 	"context"
 
-	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
+	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 )
 
 type MockStreamServer struct {

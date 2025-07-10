@@ -17,12 +17,10 @@ package deepseek
 import (
 	"context"
 	"errors"
-	"io"
-	"time"
-
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ekit/slice"
+	"io"
 )
 
 type Handler struct {
@@ -44,7 +42,7 @@ func (h *Handler) Handle(ctx context.Context, req []domain.Message) (domain.Chat
 	}
 
 	message := domain.Message{
-		Role:             h.toDomainRole(response.Choices[0].Message.Role),
+		Role:             response.Choices[0].Message.Role,
 		Content:          response.Choices[0].Message.Content,
 		ReasoningContent: response.Choices[0].Message.ReasoningContent,
 	}
@@ -59,20 +57,13 @@ func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan 
 		Stream:   true,
 	}
 
+	stream, err := h.client.CreateChatCompletionStream(ctx, &request)
+	if err != nil {
+		return nil, err
+	}
 	events := make(chan domain.StreamEvent, 10)
-
 	go func() {
 		defer close(events)
-
-		// 设置对应的超时时间
-		newCtx, cancel := context.WithTimeout(ctx, time.Minute*10)
-		defer cancel()
-		stream, err := h.client.CreateChatCompletionStream(newCtx, &request)
-		if err != nil {
-			events <- domain.StreamEvent{Error: err}
-			return
-		}
-
 		h.recv(events, stream)
 	}()
 
@@ -93,40 +84,10 @@ func (h *Handler) recv(eventCh chan domain.StreamEvent, stream deepseek.ChatComp
 	}
 }
 
-func (h *Handler) getRole(role int32) string {
-	switch role {
-	case domain.SYSTEM:
-		return deepseek.ChatMessageRoleSystem
-	case domain.USER:
-		return deepseek.ChatMessageRoleUser
-	case domain.ASSISTANT:
-		return deepseek.ChatMessageRoleAssistant
-	case domain.TOOL:
-		return deepseek.ChatMessageRoleTool
-	default:
-		return ""
-	}
-}
-
-func (h *Handler) toDomainRole(role string) int32 {
-	switch role {
-	case deepseek.ChatMessageRoleSystem:
-		return domain.SYSTEM
-	case deepseek.ChatMessageRoleUser:
-		return domain.USER
-	case deepseek.ChatMessageRoleTool:
-		return domain.TOOL
-	case deepseek.ChatMessageRoleAssistant:
-		return domain.ASSISTANT
-	default:
-		return domain.UNKNOWN
-	}
-}
-
 func (h *Handler) ToMessage(messages []domain.Message) []deepseek.ChatCompletionMessage {
 	return slice.Map(messages, func(idx int, src domain.Message) deepseek.ChatCompletionMessage {
 		return deepseek.ChatCompletionMessage{
-			Role:    h.getRole(src.Role),
+			Role:    src.Role,
 			Content: src.Content,
 		}
 	})

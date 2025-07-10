@@ -1,0 +1,14 @@
+deepseek:
+  token: "传入你的 token"
+
+grpc:
+  server:
+    host: "使用的host"
+    port: "使用的端口"
+
+mysql:
+  dsn: "你的dsn"
+
+redis:
+  addr: "你的redis地址"
+

@@ -12,27 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package domain
 
 import (
-	"context"
-
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
+	"github.com/ecodeclub/ekit"
+	"time"
 )
 
-type AIService struct {
-	handler llm.Handler
+type Chat struct {
+	Sn       string
+	Uid      int64
+	Title    string
+	Messages []Message
+	Ctime    time.Time
+	Utime    time.Time
+}
+type Message struct {
+	ID               int64
+	Role             string
+	Content          string
+	ReasoningContent string
+	Ctime            time.Time
+	Utime            time.Time
 }
 
-func NewAIService(handler llm.Handler) *AIService {
-	return &AIService{handler: handler}
-}
-
-func (svc *AIService) Stream(ctx context.Context, req domain.Message) (chan domain.StreamEvent, error) {
-	return svc.handler.StreamHandle(ctx, []domain.Message{req})
-}
-
-func (svc *AIService) Invoke(ctx context.Context, req domain.Message) (domain.ChatResponse, error) {
-	return svc.handler.Handle(ctx, []domain.Message{req})
+type ChatResponse struct {
+	Sn       string
+	Response Message
+	Metadata ekit.AnyValue
 }
