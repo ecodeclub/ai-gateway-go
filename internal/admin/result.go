@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package infra
+package admin
 
 import (
-	"time"
-
-	"github.com/ecodeclub/ginx/session"
-	redis2 "github.com/ecodeclub/ginx/session/redis"
+	"github.com/ecodeclub/ai-gateway-go/internal/errs"
+	"github.com/ecodeclub/ginx"
 )
 
-func Init() {
-	provider := redis2.NewSessionProvider(InitRedis(), "VGhpcyBpcyBhIHNlY3JldCB0aGF0IG5vYm9keSBjYW4gZ3Vlc3M=", time.Hour)
-	session.SetDefaultProvider(provider)
+var systemErrorResult = ginx.Result{
+	Code: errs.SystemError.Code,
+	Msg:  errs.SystemError.Msg,
 }

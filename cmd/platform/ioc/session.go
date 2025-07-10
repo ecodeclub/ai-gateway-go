@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package ioc
 
 import (
-	"github.com/gotomicro/ego/core/econf"
-	"github.com/redis/go-redis/v9"
+	"time"
+
+	"github.com/ecodeclub/ginx/session"
+	redis "github.com/ecodeclub/ginx/session/redis"
 )
 
-func initRedis() redis.Cmdable {
+func InitSession() session.Provider {
 	type Config struct {
-		Addr string
+		JwtKey string `yaml:"jwtKey"`
 	}
 	var cfg Config
-	err := econf.UnmarshalKey("redis", &cfg)
-	if err != nil {
-		panic(err)
-	}
-	cmd := redis.NewClient(&redis.Options{
-		Addr: cfg.Addr,
-	})
-	return cmd
+	provider := redis.NewSessionProvider(InitRedis(), cfg.JwtKey, time.Hour*24*30)
+	return provider
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web
+package admin
 
 import (
 	"bytes"
@@ -24,7 +24,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/mocks"
-	"github.com/ecodeclub/ai-gateway-go/internal/web/infra"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
@@ -108,7 +107,7 @@ func TestBizConfigHandler_Create(t *testing.T) {
 
 			server := gin.New()
 			server.Use(fakeAuthMiddleware())
-			handler.RegisterRoutes(server)
+			handler.PrivateRoutes(server)
 
 			req := tc.reqBuilder(t)
 			// 将生成的 JWT Token 设置到 Authorization 头

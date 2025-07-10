@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web
+package admin
 
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -20,17 +20,19 @@ import (
 	"github.com/ecodeclub/ginx"
 	"github.com/ecodeclub/ginx/session"
 	"github.com/gin-gonic/gin"
+	"github.com/gotomicro/ego/server/egin"
 )
 
-type Handler struct {
+type PromptHandler struct {
 	svc *service.PromptService
 }
 
-func NewHandler(svc *service.PromptService) *Handler {
-	return &Handler{svc: svc}
+func NewPromptHandler(svc *service.PromptService) *PromptHandler {
+	res := &PromptHandler{svc: svc}
+	return res
 }
 
-func (h *Handler) PrivateRoutes(server *gin.Engine) {
+func (h *PromptHandler) PrivateRoutes(server *egin.Component) {
 	prompt := server.Group("/prompt")
 	prompt.POST("/add", ginx.BS(h.Add))
 	prompt.GET("/:id", ginx.W(h.Get))
@@ -42,9 +44,9 @@ func (h *Handler) PrivateRoutes(server *gin.Engine) {
 	prompt.POST("/fork", ginx.B(h.Fork))
 }
 
-func (h *Handler) PublicRoutes(_ *gin.Engine) {}
+func (h *PromptHandler) PublicRoutes(_ *gin.Engine) {}
 
-func (h *Handler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx.Result, error) {
+func (h *PromptHandler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
 	// 这里我假设 owner_type 也存储在 jwt token 里
 	ownerType, err := sess.Claims().Get("owner_type").String()
@@ -73,7 +75,7 @@ func (h *Handler) Add(ctx *ginx.Context, req AddReq, sess session.Session) (ginx
 	}, nil
 }
 
-func (h *Handler) Get(ctx *ginx.Context) (ginx.Result, error) {
+func (h *PromptHandler) Get(ctx *ginx.Context) (ginx.Result, error) {
 	id, err := ctx.Param("id").AsInt64()
 	if err != nil {
 		return ginx.Result{}, ginx.ErrNoResponse
@@ -88,7 +90,7 @@ func (h *Handler) Get(ctx *ginx.Context) (ginx.Result, error) {
 }
 
 // Delete 删除整个 prompt
-func (h *Handler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) {
+func (h *PromptHandler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) {
 	err := h.svc.Delete(ctx, req.ID)
 	if err != nil {
 		return systemErrorResult, err
@@ -98,7 +100,7 @@ func (h *Handler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) 
 	}, nil
 }
 
-func (h *Handler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.Result, error) {
+func (h *PromptHandler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.Result, error) {
 	err := h.svc.DeleteVersion(ctx, req.VersionID)
 	if err != nil {
 		return systemErrorResult, err
@@ -109,7 +111,7 @@ func (h *Handler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.R
 }
 
 // UpdatePrompt 更新 prompt 的基本信息
-func (h *Handler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Result, error) {
+func (h *PromptHandler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Result, error) {
 	prompt := domain.Prompt{
 		ID:          req.ID,
 		Name:        req.Name,
@@ -124,7 +126,7 @@ func (h *Handler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Res
 	}, nil
 }
 
-func (h *Handler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.Result, error) {
+func (h *PromptHandler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.Result, error) {
 	version := domain.PromptVersion{
 		ID:            req.VersionID,
 		Content:       req.Content,
@@ -142,7 +144,7 @@ func (h *Handler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.R
 	}, nil
 }
 
-func (h *Handler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error) {
+func (h *PromptHandler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error) {
 	err := h.svc.Publish(ctx, req.VersionID, req.Label)
 	if err != nil {
 		return systemErrorResult, err
@@ -153,7 +155,7 @@ func (h *Handler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error
 }
 
 // Fork 新增一个版本
-func (h *Handler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Result, error) {
+func (h *PromptHandler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Result, error) {
 	err := h.svc.Fork(ctx, req.VersionID)
 	if err != nil {
 		return systemErrorResult, err

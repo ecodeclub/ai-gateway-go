@@ -12,26 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package ioc
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/cmd/platform/ioc"
-	"github.com/gotomicro/ego"
+	"fmt"
+	"github.com/gotomicro/ego/core/econf"
+	"github.com/redis/go-redis/v9"
 )
 
-// --config=local.yaml，替换你的配置文件地址
-func main() {
-	egoApp := ego.New()
-	app := ioc.InitApp()
+func InitRedis() redis.Cmdable {
+	type RedisConfig struct {
+		Addr string `yaml:"addr"`
+	}
 
-	err := egoApp.
-		// Invoker 在 Ego 里面，应该叫做初始化函数
-		Invoker().
-		Serve(
-			//egovernor.Load("server.governor").Build(),
-			app.GinServer,
-			app.GrpcSever).
-		Run()
-	panic(err)
+	var cfg RedisConfig
+	err := econf.UnmarshalKey("redis", &cfg)
+	if err != nil {
+		panic(fmt.Errorf("初始化 Redis 失败 %w", err))
+	}
 
+	return redis.NewClient(&redis.Options{
+		Addr: cfg.Addr,
+	})
 }

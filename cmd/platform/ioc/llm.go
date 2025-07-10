@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package ioc
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/cmd/platform/ioc"
-	"github.com/gotomicro/ego"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/openai"
+	"github.com/gotomicro/ego/core/econf"
 )
 
-// --config=local.yaml，替换你的配置文件地址
-func main() {
-	egoApp := ego.New()
-	app := ioc.InitApp()
+func initLLMHandler() llm.Handler {
+	type AliyunConfig struct {
+		APIKey  string `json:"apiKey"`
+		BaseURL string `json:"baseURL"`
+		Model   string `json:"model"`
+	}
+	var cfg AliyunConfig
 
-	err := egoApp.
-		// Invoker 在 Ego 里面，应该叫做初始化函数
-		Invoker().
-		Serve(
-			//egovernor.Load("server.governor").Build(),
-			app.GinServer,
-			app.GrpcSever).
-		Run()
-	panic(err)
-
+	err := econf.UnmarshalKey("aliyun", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	handler := openai.NewHandler(cfg.APIKey, cfg.BaseURL, cfg.Model)
+	return handler
 }

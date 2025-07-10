@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web
+package admin
 
 import (
 	"errors"
+	"github.com/gotomicro/ego/server/egin"
 	"strconv"
 
 	"github.com/ecodeclub/ai-gateway-go/errs"
@@ -34,7 +35,7 @@ func NewBizConfigHandler(svc service.BizConfigService) *BizConfigHandler {
 	return &BizConfigHandler{svc: svc}
 }
 
-func (h *BizConfigHandler) RegisterRoutes(server *gin.Engine) {
+func (h *BizConfigHandler) PrivateRoutes(server *egin.Component) {
 	bg := server.Group("/api/v1/biz-configs")
 
 	bg.POST("/create", ginx.BS[CreateBizConfigReq](h.CreateBizConfig))

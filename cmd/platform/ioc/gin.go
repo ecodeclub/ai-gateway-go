@@ -12,18 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package ioc
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
-	"github.com/ego-component/egorm"
+	"github.com/ecodeclub/ai-gateway-go/internal/admin"
+	"github.com/ecodeclub/ginx/session"
+	"github.com/gotomicro/ego/server/egin"
 )
 
-func initDB() *egorm.Component {
-	db := egorm.Load("mysql").Build()
-	err := dao.InitTables(db)
-	if err != nil {
-		panic(err)
-	}
-	return db
+func InitGin(
+	sp session.Provider,
+	promptHandler *admin.PromptHandler,
+	bizConfig *admin.BizConfigHandler,
+) *egin.Component {
+	session.SetDefaultProvider(sp)
+	res := egin.Load("admin").Build()
+	// 登录校验
+	res.Use(session.CheckLoginMiddleware())
+	promptHandler.PrivateRoutes(res)
+	bizConfig.PrivateRoutes(res)
+	return res
 }

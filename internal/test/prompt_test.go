@@ -26,7 +26,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/test/mocks"
-	"github.com/ecodeclub/ai-gateway-go/internal/web"
 	"github.com/ecodeclub/ginx/session"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +55,7 @@ func (s *PromptTestSuite) SetupSuite() {
 	d := dao.NewPromptDAO(db)
 	repo := repository.NewPromptRepo(d)
 	svc := service.NewPromptService(repo)
-	handler := web.NewHandler(svc)
+	handler := admin.NewHandler(svc)
 	server := gin.Default()
 	handler.PrivateRoutes(server)
 	s.server = server
@@ -155,7 +154,7 @@ func (s *PromptTestSuite) TestGet() {
 		name       string
 		reqBody    string
 		wantCode   int
-		wantResult web.PromptVO
+		wantResult admin.PromptVO
 		wantReq    string
 		before     func()
 		after      func()
@@ -190,14 +189,14 @@ func (s *PromptTestSuite) TestGet() {
 			},
 			after:    func() {},
 			wantCode: http.StatusOK,
-			wantResult: web.PromptVO{
+			wantResult: admin.PromptVO{
 				ID:            1,
 				Name:          "test",
 				Description:   "test",
 				Owner:         1,
 				OwnerType:     "personal",
 				ActiveVersion: 1,
-				Versions: []web.PromptVersionVO{{
+				Versions: []admin.PromptVersionVO{{
 					ID:            1,
 					Label:         "test",
 					Content:       "test",
@@ -219,7 +218,7 @@ func (s *PromptTestSuite) TestGet() {
 			resp := httptest.NewRecorder()
 			s.server.ServeHTTP(resp, req)
 			assert.Equal(t, tc.wantCode, resp.Code)
-			var result Result[web.PromptVO]
+			var result Result[admin.PromptVO]
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			require.NoError(t, err)
 			assert.True(t, result.Data.CreateTime > 0)

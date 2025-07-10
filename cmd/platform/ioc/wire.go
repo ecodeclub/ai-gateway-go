@@ -1,4 +1,6 @@
-// Copyright 2021 ecodeclub
+//go:build wireinject
+
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +14,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package infra
+package ioc
 
-import "github.com/redis/go-redis/v9"
+import (
+	"github.com/google/wire"
+)
 
-var rdb redis.Cmdable
-
-func InitRedis() redis.Cmdable {
-	if rdb != nil {
-		return rdb
-	}
-	return redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
+func InitApp() *App {
+	wire.Build(BaseSet, LLMSet, ChatSet,
+		PromptSet, BizConfigSet,
+		wire.Struct(new(App), "*"),
+	)
+	return new(App)
 }
