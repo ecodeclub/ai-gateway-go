@@ -16,9 +16,11 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/errs"
+	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -93,6 +95,7 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 	quota.Utime = now
 
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().Unix()
 		record := QuotaRecord{
 			Key:    quota.Key,
 			Uid:    quota.UID,
@@ -100,20 +103,13 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 			Ctime:  now,
 			Utime:  now,
 		}
-		result := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
-			DoUpdates: clause.Assignments(map[string]any{
-				"amount": quota.Amount,
-				"utime":  now,
-			}),
-		}).Create(&record)
-
-		if result.Error != nil {
-			return result.Error
-		}
-
-		if result.RowsAffected == 0 {
-			return nil
+		err := tx.Create(&record).Error
+		if err != nil {
+			var mysqlErr *mysql.MySQLError
+			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+				return err
+			}
+			return err
 		}
 
 		return tx.Clauses(clause.OnConflict{
@@ -160,18 +156,15 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key st
 			Ctime:  now,
 			Utime:  now,
 		}
-		result := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "key"}},
-			DoNothing: true,
-		}).Create(&record)
-
-		if result.Error != nil {
-			return result.Error
+		err := tx.Create(&record).Error
+		if err != nil {
+			// 判断是否唯一索引冲突（MySQL 1062）
+			var mysqlErr *mysql.MySQLError
+			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+				return err
+			}
+			return err
 		}
-		if result.RowsAffected == 0 {
-			return nil
-		}
-		// 执行扣减程序
 		return dao.deduct(tx, uid, amount, now)
 	})
 }
