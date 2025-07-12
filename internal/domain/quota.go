@@ -12,13 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package domain
 
-import (
-	"errors"
-)
+type Quota struct {
+	Amount        int64
+	Key           string
+	Uid           int64
+	LastClearTime int64
+}
 
-var (
-	ErrDeductAmountFailed = errors.New("扣减失败")
-	ErrBizConfigNotFound  = errors.New("biz config not found")
-)
+type TempQuota struct {
+	Amount    int64
+	Key       string
+	StartTime int64
+	EndTime   int64
+	Uid       int64
+}
+
+type Record struct{}

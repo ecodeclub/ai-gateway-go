@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	aiv1 "github.com/ecodeclub/ai-gateway-go/api/proto/gen/ai/v1"
+	aiv1 "github.com/ecodeclub/ai-gateway-go/api/gen/ai/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/grpc"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
@@ -288,7 +288,7 @@ func (c *ConversationSuite) TestDetail() {
 			conversationService := service.NewConversationService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 			tc.before()
-			detail, err := server.Detail(context.Background(), &aiv1.MsgListReq{Sn: "1"})
+			detail, err := server.Detail(context.Background(), &aiv1.DetailRequest{Sn: "1"})
 			require.NoError(t, err)
 			assert.ElementsMatch(t, detail.Message, []*aiv1.Message{
 				{Role: aiv1.Role_USER, Content: "user1"},

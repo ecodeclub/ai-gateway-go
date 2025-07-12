@@ -14,8 +14,7 @@
 
 syntax = "proto3";
 package ai.v1;
-
-option go_package = "v1/ai;aiv1";
+option go_package = "ai/v1;aiv1";
 
 service AIService {
   rpc Chat(Message) returns (ChatResponse);
