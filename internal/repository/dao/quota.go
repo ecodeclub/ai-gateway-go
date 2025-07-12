@@ -186,11 +186,8 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 		// 表示扣减完毕
 		amount -= deductAmount
 		if amount <= 0 {
-			break
+			return nil
 		}
-	}
-	if amount == 0 {
-		return nil
 	}
 	// 从主额度扣
 	result := tx.Model(&Quota{}).
