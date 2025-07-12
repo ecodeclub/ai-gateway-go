@@ -46,7 +46,6 @@ tidy:
 check:
 	@$(MAKE) fmt
 	@$(MAKE) tidy
-	#@$(MAKE) lint
 
 # 生成gRPC相关文件
 .PHONY: grpc
