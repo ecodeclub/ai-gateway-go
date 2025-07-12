@@ -216,7 +216,7 @@ func (q *QuotaSuite) TestDeduct() {
 		},
 		{
 			name:    "deduct temp quota",
-			reqBody: `{"amount": 10, "key": "23921"}`,
+			reqBody: `{"amount": 10, "key": "23922"}`,
 			before: func(db *gorm.DB, server *gin.Engine) {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
@@ -226,7 +226,7 @@ func (q *QuotaSuite) TestDeduct() {
 				session.SetDefaultProvider(provider)
 				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
 
-				quota := dao.TempQuota{Amount: 20, Key: "23921", UID: 1, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix()}
+				quota := dao.TempQuota{Amount: 20, Key: "23922", UID: 1, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix()}
 				err := db.Create(&quota).Error
 				require.NoError(t, err)
 			},
