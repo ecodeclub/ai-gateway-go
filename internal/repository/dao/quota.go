@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/errs"
-	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -105,10 +104,6 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 		}
 		err := tx.Create(&record).Error
 		if err != nil {
-			var mysqlErr *mysql.MySQLError
-			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-				return err
-			}
 			return err
 		}
 
