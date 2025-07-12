@@ -158,11 +158,6 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key st
 		}
 		err := tx.Create(&record).Error
 		if err != nil {
-			// 判断是否唯一索引冲突（MySQL 1062）
-			var mysqlErr *mysql.MySQLError
-			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-				return err
-			}
 			return err
 		}
 		return dao.deduct(tx, uid, amount, now)
@@ -170,44 +165,41 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key st
 }
 
 func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) error {
-	var tempQuotas []TempQuota
-	err := tx.Where("uid = ? AND end_time >= ? AND amount > 0", uid, now).
-		Order("end_time ASC").
-		Find(&tempQuotas).Error
-	if err != nil {
-		return err
-	}
-
-	remain := amount
-
-	// 先扣临时额度
-	for _, tq := range tempQuotas {
-		deduct := min(tq.Amount, remain)
-
-		update := tx.Model(&TempQuota{}).
-			Where("id = ? AND amount >= ?", tq.ID, deduct).
-			Updates(map[string]any{
-				"amount": gorm.Expr("amount - ?", deduct),
-				"utime":  now,
-			})
-		if update.Error != nil {
-			return update.Error
+	deductAmount := amount
+	for {
+		var quota TempQuota
+		err := tx.Where("amount > ? and uid = ?", 0, uid).First(&quota).Error
+		if err != nil {
+			// 表示找不到可以扣减的temp
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				break
+			}
+			return err
 		}
-		if update.RowsAffected == 0 {
+		deductAmount = min(deductAmount, quota.Amount)
+		result := tx.Where("amount > ? and uid = ?", 0, uid).Updates(map[string]any{
+			"amount": gorm.Expr("amount - ?", deductAmount),
+			"utime":  now,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		// 并发问题, 直接下一个
+		if result.RowsAffected == 0 {
 			continue
 		}
-
-		remain -= deduct
-		if remain <= 0 {
-			return nil
+		// 表示扣减完毕
+		amount -= deductAmount
+		if amount <= 0 {
+			break
 		}
 	}
 
-	// 如果还有剩余，从主额度扣
+	// 从主额度扣
 	result := tx.Model(&Quota{}).
-		Where("uid = ? AND amount >= ?", uid, remain).
+		Where("uid = ? AND amount >= ?", uid, deductAmount).
 		Updates(map[string]any{
-			"amount": gorm.Expr("amount - ?", remain),
+			"amount": gorm.Expr("amount - ?", deductAmount),
 			"utime":  now,
 		})
 	if result.Error != nil {
@@ -216,7 +208,6 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 	if result.RowsAffected == 0 {
 		return errs.ErrDeductAmountFailed
 	}
-
 	return nil
 }
 
