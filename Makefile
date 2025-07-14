@@ -28,13 +28,12 @@ e2e:
 	@go	test -race -v -failfast ./...
 	@docker compose -f ./.script/docker-compose.yaml down
 
+# .PHONY: fmt
+# fmt:
+# 	@goimports -l -w $(GOFILES)
+# 	@gofumpt -l -w $(GOFILES)
 
-.PHONY:	fmt
-fmt:
-	@goimports -l -w $(GOFILES)
-	@gofumpt -l -w $(GOFILES)
-
-.PHONY:	lint
+.PHONY: lint
 lint:
 	@golangci-lint run -c .golangci.yml
 
@@ -44,7 +43,6 @@ tidy:
 
 .PHONY: check
 check:
-	@$(MAKE) fmt
 	@$(MAKE) tidy
 
 # 生成gRPC相关文件
