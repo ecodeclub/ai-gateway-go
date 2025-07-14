@@ -19,6 +19,7 @@ import (
 )
 
 var (
-	ErrDeductAmountFailed = errors.New("扣减失败")
-	ErrBizConfigNotFound  = errors.New("biz config not found")
+	ErrBizConfigNotFound   = errors.New("查询业务配置失败")
+	ErrInvalidParam        = errors.New("参数错误")
+	ErrInsufficientBalance = errors.New("余额不足")
 )

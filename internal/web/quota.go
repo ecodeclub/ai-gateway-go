@@ -15,8 +15,9 @@
 package web
 
 import (
-	"time"
+	"errors"
 
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ekit/slice"
@@ -33,44 +34,45 @@ func NewQuotaHandler(svc *service.QuotaService) *QuotaHandler {
 	return &QuotaHandler{svc: svc}
 }
 
-func (q *QuotaHandler) PublicRoutes(_ *gin.Engine) {}
-
 func (q *QuotaHandler) PrivateRoutes(server *gin.Engine) {
 	group := server.Group("/quota")
-	group.POST("/save", ginx.BS(q.SaveQuota))
+	group.POST("/save", ginx.BS(q.AddQuota))
 	group.POST("/get", ginx.S(q.GetQuota))
 
 	tmp := server.Group("/tmp")
-	tmp.POST("/save", ginx.BS(q.SaveTempQuota))
+	tmp.POST("/save", ginx.BS(q.CreateTempQuota))
 	tmp.POST("/get", ginx.S(q.GetTempQuota))
 
 	server.POST("/deduct", ginx.BS(q.Deduct))
 }
 
-func (q *QuotaHandler) SaveQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
+func (q *QuotaHandler) AddQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
-	err := q.svc.SaveQuota(ctx, domain.Quota{Amount: req.Amount, Uid: uid, Key: req.Key})
+	err := q.svc.AddQuota(ctx, domain.Quota{Amount: req.Amount, Uid: uid, Key: req.Key})
 	if err != nil {
-		return systemErrorResult, nil
+		return systemErrorResult, err
 	}
 	return ginx.Result{
 		Msg: "OK",
 	}, nil
 }
 
-func (q *QuotaHandler) SaveTempQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
+func (q *QuotaHandler) CreateTempQuota(ctx *ginx.Context, req QuotaRequest, sess session.Session) (ginx.Result, error) {
 	uid := sess.Claims().Uid
 
-	if req.StartTime == "" || req.EndTime == "" {
-		return systemErrorResult, nil
+	if req.StartTime == 0 || req.EndTime == 0 {
+		return invalidParamResult, errs.ErrInvalidParam
 	}
 
-	start, _ := q.toTimestamp(req.StartTime)
-	end, _ := q.toTimestamp(req.EndTime)
-
-	err := q.svc.SaveTempQuota(ctx, domain.TempQuota{Amount: req.Amount, Uid: uid, StartTime: start, EndTime: end})
+	err := q.svc.CreateTempQuota(ctx, domain.TempQuota{
+		Amount:    req.Amount,
+		Key:       req.Key,
+		Uid:       uid,
+		StartTime: req.StartTime,
+		EndTime:   req.EndTime,
+	})
 	if err != nil {
-		return systemErrorResult, nil
+		return systemErrorResult, err
 	}
 	return ginx.Result{
 		Msg: "OK",
@@ -106,26 +108,22 @@ func (q *QuotaHandler) Deduct(ctx *ginx.Context, req QuotaRequest, sees session.
 	uid := sees.Claims().Uid
 	err := q.svc.Deduct(ctx, uid, req.Amount, req.Key)
 	if err != nil {
+		// 检查是否是余额不足错误
+		if errors.Is(err, errs.ErrInsufficientBalance) {
+			return insufficientBalanceResult, nil
+		}
+		// 其他系统错误
 		return systemErrorResult, nil
 	}
 	return ginx.Result{Msg: "OK"}, nil
-}
-
-func (q *QuotaHandler) toTimestamp(timeStr string) (int64, error) {
-	const layout = "2006-01-02 15:04:05"
-	t, err := time.Parse(layout, timeStr)
-	if err != nil {
-		return 0, err
-	}
-	return t.Unix(), nil
 }
 
 func (q *QuotaHandler) toQuotaResponse(tempQuotaList []domain.TempQuota) []QuotaResponse {
 	return slice.Map[domain.TempQuota, QuotaResponse](tempQuotaList, func(idx int, src domain.TempQuota) QuotaResponse {
 		return QuotaResponse{
 			Amount:    src.Amount,
-			StartTime: time.Unix(src.StartTime, 0).Format("2006-01-02 15:04:05"),
-			EndTime:   time.Unix(src.EndTime, 0).Format("2006-01-02 15:04:05"),
+			StartTime: src.StartTime,
+			EndTime:   src.EndTime,
 		}
 	})
 }
@@ -133,13 +131,13 @@ func (q *QuotaHandler) toQuotaResponse(tempQuotaList []domain.TempQuota) []Quota
 type QuotaRequest struct {
 	Amount    int64  `json:"amount,omitempty"`
 	Key       string `json:"key,omitempty"`
-	StartTime string `json:"start_time,omitempty"`
-	EndTime   string `json:"end_time,omitempty"`
+	StartTime int64  `json:"start_time,omitempty"`
+	EndTime   int64  `json:"end_time,omitempty"`
 }
 
 type QuotaResponse struct {
 	Amount    int64  `json:"amount,omitempty"`
 	Key       string `json:"key"`
-	StartTime string `json:"start_time,omitempty"`
-	EndTime   string `json:"end_time,omitempty"`
+	StartTime int64  `json:"start_time,omitempty"`
+	EndTime   int64  `json:"end_time,omitempty"`
 }

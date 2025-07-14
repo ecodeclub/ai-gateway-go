@@ -30,12 +30,12 @@ func NewQuotaRepo(dao *dao.QuotaDao) *QuotaRepo {
 	return &QuotaRepo{dao: dao}
 }
 
-func (q *QuotaRepo) SaveQuota(ctx context.Context, quota domain.Quota) error {
-	return q.dao.SaveQuota(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount, Key: quota.Key})
+func (q *QuotaRepo) AddQuota(ctx context.Context, quota domain.Quota) error {
+	return q.dao.AddQuota(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount, Key: quota.Key})
 }
 
-func (q *QuotaRepo) SaveTempQuota(ctx context.Context, quota domain.TempQuota) error {
-	return q.dao.SaveTempQuota(ctx, dao.TempQuota{Amount: quota.Amount, StartTime: quota.StartTime, EndTime: quota.EndTime, Key: quota.Key})
+func (q *QuotaRepo) CreateTempQuota(ctx context.Context, quota domain.TempQuota) error {
+	return q.dao.CreateTempQuota(ctx, dao.TempQuota{Amount: quota.Amount, StartTime: quota.StartTime, EndTime: quota.EndTime, Key: quota.Key, UID: quota.Uid})
 }
 
 func (q *QuotaRepo) GetQuota(ctx context.Context, uid int64) (domain.Quota, error) {

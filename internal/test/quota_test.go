@@ -16,6 +16,7 @@ package test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -118,6 +119,14 @@ func (q *QuotaSuite) TestQuotaSave() {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			// 每个测试用例开始时清理数据
+			err := q.db.Exec("TRUNCATE TABLE quotas").Error
+			require.NoError(t, err)
+			err = q.db.Exec("TRUNCATE TABLE quota_records").Error
+			require.NoError(t, err)
+			err = q.db.Exec("TRUNCATE TABLE temp_quotas").Error
+			require.NoError(t, err)
+
 			tc.before()
 			req, err := http.NewRequest(http.MethodPost, "/quota/save", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
@@ -140,13 +149,12 @@ func (q *QuotaSuite) TestSaveTempQuota() {
 
 	testcases := []struct {
 		name    string
-		reqBody string
 		before  func()
 		after   func()
+		reqBody string
 	}{
 		{
-			name:    "save temp",
-			reqBody: `{"amount": 100000, "key": "23911", "start_time": "123", "end_time": "456"}`,
+			name: "创建临时额度",
 			before: func() {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
@@ -158,15 +166,26 @@ func (q *QuotaSuite) TestSaveTempQuota() {
 			},
 			after: func() {
 				var quota dao.TempQuota
-				err := q.db.Where("id = ?", 1).First(&quota).Error
+				err := q.db.Where("uid = ? AND `key` = ?", 1, "temp_key_1").First(&quota).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(100000), quota.Amount)
+				assert.Equal(t, int64(123), quota.StartTime)
+				assert.Equal(t, int64(456), quota.EndTime)
 			},
+			reqBody: `{"amount": 100000, "key": "temp_key_1", "start_time": 123, "end_time": 456}`,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			// 每个测试用例开始时清理数据
+			err := q.db.Exec("TRUNCATE TABLE quotas").Error
+			require.NoError(t, err)
+			err = q.db.Exec("TRUNCATE TABLE quota_records").Error
+			require.NoError(t, err)
+			err = q.db.Exec("TRUNCATE TABLE temp_quotas").Error
+			require.NoError(t, err)
+
 			tc.before()
 			req, err := http.NewRequest(http.MethodPost, "/tmp/save", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
@@ -183,19 +202,19 @@ func (q *QuotaSuite) TestSaveTempQuota() {
 
 func (q *QuotaSuite) TestDeduct() {
 	t := q.T()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	testcases := []struct {
 		name    string
+		before  func()
+		after   func()
 		reqBody string
-		before  func(db *gorm.DB, server *gin.Engine)
-		after   func(db *gorm.DB)
 	}{
 		{
-			name:    "deduct quota",
-			reqBody: `{"amount": 10, "key": "23911"}`,
-			before: func(db *gorm.DB, server *gin.Engine) {
+			name: "从主额度扣减",
+			before: func() {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
 					Uid: 1,
@@ -204,20 +223,29 @@ func (q *QuotaSuite) TestDeduct() {
 				session.SetDefaultProvider(provider)
 				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
 
-				quota := dao.Quota{Amount: 20, Key: "23911", UID: 1}
-				db.Create(&quota)
-			},
-			after: func(db *gorm.DB) {
-				var quota dao.Quota
-				err := db.Where("id = ?", 1).First(&quota).Error
+				// 创建主额度
+				quota := dao.Quota{Amount: 100, Key: "main_quota", UID: 1}
+				err := q.db.Create(&quota).Error
 				require.NoError(t, err)
-				assert.Equal(t, int64(10), quota.Amount)
 			},
+			after: func() {
+				// 验证主额度被扣减
+				var quota dao.Quota
+				err := q.db.Where("uid = ? AND `key` = ?", 1, "main_quota").First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(80), quota.Amount)
+
+				// 验证扣减记录被创建
+				var record dao.QuotaRecord
+				err = q.db.Where("uid = ? AND `key` = ?", 1, "deduct_key_1").First(&record).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(20), record.Amount)
+			},
+			reqBody: `{"amount": 20, "key": "deduct_key_1"}`,
 		},
 		{
-			name:    "deduct temp quota",
-			reqBody: `{"amount": 10, "key": "23922"}`,
-			before: func(db *gorm.DB, server *gin.Engine) {
+			name: "从临时额度扣减",
+			before: func() {
 				sess := mocks.NewMockSession(ctrl)
 				sess.EXPECT().Claims().Return(session.Claims{
 					Uid: 1,
@@ -226,56 +254,145 @@ func (q *QuotaSuite) TestDeduct() {
 				session.SetDefaultProvider(provider)
 				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
 
-				quota := dao.TempQuota{Amount: 20, Key: "23922", UID: 1, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix()}
-				err := db.Create(&quota).Error
+				// 创建临时额度
+				now := time.Now().Unix()
+				tempQuota := dao.TempQuota{
+					Amount:    50,
+					Key:       "temp_quota_1",
+					UID:       1,
+					StartTime: now,
+					EndTime:   now + 24*3600,
+				}
+				err := q.db.Create(&tempQuota).Error
 				require.NoError(t, err)
 			},
-			after: func(db *gorm.DB) {
-				var quota dao.TempQuota
-				err := db.Where("id = ?", 1).First(&quota).Error
+			after: func() {
+				// 验证临时额度被扣减
+				var tempQuota dao.TempQuota
+				err := q.db.Where("uid = ? AND `key` = ?", 1, "temp_quota_1").First(&tempQuota).Error
 				require.NoError(t, err)
-				assert.Equal(t, int64(10), quota.Amount)
+				assert.Equal(t, int64(30), tempQuota.Amount)
+
+				// 验证扣减记录被创建
+				var record dao.QuotaRecord
+				err = q.db.Where("uid = ? AND `key` = ?", 1, "deduct_key_2").First(&record).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(20), record.Amount)
 			},
+			reqBody: `{"amount": 20, "key": "deduct_key_2"}`,
+		},
+		{
+			name: "优先从临时额度扣减，不足再从主额度扣减",
+			before: func() {
+				sess := mocks.NewMockSession(ctrl)
+				sess.EXPECT().Claims().Return(session.Claims{
+					Uid: 1,
+				}).AnyTimes()
+				provider := mocks.NewMockProvider(ctrl)
+				session.SetDefaultProvider(provider)
+				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
+
+				// 创建主额度
+				quota := dao.Quota{Amount: 100, Key: "main_quota_2", UID: 1}
+				err := q.db.Create(&quota).Error
+				require.NoError(t, err)
+
+				// 创建临时额度（金额不足）
+				now := time.Now().Unix()
+				tempQuota := dao.TempQuota{
+					Amount:    10,
+					Key:       "temp_quota_2",
+					UID:       1,
+					StartTime: now,
+					EndTime:   now + 24*3600,
+				}
+				err = q.db.Create(&tempQuota).Error
+				require.NoError(t, err)
+			},
+			after: func() {
+				// 验证临时额度被完全扣减
+				var tempQuota dao.TempQuota
+				err := q.db.Where("uid = ? AND `key` = ?", 1, "temp_quota_2").First(&tempQuota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(0), tempQuota.Amount)
+
+				// 验证主额度被扣减
+				var quota dao.Quota
+				err = q.db.Where("uid = ? AND `key` = ?", 1, "main_quota_2").First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(90), quota.Amount)
+
+				// 验证扣减记录被创建
+				var record dao.QuotaRecord
+				err = q.db.Where("uid = ? AND `key` = ?", 1, "deduct_key_3").First(&record).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(30), record.Amount)
+			},
+			reqBody: `{"amount": 30, "key": "deduct_key_3"}`,
+		},
+		{
+			name: "扣减失败 - 余额不足",
+			before: func() {
+				sess := mocks.NewMockSession(ctrl)
+				sess.EXPECT().Claims().Return(session.Claims{
+					Uid: 1,
+				}).AnyTimes()
+				provider := mocks.NewMockProvider(ctrl)
+				session.SetDefaultProvider(provider)
+				provider.EXPECT().Get(gomock.Any()).Return(sess, nil)
+
+				// 创建少量主额度
+				quota := dao.Quota{Amount: 10, Key: "main_quota_3", UID: 1}
+				err := q.db.Create(&quota).Error
+				require.NoError(t, err)
+			},
+			after: func() {
+				// 验证主额度没有被扣减
+				var quota dao.Quota
+				err := q.db.Where("uid = ? AND `key` = ?", 1, "main_quota_3").First(&quota).Error
+				require.NoError(t, err)
+				assert.Equal(t, int64(10), quota.Amount) // 额度应该保持不变
+
+				// 验证扣减记录没有被创建（因为事务回滚）
+				var record dao.QuotaRecord
+				err = q.db.Where("uid = ? AND `key` = ?", 1, "deduct_key_4").First(&record).Error
+				assert.Error(t, err) // 应该找不到记录，因为事务回滚了
+			},
+			reqBody: `{"amount": 50, "key": "deduct_key_4"}`,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 独立初始化 DB 和 Gin Engine
-			dbConfig := config.NewConfig(
-				config.WithDBName("ai_gateway_platform"),
-				config.WithUserName("root"),
-				config.WithPassword("root"),
-				config.WithHost("127.0.0.1"),
-				config.WithPort("13306"),
-			)
-			db, err := config.NewDB(dbConfig)
+			// 每个测试用例开始时清理数据
+			err := q.db.Exec("TRUNCATE TABLE quotas").Error
 			require.NoError(t, err)
-			err = dao.InitQuotaTable(db)
+			err = q.db.Exec("TRUNCATE TABLE quota_records").Error
+			require.NoError(t, err)
+			err = q.db.Exec("TRUNCATE TABLE temp_quotas").Error
 			require.NoError(t, err)
 
-			d := dao.NewQuotaDao(db)
-			repo := repository.NewQuotaRepo(d)
-			svc := service.NewQuotaService(repo)
-			handler := web.NewQuotaHandler(svc)
-			server := gin.Default()
-			handler.PrivateRoutes(server)
-
-			// 清理表
-			defer func() {
-				db.Exec("TRUNCATE TABLE quotas")
-				db.Exec("TRUNCATE TABLE quota_records")
-				db.Exec("TRUNCATE TABLE temp_quotas")
-			}()
-
-			tc.before(db, server)
+			tc.before()
 			req, err := http.NewRequest(http.MethodPost, "/deduct", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
-			server.ServeHTTP(resp, req)
-			assert.Equal(t, http.StatusOK, resp.Code)
-			tc.after(db)
+			q.server.ServeHTTP(resp, req)
+
+			if tc.name == "扣减失败 - 余额不足" {
+				assert.Equal(t, http.StatusOK, resp.Code) // HTTP状态码仍然是200
+
+				var response map[string]interface{}
+				err = json.Unmarshal(resp.Body.Bytes(), &response)
+				require.NoError(t, err)
+
+				assert.Equal(t, float64(400002), response["code"])
+				assert.Equal(t, "余额不足", response["msg"])
+			} else {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			}
+
+			tc.after()
 		})
 	}
 }

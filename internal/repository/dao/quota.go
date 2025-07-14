@@ -74,22 +74,14 @@ func NewQuotaDao(db *gorm.DB) *QuotaDao {
 	return &QuotaDao{db: db}
 }
 
-func (dao *QuotaDao) SaveTempQuota(ctx context.Context, quota TempQuota) error {
+func (dao *QuotaDao) CreateTempQuota(ctx context.Context, quota TempQuota) error {
 	now := time.Now().Unix()
 	quota.Ctime = now
 	quota.Utime = now
-	return dao.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "key"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"amount":     quota.Amount,
-			"start_time": quota.StartTime,
-			"end_time":   quota.EndTime,
-			"utime":      now,
-		}),
-	}).Create(&quota).Error
+	return dao.db.WithContext(ctx).Create(&quota).Error
 }
 
-func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
+func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
 	now := time.Now().Unix()
 	quota.Utime = now
 
@@ -110,7 +102,7 @@ func (dao *QuotaDao) SaveQuota(ctx context.Context, quota Quota) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "key"}},
 			DoUpdates: clause.Assignments(map[string]any{
-				"amount": quota.Amount,
+				"amount": gorm.Expr("amount + ?", quota.Amount),
 				"utime":  now,
 			}),
 		}).Create(&quota).Error
@@ -200,7 +192,7 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errs.ErrDeductAmountFailed
+		return errs.ErrInsufficientBalance
 	}
 	return nil
 }

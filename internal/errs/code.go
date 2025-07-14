@@ -14,7 +14,11 @@
 
 package errs
 
-var SystemError = ErrorCode{Code: 501001, Msg: "系统错误"}
+var (
+	SystemError              = ErrorCode{Code: 501001, Msg: "系统错误"}
+	InvalidParamError        = ErrorCode{Code: 400001, Msg: "参数错误"}
+	InsufficientBalanceError = ErrorCode{Code: 400002, Msg: "余额不足"}
+)
 
 type ErrorCode struct {
 	Code int

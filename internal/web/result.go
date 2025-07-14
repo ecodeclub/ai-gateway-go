@@ -23,3 +23,13 @@ var systemErrorResult = ginx.Result{
 	Code: errs.SystemError.Code,
 	Msg:  errs.SystemError.Msg,
 }
+
+var invalidParamResult = ginx.Result{
+	Code: errs.InvalidParamError.Code,
+	Msg:  errs.InvalidParamError.Msg,
+}
+
+var insufficientBalanceResult = ginx.Result{
+	Code: errs.InsufficientBalanceError.Code,
+	Msg:  errs.InsufficientBalanceError.Msg,
+}

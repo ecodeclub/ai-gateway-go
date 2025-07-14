@@ -29,12 +29,12 @@ func NewQuotaService(repo *repository.QuotaRepo) *QuotaService {
 	return &QuotaService{repo: repo}
 }
 
-func (q *QuotaService) SaveQuota(ctx context.Context, quota domain.Quota) error {
-	return q.repo.SaveQuota(ctx, quota)
+func (q *QuotaService) AddQuota(ctx context.Context, quota domain.Quota) error {
+	return q.repo.AddQuota(ctx, quota)
 }
 
-func (q *QuotaService) SaveTempQuota(ctx context.Context, quota domain.TempQuota) error {
-	return q.repo.SaveTempQuota(ctx, quota)
+func (q *QuotaService) CreateTempQuota(ctx context.Context, quota domain.TempQuota) error {
+	return q.repo.CreateTempQuota(ctx, quota)
 }
 
 func (q *QuotaService) GetTempQuota(ctx context.Context, uid int64) ([]domain.TempQuota, error) {
