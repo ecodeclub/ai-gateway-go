@@ -1,10 +1,3 @@
-GOFILES=$(shell find . -type f -name '*.go' \
-    -not -path "./vendor/*" \
-    -not -path "./third_party/*" \
-    -not -path "./.idea/*" \
-    -not -name '*.pb.go' \
-    -not -name '*mock*.go')
-
 .PHONY:	bench
 bench:
 	@go test -bench=. -benchmem  ./...
@@ -28,12 +21,12 @@ e2e:
 	@go	test -race -v -failfast ./...
 	@docker compose -f ./.script/docker-compose.yaml down
 
-# .PHONY: fmt
-# fmt:
-# 	@goimports -l -w $(GOFILES)
-# 	@gofumpt -l -w $(GOFILES)
 
-.PHONY: lint
+.PHONY:	fmt
+fmt:
+	@goimports -l -w $$(find . -type f -name '*.go'  -not -path "./.idea/*" -not -name '*.pb.go' -not -name '*mock*.go')
+
+.PHONY:	lint
 lint:
 	@golangci-lint run -c .golangci.yml
 
@@ -43,7 +36,9 @@ tidy:
 
 .PHONY: check
 check:
+	@$(MAKE) fmt
 	@$(MAKE) tidy
+	#@$(MAKE) lint
 
 # 生成gRPC相关文件
 .PHONY: grpc
