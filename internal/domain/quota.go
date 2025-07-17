@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web
+package domain
 
-import (
-	"github.com/ecodeclub/ai-gateway-go/internal/errs"
-	"github.com/ecodeclub/ginx"
-)
-
-var systemErrorResult = ginx.Result{
-	Code: errs.SystemError.Code,
-	Msg:  errs.SystemError.Msg,
+type Quota struct {
+	Amount        int64
+	Key           string
+	Uid           int64
+	LastClearTime int64
 }
 
-var invalidParamResult = ginx.Result{
-	Code: errs.InvalidParamError.Code,
-	Msg:  errs.InvalidParamError.Msg,
+type TempQuota struct {
+	Amount    int64
+	Key       string
+	StartTime int64
+	EndTime   int64
+	Uid       int64
 }
 
-var insufficientBalanceResult = ginx.Result{
-	Code: errs.InsufficientBalanceError.Code,
-	Msg:  errs.InsufficientBalanceError.Msg,
-}
+type Record struct{}
