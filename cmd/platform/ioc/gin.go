@@ -17,19 +17,31 @@ package ioc
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/admin"
 	"github.com/ecodeclub/ginx/session"
+	"github.com/gin-contrib/cors"
 	"github.com/gotomicro/ego/server/egin"
 )
 
 func InitGin(
 	sp session.Provider,
-	promptHandler *admin.PromptHandler,
+	mockHandler *admin.MockHandler,
+	invocationCfgHandler *admin.InvocationConfigHandler,
 	bizConfig *admin.BizConfigHandler,
+	providerHandler *admin.ProviderHandler,
 ) *egin.Component {
 	session.SetDefaultProvider(sp)
 	res := egin.Load("admin").Build()
+	res.Use(cors.New(cors.Config{
+		AllowCredentials: true,
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		AllowOriginFunc: func(origin string) bool {
+			return true
+		},
+	}))
+	mockHandler.PublicRoutes(res)
 	// 登录校验
 	res.Use(session.CheckLoginMiddleware())
-	promptHandler.PrivateRoutes(res)
+	invocationCfgHandler.PrivateRoutes(res)
 	bizConfig.PrivateRoutes(res)
+	providerHandler.PrivateRoutes(res)
 	return res
 }

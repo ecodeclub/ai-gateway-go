@@ -52,9 +52,9 @@ func (s *PromptTestSuite) SetupSuite() {
 	err = dao.InitTable(db)
 	require.NoError(s.T(), err)
 	s.db = db
-	d := dao.NewPromptDAO(db)
-	repo := repository.NewPromptRepo(d)
-	svc := service.NewPromptService(repo)
+	d := dao.NewInvocationConfigDAO(db)
+	repo := repository.NewInvocationConfigRepo(d)
+	svc := service.NewInvocationConfigService(repo)
 	handler := admin.NewHandler(svc)
 	server := gin.Default()
 	handler.PrivateRoutes(server)
@@ -96,7 +96,7 @@ func (s *PromptTestSuite) TestAdd() {
 			},
 			after: func() {
 				t := s.T()
-				var res dao.Prompt
+				var res dao.InvocationConfig
 				err := s.db.Where("id = ?", 1).First(&res).Error
 				require.NoError(t, err)
 				assert.Equal(t, "test", res.Name)
@@ -107,16 +107,16 @@ func (s *PromptTestSuite) TestAdd() {
 				assert.True(t, res.Ctime > 0)
 				assert.True(t, res.Utime > 0)
 
-				var version dao.PromptVersion
+				var version dao.InvocationConfigVersion
 				err = s.db.Where("id = ?", 1).First(&version).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(1), version.PromptID)
 				assert.Equal(t, "", version.Label)
-				assert.Equal(t, "test", version.Content)
-				assert.Equal(t, "test", version.SystemContent)
+				assert.Equal(t, "test", version.Prompt)
+				assert.Equal(t, "test", version.SystemPrompt)
 				assert.Equal(t, uint8(1), res.Status)
 				assert.Equal(t, float32(9.9), version.Temperature)
-				assert.Equal(t, float32(0.9), version.TopN)
+				assert.Equal(t, float32(0.9), version.TopP)
 				assert.Equal(t, 1000, version.MaxTokens)
 				assert.True(t, version.Ctime > 0)
 				assert.True(t, version.Utime > 0)
@@ -163,7 +163,7 @@ func (s *PromptTestSuite) TestGet() {
 			name: "成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -174,17 +174,17 @@ func (s *PromptTestSuite) TestGet() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "test",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "test",
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				})
 			},
 			after:    func() {},
@@ -249,7 +249,7 @@ func (s *PromptTestSuite) TestUpdatePrompt() {
 			name: "成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -263,7 +263,7 @@ func (s *PromptTestSuite) TestUpdatePrompt() {
 			},
 			after: func() {
 				t := s.T()
-				var res dao.Prompt
+				var res dao.InvocationConfig
 				err := s.db.Where("id = ?", 1).First(&res).Error
 				require.NoError(t, err)
 				assert.Equal(t, "aaa", res.Name)
@@ -311,31 +311,31 @@ func (s *PromptTestSuite) TestUpdateVersion() {
 			name: "成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "test",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				err := s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "test",
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				}).Error
 				require.NoError(s.T(), err)
 			},
 			after: func() {
 				t := s.T()
-				var version dao.PromptVersion
+				var version dao.InvocationConfigVersion
 				err := s.db.Where("id = ?", 1).First(&version).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(1), version.PromptID)
-				assert.Equal(t, "aaa", version.Content)
+				assert.Equal(t, "aaa", version.Prompt)
 				assert.Equal(t, "test", version.Label)
-				assert.Equal(t, "test", version.SystemContent)
+				assert.Equal(t, "test", version.SystemPrompt)
 				assert.Equal(t, uint8(1), version.Status)
-				assert.Equal(t, float32(1.0), version.TopN)
+				assert.Equal(t, float32(1.0), version.TopP)
 				assert.True(t, version.Utime > version.Ctime)
 			},
 			reqBody: `{
@@ -375,7 +375,7 @@ func (s *PromptTestSuite) TestDelete() {
 			name: "删除整个prompt-成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -386,28 +386,28 @@ func (s *PromptTestSuite) TestDelete() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "test",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "test",
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				})
 			},
 			after: func() {
 				t := s.T()
-				var res dao.Prompt
+				var res dao.InvocationConfig
 				err := s.db.Where("id = ?", 1).First(&res).Error
 				require.NoError(t, err)
 				assert.Equal(t, uint8(0), res.Status)
 				assert.True(t, res.Utime > res.Ctime)
 
-				var version dao.PromptVersion
+				var version dao.InvocationConfigVersion
 				err = s.db.Where("id = ?", 1).First(&version).Error
 				require.NoError(t, err)
 				assert.Equal(t, uint8(0), version.Status)
@@ -448,7 +448,7 @@ func (s *PromptTestSuite) TestDeleteVersion() {
 			name: "删除version-成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -459,28 +459,28 @@ func (s *PromptTestSuite) TestDeleteVersion() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "test",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "test",
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				})
 			},
 			after: func() {
 				t := s.T()
-				var res dao.Prompt
+				var res dao.InvocationConfig
 				err := s.db.Where("id = ?", 1).First(&res).Error
 				require.NoError(t, err)
 				assert.Equal(t, uint8(1), res.Status)
 				assert.True(t, res.Utime == res.Ctime)
 
-				var version dao.PromptVersion
+				var version dao.InvocationConfigVersion
 				err = s.db.Where("id = ?", 1).First(&version).Error
 				require.NoError(t, err)
 				assert.Equal(t, uint8(0), version.Status)
@@ -521,7 +521,7 @@ func (s *PromptTestSuite) TestPublish() {
 			name: "成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -532,28 +532,28 @@ func (s *PromptTestSuite) TestPublish() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "", // 没有语义化版本
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "", // 没有语义化版本
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				})
 			},
 			after: func() {
 				t := s.T()
-				var res dao.Prompt
+				var res dao.InvocationConfig
 				err := s.db.Where("id = ?", 1).First(&res).Error
 				require.NoError(t, err)
 				assert.True(t, res.ActiveVersion == 1)
 				assert.True(t, res.Utime > res.Ctime)
 
-				var version dao.PromptVersion
+				var version dao.InvocationConfigVersion
 				err = s.db.Where("id = ?", 1).First(&version).Error
 				require.NoError(t, err)
 				assert.Equal(t, int64(1), version.PromptID)
@@ -596,7 +596,7 @@ func (s *PromptTestSuite) TestFork() {
 			name: "成功",
 			before: func() {
 				now := time.Now().UnixMilli()
-				err := s.db.Create(&dao.Prompt{
+				err := s.db.Create(&dao.InvocationConfig{
 					Name:          "test",
 					Description:   "test",
 					Owner:         1,
@@ -607,39 +607,39 @@ func (s *PromptTestSuite) TestFork() {
 					Utime:         now,
 				}).Error
 				require.NoError(s.T(), err)
-				s.db.Create(&dao.PromptVersion{
-					PromptID:      1,
-					Label:         "v1.0.0",
-					Content:       "test",
-					SystemContent: "test",
-					Temperature:   9.9,
-					TopN:          0.9,
-					MaxTokens:     1000,
-					Status:        1,
-					Ctime:         now,
-					Utime:         now,
+				s.db.Create(&dao.InvocationConfigVersion{
+					PromptID:     1,
+					Label:        "v1.0.0",
+					Prompt:       "test",
+					SystemPrompt: "test",
+					Temperature:  9.9,
+					TopP:         0.9,
+					MaxTokens:    1000,
+					Status:       1,
+					Ctime:        now,
+					Utime:        now,
 				})
 			},
 			after: func() {
 				t := s.T()
-				var versions []dao.PromptVersion
+				var versions []dao.InvocationConfigVersion
 				err := s.db.Where("prompt_id = ?", 1).Find(&versions).Error
 				require.NoError(t, err)
 				require.True(t, len(versions) == 2) // fork 之后有两个版本
-				assert.Equal(t, "test", versions[0].Content)
-				assert.Equal(t, "test", versions[0].SystemContent)
+				assert.Equal(t, "test", versions[0].Prompt)
+				assert.Equal(t, "test", versions[0].SystemPrompt)
 				assert.Equal(t, "v1.0.0", versions[0].Label)
-				assert.Equal(t, float32(0.9), versions[0].TopN)
+				assert.Equal(t, float32(0.9), versions[0].TopP)
 				assert.Equal(t, float32(9.9), versions[0].Temperature)
 				assert.Equal(t, 1000, versions[0].MaxTokens)
 				assert.True(t, versions[0].Ctime > 0)
 				assert.True(t, versions[0].Utime > 0)
 
-				assert.Equal(t, "test", versions[1].Content)
-				assert.Equal(t, "test", versions[1].SystemContent)
+				assert.Equal(t, "test", versions[1].Prompt)
+				assert.Equal(t, "test", versions[1].SystemPrompt)
 				// fork 后的 label 为空
 				assert.Equal(t, "", versions[1].Label)
-				assert.Equal(t, float32(0.9), versions[1].TopN)
+				assert.Equal(t, float32(0.9), versions[1].TopP)
 				assert.Equal(t, float32(9.9), versions[1].Temperature)
 				assert.Equal(t, 1000, versions[1].MaxTokens)
 				assert.True(t, versions[0].Ctime > 0)

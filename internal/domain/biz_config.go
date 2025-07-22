@@ -18,8 +18,9 @@ import "time"
 
 type BizConfig struct {
 	ID        int64
+	Name      string
 	OwnerID   int64
-	OwnerType string // "person" or "organization"
+	OwnerType string // "user" or "organization"
 	Config    string // JSON string
 	Ctime     time.Time
 	Utime     time.Time

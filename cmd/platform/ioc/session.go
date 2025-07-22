@@ -15,17 +15,30 @@
 package ioc
 
 import (
+	"github.com/ecodeclub/ginx/session/cookie"
 	"time"
 
 	"github.com/ecodeclub/ginx/session"
-	redis "github.com/ecodeclub/ginx/session/redis"
+	"github.com/ecodeclub/ginx/session/redis"
 )
 
 func InitSession() session.Provider {
 	type Config struct {
-		JwtKey string `yaml:"jwtKey"`
+		JwtKey     string        `yaml:"jwtKey"`
+		Expiration time.Duration `yaml:"expiration"`
+		Cookie     struct {
+			Domain string `yaml:"domain"`
+		} `json:"cookie"`
 	}
 	var cfg Config
-	provider := redis.NewSessionProvider(InitRedis(), cfg.JwtKey, time.Hour*24*30)
+	const day30 = time.Hour * 24 * 30
+	provider := redis.NewSessionProvider(InitRedis(), cfg.JwtKey, day30)
+	provider.TokenCarrier = &cookie.TokenCarrier{
+		MaxAge:   int(day30.Seconds()),
+		Name:     "ssid",
+		Secure:   true,
+		HttpOnly: true,
+		Domain:   cfg.Cookie.Domain,
+	}
 	return provider
 }

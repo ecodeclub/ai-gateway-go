@@ -39,11 +39,11 @@ var (
 		service.NewChatService,
 		igrpc.NewChatServer,
 	)
-	PromptSet = wire.NewSet(
-		dao.NewPromptDAO,
-		repository.NewPromptRepo,
-		service.NewPromptService,
-		admin.NewPromptHandler,
+	InvocationConfigSet = wire.NewSet(
+		dao.NewInvocationConfigDAO,
+		repository.NewInvocationConfigRepo,
+		service.NewInvocationConfigService,
+		admin.NewInvocationConfigHandler,
 	)
 	BizConfigSet = wire.NewSet(
 		dao.NewBizConfigDAO,
@@ -51,6 +51,11 @@ var (
 		service.NewBizConfigService,
 		admin.NewBizConfigHandler,
 	)
+
+	ProviderSet = wire.NewSet(admin.NewProviderHandler)
+	ModelSet    = wire.NewSet(repository.NewModelRepository)
+
+	MockSet = wire.NewSet(admin.NewMockHandler)
 )
 
 type App struct {

@@ -28,15 +28,18 @@ func InitApp() *App {
 	chatServer := grpc.NewChatServer(chatService)
 	component := InitGrpcServer(chatServer)
 	provider := InitSession()
-	promptDAO := dao.NewPromptDAO(db)
-	promptRepo := repository.NewPromptRepo(promptDAO)
-	promptService := service.NewPromptService(promptRepo)
-	promptHandler := admin.NewPromptHandler(promptService)
+	mockHandler := admin.NewMockHandler()
+	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
+	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizConfigRepository := repository.NewBizConfigRepository(bizConfigDAO)
+	modelRepository := repository.NewModelRepository()
+	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, modelRepository)
+	invocationConfigHandler := admin.NewInvocationConfigHandler(invocationConfigService)
 	bizConfigService := service.NewBizConfigService(bizConfigRepository)
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
-	eginComponent := InitGin(provider, promptHandler, bizConfigHandler)
+	providerHandler := admin.NewProviderHandler()
+	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
 	app := &App{
 		GrpcSever: component,
 		GinServer: eginComponent,

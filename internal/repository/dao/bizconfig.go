@@ -15,6 +15,7 @@
 package dao
 
 import (
+	"gorm.io/gorm/clause"
 	"time"
 
 	"golang.org/x/net/context"
@@ -23,6 +24,7 @@ import (
 
 type BizConfig struct {
 	ID        int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	Name      string `gorm:"type:varchar(256)"`
 	OwnerID   int64  `gorm:"column:owner_id;type:bigint;not null"`
 	OwnerType string `gorm:"column:owner_type;type:varchar(20);not null"`
 	Config    string `gorm:"column:config;type:text"`
@@ -42,15 +44,14 @@ func NewBizConfigDAO(db *gorm.DB) *BizConfigDAO {
 	return &BizConfigDAO{db: db}
 }
 
-func (d *BizConfigDAO) Insert(ctx context.Context, bc *BizConfig) (BizConfig, error) {
+func (d *BizConfigDAO) Save(ctx context.Context, bc BizConfig) (int64, error) {
 	now := time.Now().UnixMilli()
 	bc.Ctime = now
 	bc.Utime = now
-	err := d.db.WithContext(ctx).Create(bc).Error
-	if err != nil {
-		return BizConfig{}, err
-	}
-	return *bc, nil
+	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{"config", "name", "utime"}),
+	}).Create(&bc).Error
+	return bc.ID, err
 }
 
 // GetByID 根据ID查询
@@ -60,13 +61,15 @@ func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (BizConfig, error)
 	return bc, err
 }
 
-// Update 更新记录
-func (d *BizConfigDAO) Update(ctx context.Context, bc *BizConfig) error {
-	bc.Utime = time.Now().UnixMilli()
-	return d.db.WithContext(ctx).Save(bc).Error
+func (d *BizConfigDAO) List(ctx context.Context, offset, limit int) ([]BizConfig, error) {
+	var bc []BizConfig
+	err := d.db.WithContext(ctx).Order("utime DESC").
+		Offset(offset).Limit(limit).Find(&bc).Error
+	return bc, err
 }
 
-// Delete 删除记录
-func (d *BizConfigDAO) Delete(ctx context.Context, id string) error {
-	return d.db.WithContext(ctx).Where("id = ?", id).Delete(&BizConfig{}).Error
+func (d *BizConfigDAO) Count(ctx context.Context) (int, error) {
+	var total int
+	err := d.db.WithContext(ctx).Model(&BizConfig{}).Select("COUNT(id)").First(&total).Error
+	return total, err
 }

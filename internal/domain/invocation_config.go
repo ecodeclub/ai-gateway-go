@@ -25,33 +25,45 @@ func (o OwnerType) String() string {
 }
 
 const (
-	_ OwnerType = "personal"
-	_ OwnerType = "organization"
+	OwnerTypeUser         OwnerType = "user"
+	OwnerTypeOrganization OwnerType = "organization"
 )
 
-type Prompt struct {
+type InvocationConfig struct {
 	ID          int64
 	Name        string
-	Owner       int64
-	OwnerType   OwnerType
+	Biz         BizConfig
 	Description string
-	// 当前发布版本的 id
-	ActiveVersion int64
-	// prompt 所有的版本信息
-	Versions []PromptVersion
+	// 配置的所有的版本信息
+	Versions []InvocationCfgVersion
 	Ctime    time.Time
 	Utime    time.Time
 }
 
-type PromptVersion struct {
-	ID            int64
-	Label         string
-	Content       string
-	SystemContent string
-	Temperature   float32
-	TopN          float32
-	MaxTokens     int
-	Status        uint8
-	Ctime         time.Time
-	Utime         time.Time
+type InvocationCfgVersionStatus string
+
+const (
+	InvocationCfgVersionStatusDraft  InvocationCfgVersionStatus = "draft"
+	InvocationCfgVersionStatusActive InvocationCfgVersionStatus = "active"
+)
+
+func (s InvocationCfgVersionStatus) String() string {
+	return string(s)
+}
+
+type InvocationCfgVersion struct {
+	ID int64
+	// InvocationConfig 的 ID
+	InvID int64
+	Model Model
+	// 版本号
+	Version      string
+	Prompt       string
+	SystemPrompt string
+	Temperature  float32
+	TopP         float32
+	MaxTokens    int
+	Status       InvocationCfgVersionStatus
+	Ctime        time.Time
+	Utime        time.Time
 }

@@ -1,4 +1,4 @@
-//go:build wireinject
+//go:build product
 
 // Copyright 2023 ecodeclub
 //
@@ -14,23 +14,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ioc
+package admin
 
 import (
-	"github.com/google/wire"
+	"github.com/ecodeclub/ginx"
+	"github.com/gotomicro/ego/server/egin"
 )
 
-func InitApp() *App {
-	wire.Build(
-		BaseSet,
-		MockSet,
-		LLMSet,
-		ChatSet,
-		InvocationConfigSet,
-		BizConfigSet,
-		ProviderSet,
-		ModelSet,
-		wire.Struct(new(App), "*"),
-	)
-	return new(App)
+// MockHandler 这是 mock 的东西，你在生产环境要关掉
+type MockHandler struct {
+}
+
+func NewMockHandler() *MockHandler {
+	return new(MockHandler)
+}
+
+func (h *MockHandler) PublicRoutes(server *egin.Component) {
+	server.Any("/mock/login", ginx.W(h.MockLogin))
+}
+
+func (h *MockHandler) MockLogin(ctx *ginx.Context) (ginx.Result, error) {
+	return ginx.Result{
+		Msg: "小伙子你在乱搞啊！",
+		Data: Profile{
+			Nickname: "模拟用户",
+		},
+	}, nil
 }
