@@ -18,4 +18,8 @@ import (
 	"errors"
 )
 
-var ErrBizConfigNotFound = errors.New("biz config not found")
+var (
+	ErrBizConfigNotFound   = errors.New("查询业务配置失败")
+	ErrInvalidParam        = errors.New("参数错误")
+	ErrInsufficientBalance = errors.New("余额不足")
+)

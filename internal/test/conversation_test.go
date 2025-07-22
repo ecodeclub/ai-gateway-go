@@ -288,7 +288,7 @@ func (c *ConversationSuite) TestDetail() {
 			conversationService := service.NewChatService(repo, handler)
 			server := grpc.NewConversationServer(conversationService)
 			tc.before()
-			detail, err := server.Detail(context.Background(), &aiv1.MsgListReq{Sn: "1"})
+			detail, err := server.Detail(context.Background(), &aiv1.DetailRequest{Sn: "1"})
 			require.NoError(t, err)
 			assert.ElementsMatch(t, detail.Message, []*aiv1.Message{
 				{Role: aiv1.Role_USER, Content: "user1"},

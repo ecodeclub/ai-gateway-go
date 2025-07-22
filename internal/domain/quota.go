@@ -12,15 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package domain
 
-var (
-	SystemError              = ErrorCode{Code: 501001, Msg: "系统错误"}
-	InvalidParamError        = ErrorCode{Code: 400001, Msg: "参数错误"}
-	InsufficientBalanceError = ErrorCode{Code: 400002, Msg: "余额不足"}
-)
-
-type ErrorCode struct {
-	Code int
-	Msg  string
+type Quota struct {
+	Amount        int64
+	Key           string
+	Uid           int64
+	LastClearTime int64
 }
+
+type TempQuota struct {
+	Amount    int64
+	Key       string
+	StartTime int64
+	EndTime   int64
+	Uid       int64
+}
+
+type Record struct{}
