@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package repository
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"strconv"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+type ModelRepository struct {
+}
+
+func NewModelRepository() *ModelRepository {
+	return &ModelRepository{}
+}
+
+func (repo *ModelRepository) FindById(id int64) (domain.Model, error) {
+	// TODO 找到并且组合 model, provider
+	return domain.Model{
+		ID:   id,
+		Name: "model" + strconv.FormatInt(id, 10),
+		Provider: domain.Provider{
+			ID:   id,
+			Name: "provider" + strconv.FormatInt(id, 10),
+		},
+	}, nil
 }

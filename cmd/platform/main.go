@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package main
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ai-gateway-go/cmd/platform/ioc"
+	"github.com/gotomicro/ego"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+// --config=local.yaml，替换你的配置文件地址
+func main() {
+	egoApp := ego.New()
+	app := ioc.InitApp()
+
+	err := egoApp.
+		// Invoker 在 Ego 里面，应该叫做初始化函数
+		Invoker().
+		Serve(
+			//egovernor.Load("server.governor").Build(),
+			app.GinServer,
+			app.GrpcSever).
+		Run()
+	panic(err)
+
 }

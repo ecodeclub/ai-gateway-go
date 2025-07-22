@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package ioc
 
-import "gorm.io/gorm"
+import (
+	"fmt"
+	"github.com/gotomicro/ego/core/econf"
+	"github.com/redis/go-redis/v9"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+func InitRedis() redis.Cmdable {
+	type RedisConfig struct {
+		Addr string `yaml:"addr"`
+	}
+
+	var cfg RedisConfig
+	err := econf.UnmarshalKey("redis", &cfg)
+	if err != nil {
+		panic(fmt.Errorf("初始化 Redis 失败 %w", err))
+	}
+
+	return redis.NewClient(&redis.Options{
+		Addr: cfg.Addr,
+	})
 }

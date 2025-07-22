@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package domain
 
-import "gorm.io/gorm"
-
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+type Quota struct {
+	Amount        int64
+	Key           string
+	Uid           int64
+	LastClearTime int64
 }
+
+type TempQuota struct {
+	Amount    int64
+	Key       string
+	StartTime int64
+	EndTime   int64
+	Uid       int64
+}
+
+type Record struct{}

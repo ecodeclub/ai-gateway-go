@@ -12,14 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package admin
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/errs"
+	"github.com/ecodeclub/ginx"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+var systemErrorResult = ginx.Result{
+	Code: errs.SystemError.Code,
+	Msg:  errs.SystemError.Msg,
+}
+
+var invalidParamResult = ginx.Result{
+	Code: errs.InvalidParamError.Code,
+	Msg:  errs.InvalidParamError.Msg,
+}
+
+var insufficientBalanceResult = ginx.Result{
+	Code: errs.InsufficientBalanceError.Code,
+	Msg:  errs.InsufficientBalanceError.Msg,
 }

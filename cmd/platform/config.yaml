@@ -1,0 +1,19 @@
+deepseek:
+  token: "传入你的 token"
+
+grpc:
+  server:
+    host: "使用的host"
+    port: "使用的端口"
+
+mysql:
+  dsn: "你的dsn"
+
+redis:
+  addr: "你的redis地址"
+
+admin:
+  enable: true # 只有这只为 true 才会启动 admin 的 HTTP 接口，可以和对应的 web 前端结合
+  governor:
+    host: "0.0.0.0"
+    port: 8082

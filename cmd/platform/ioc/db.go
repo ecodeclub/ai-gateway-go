@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package ioc
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
+	"github.com/ego-component/egorm"
+	"gorm.io/gorm"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+// InitDB 初始化数据库并自动建表
+func InitDB() *gorm.DB {
+	db := egorm.Load("mysql").Build()
+	err := dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }

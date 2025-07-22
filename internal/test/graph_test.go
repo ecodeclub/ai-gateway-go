@@ -27,7 +27,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/test/mocks"
-	"github.com/ecodeclub/ai-gateway-go/internal/web"
 	"github.com/ecodeclub/ginx/session"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -65,7 +64,7 @@ func (n *GraphTestSuite) SetupSuite() {
 	d := dao.NewGraphDAO(db)
 	repo := repository.NewGraphRepo(d)
 	svc := service.NewGraphService(repo)
-	handler := web.NewGraphHandler(svc)
+	handler := admin.NewGraphHandler(svc)
 	server := gin.Default()
 	handler.PrivateRoutes(server)
 	n.server = server
@@ -278,7 +277,7 @@ func (n *GraphTestSuite) TestGetGraph() {
 			req.Header.Set("Content-Type", "application/json")
 			resp := httptest.NewRecorder()
 			n.server.ServeHTTP(resp, req)
-			var result Result[web.GraphVO]
+			var result Result[admin.GraphVO]
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			require.NoError(t, err)
 			assert.Equal(t, len(result.Data.Edges), 1)

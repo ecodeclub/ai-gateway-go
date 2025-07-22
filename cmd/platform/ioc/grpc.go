@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package ioc
 
-import "gorm.io/gorm"
+import (
+	chatv1 "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
+	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	"github.com/gotomicro/ego/server/egrpc"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+func InitGrpcServer(chatSvc *igrpc.ChatServer) *egrpc.Component {
+	grpcComponent := egrpc.Load("grpc.server").Build()
+	chatv1.RegisterServiceServer(grpcComponent, chatSvc)
+	return grpcComponent
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package domain
 
-import "gorm.io/gorm"
+type Model struct {
+	ID       int64
+	Name     string
+	Provider Provider
+}
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+type Provider struct {
+	ID     int64
+	Name   string
+	Models []Model
 }

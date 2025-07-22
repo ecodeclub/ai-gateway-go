@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package domain
 
-import "gorm.io/gorm"
+import "time"
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+type BizConfig struct {
+	ID        int64
+	Name      string
+	OwnerID   int64
+	OwnerType string // "user" or "organization"
+	Config    string // JSON string
+	Ctime     time.Time
+	Utime     time.Time
 }

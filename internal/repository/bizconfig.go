@@ -17,6 +17,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"github.com/ecodeclub/ekit/slice"
+	"golang.org/x/sync/errgroup"
 	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/errs"
@@ -32,12 +34,8 @@ func NewBizConfigRepository(dao *dao.BizConfigDAO) *BizConfigRepository {
 	return &BizConfigRepository{dao: dao}
 }
 
-func (r *BizConfigRepository) Create(ctx context.Context, config domain.BizConfig) (domain.BizConfig, error) {
-	daoBC, err := r.dao.Insert(ctx, toDAOConfig(config))
-	if err != nil {
-		return domain.BizConfig{}, err
-	}
-	return fromDAOConfig(daoBC), nil
+func (r *BizConfigRepository) Save(ctx context.Context, config domain.BizConfig) (int64, error) {
+	return r.dao.Save(ctx, toDAOConfig(config))
 }
 
 func (r *BizConfigRepository) GetByID(ctx context.Context, id int64) (domain.BizConfig, error) {
@@ -51,20 +49,35 @@ func (r *BizConfigRepository) GetByID(ctx context.Context, id int64) (domain.Biz
 	return fromDAOConfig(bc), nil
 }
 
-func (r *BizConfigRepository) Update(ctx context.Context, config domain.BizConfig) error {
-	return r.dao.Update(ctx, toDAOConfig(config))
+func (r *BizConfigRepository) List(ctx context.Context, offset, limit int) ([]domain.BizConfig, int, error) {
+	var (
+		eg    errgroup.Group
+		list  []dao.BizConfig
+		total int
+	)
+	eg.Go(func() error {
+		var err error
+		list, err = r.dao.List(ctx, offset, limit)
+		return err
+	})
+	eg.Go(func() error {
+		var err error
+		total, err = r.dao.Count(ctx)
+		return err
+	})
+	err := eg.Wait()
+	return slice.Map(list, func(idx int, src dao.BizConfig) domain.BizConfig {
+		return fromDAOConfig(src)
+	}), total, err
 }
 
-func (r *BizConfigRepository) Delete(ctx context.Context, id string) error {
-	return r.dao.Delete(ctx, id)
-}
-
-func toDAOConfig(config domain.BizConfig) *dao.BizConfig {
-	return &dao.BizConfig{
+func toDAOConfig(config domain.BizConfig) dao.BizConfig {
+	return dao.BizConfig{
 		ID:        config.ID,
 		OwnerID:   config.OwnerID,
 		OwnerType: config.OwnerType,
 		Config:    config.Config,
+		Name:      config.Name,
 		Ctime:     config.Ctime.UnixMilli(),
 		Utime:     config.Utime.UnixMilli(),
 	}
@@ -73,6 +86,7 @@ func toDAOConfig(config domain.BizConfig) *dao.BizConfig {
 func fromDAOConfig(bc dao.BizConfig) domain.BizConfig {
 	return domain.BizConfig{
 		ID:        bc.ID,
+		Name:      bc.Name,
 		OwnerID:   bc.OwnerID,
 		OwnerType: bc.OwnerType,
 		Config:    bc.Config,

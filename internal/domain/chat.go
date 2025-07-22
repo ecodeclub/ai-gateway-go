@@ -12,14 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package domain
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ekit"
+	"time"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+type Chat struct {
+	Sn       string
+	Uid      int64
+	Title    string
+	Messages []Message
+	Ctime    time.Time
+	Utime    time.Time
+}
+type Message struct {
+	ID               int64
+	Role             string
+	Content          string
+	ReasoningContent string
+	Ctime            time.Time
+	Utime            time.Time
+}
+
+type ChatResponse struct {
+	Sn       string
+	Response Message
+	Metadata ekit.AnyValue
 }

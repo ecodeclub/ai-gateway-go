@@ -1,4 +1,6 @@
-// Copyright 2021 ecodeclub
+//go:build wireinject
+
+// Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +14,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package ioc
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/wire"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{})
+func InitApp() *App {
+	wire.Build(
+		BaseSet,
+		MockSet,
+		LLMSet,
+		ChatSet,
+		InvocationConfigSet,
+		BizConfigSet,
+		ProviderSet,
+		ModelSet,
+		wire.Struct(new(App), "*"),
+	)
+	return new(App)
 }

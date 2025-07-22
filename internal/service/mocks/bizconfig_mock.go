@@ -41,10 +41,10 @@ func (m *MockBizConfigService) EXPECT() *MockBizConfigServiceMockRecorder {
 	return m.recorder
 }
 
-// Create mocks base method.
-func (m *MockBizConfigService) Create(ctx context.Context, config domain.BizConfig) (domain.BizConfig, error) {
+// Save mocks base method.
+func (m *MockBizConfigService) Save(ctx context.Context, config domain.BizConfig) (domain.BizConfig, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, config)
+	ret := m.ctrl.Call(m, "Save", ctx, config)
 	ret0, _ := ret[0].(domain.BizConfig)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -53,7 +53,7 @@ func (m *MockBizConfigService) Create(ctx context.Context, config domain.BizConf
 // Create indicates an expected call of Create.
 func (mr *MockBizConfigServiceMockRecorder) Create(ctx, config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockBizConfigService)(nil).Create), ctx, config)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockBizConfigService)(nil).Save), ctx, config)
 }
 
 // Delete mocks base method.
