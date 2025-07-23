@@ -79,7 +79,7 @@ func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, err
 
 	cacheProvider, err := p.cache.GetAllProvider(ctx)
 	if err != nil {
-		providers, err = p.getProvider(ctx)
+		providers, err = p.getAllProviders(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +91,7 @@ func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, err
 	for _, provider := range providers {
 		cacheModels, err := p.cache.GetModelListByPid(ctx, provider.ID)
 		if err != nil {
-			models, err = p.getModel(ctx, provider.ID)
+			models, err = p.getModelByPid(ctx, provider.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -104,7 +104,7 @@ func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, err
 	return providers, nil
 }
 
-func (p *ProviderRepo) getProvider(ctx context.Context) ([]domain.Provider, error) {
+func (p *ProviderRepo) getAllProviders(ctx context.Context) ([]domain.Provider, error) {
 	providers, err := p.dao.GetAllProviders(ctx)
 	if err != nil {
 		return nil, err
@@ -112,8 +112,16 @@ func (p *ProviderRepo) getProvider(ctx context.Context) ([]domain.Provider, erro
 	return p.toDomainProvider(providers), nil
 }
 
-func (p *ProviderRepo) getModel(ctx context.Context, pid int64) ([]domain.Model, error) {
-	models, err := p.dao.GetModels(ctx, pid)
+func (p *ProviderRepo) getAllModels(ctx context.Context) ([]domain.Model, error) {
+	models, err := p.dao.GetAllModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return p.toDomainModel(models), err
+}
+
+func (p *ProviderRepo) getModelByPid(ctx context.Context, pid int64) ([]domain.Model, error) {
+	models, err := p.dao.GetModelByPid(ctx, pid)
 	if err != nil {
 		return nil, err
 	}

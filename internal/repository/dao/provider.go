@@ -60,7 +60,7 @@ func (d *ProviderDao) SaveModel(ctx context.Context, model Model) (int64, error)
 	return model.Id, err
 }
 
-func (d *ProviderDao) GetModels(ctx context.Context, pid int64) ([]Model, error) {
+func (d *ProviderDao) GetModelByPid(ctx context.Context, pid int64) ([]Model, error) {
 	var model []Model
 	err := d.db.WithContext(ctx).Model(&Model{}).
 		Where("pid = ?", pid).
@@ -76,6 +76,12 @@ func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
 	var providers []Provider
 	err := d.db.WithContext(ctx).Model(&Provider{}).Find(&providers).Error
 	return providers, err
+}
+
+func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
+	var models []Model
+	err := d.db.WithContext(ctx).Model(&Provider{}).Find(&models).Error
+	return models, err
 }
 
 type Provider struct {
