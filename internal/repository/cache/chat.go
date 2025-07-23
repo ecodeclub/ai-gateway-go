@@ -28,48 +28,37 @@ const (
 	DefaultExpiration = 24 * time.Hour
 )
 
-type ConversationCache struct {
+type ChatCache struct {
 	rdb redis.Cmdable
 }
 
-func NewConversationCache(rdb redis.Cmdable) *ConversationCache {
-	return &ConversationCache{rdb: rdb}
+func NewChatCache(rdb redis.Cmdable) *ChatCache {
+	return &ChatCache{rdb: rdb}
 }
 
-func (c *ConversationCache) AddMessages(ctx context.Context, sn string, messages []Message) error {
+func (c *ChatCache) AddMessages(ctx context.Context, chatSN string, messages ...Message) error {
+	if len(messages) == 0 {
+		return nil
+	}
 	pipe := c.rdb.Pipeline()
-
 	for _, msg := range messages {
 		jsonMsg, err := json.Marshal(msg)
 		if err != nil {
 			return err
 		}
-		pipe.RPush(ctx, c.key(sn), jsonMsg)
+		pipe.RPush(ctx, c.key(chatSN), jsonMsg)
 	}
-
-	pipe.Expire(ctx, fmt.Sprintf(NameSpace, sn), DefaultExpiration)
+	pipe.Expire(ctx, fmt.Sprintf(NameSpace, chatSN), DefaultExpiration)
 	_, err := pipe.Exec(ctx)
-
 	return err
 }
 
-func (c *ConversationCache) GetMessage(ctx context.Context, sn string, limit int64, offset int64) ([]Message, error) {
-	length, err := c.rdb.LLen(ctx, c.key(sn)).Result()
-	if err != nil {
-		return []Message{}, err
-	}
-
-	start := offset
-	end := offset + limit - 1
-	if end >= length {
-		end = length - 1
-	}
-
-	messagesJSON, err := c.rdb.LRange(ctx, sn, start, end).Result()
+// GetMessages 后续考虑分页
+func (c *ChatCache) GetMessages(ctx context.Context, sn string) ([]Message, error) {
+	messagesJSON, err := c.rdb.LRange(ctx, c.key(sn), 0, -1).Result()
 	if err != nil {
 		return nil, err
 	}
-
 	messages := make([]Message, 0, len(messagesJSON))
 	for _, jsonStr := range messagesJSON {
 		var msg Message
@@ -82,12 +71,12 @@ func (c *ConversationCache) GetMessage(ctx context.Context, sn string, limit int
 	return messages, nil
 }
 
-func (c *ConversationCache) key(sn string) string {
+func (c *ChatCache) key(sn string) string {
 	return fmt.Sprintf(NameSpace, sn)
 }
 
 type Message struct {
-	Role          int32  `json:"role"`
+	Role          string `json:"role"`
 	Content       string `json:"content"`
-	ReasonContent string `json:"reason_content"`
+	ReasonContent string `json:"reasonContent"`
 }

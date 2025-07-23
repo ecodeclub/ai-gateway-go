@@ -12,7 +12,7 @@ type ProviderDao struct {
 	db *gorm.DB
 }
 
-func NewProvider(db *gorm.DB) *ProviderDao {
+func NewProviderDao(db *gorm.DB) *ProviderDao {
 	return &ProviderDao{db: db}
 }
 
