@@ -106,9 +106,9 @@ func (c *ConversationSuite) TestCreate() {
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
 			conversationService := service.NewChatService(repo, handler)
-			server := grpc.NewConversationServer(conversationService)
+			server := grpc.NewChatServer(conversationService)
 
-			res, err := server.Create(context.Background(), &aiv1.Conversation{Title: "test"})
+			res, err := server.Save(context.Background(), &aiv1.SaveRequest{Chat: &aiv1.Chat{Title: "test"}})
 			require.NoError(t, err)
 			assert.NotEmpty(t, res.Sn)
 			tc.after(res.Sn)
@@ -126,7 +126,7 @@ func (c *ConversationSuite) TestGetList() {
 			name: "获取conversation list",
 			before: func(sn string) {
 				err := c.db.Create([]dao.Chat{
-					{Title: "test1", Uid: "123", Sn: sn},
+					{Title: "test1", Uid: 123, Sn: sn},
 				}).Error
 				require.NoError(t, err)
 			},
@@ -143,10 +143,10 @@ func (c *ConversationSuite) TestGetList() {
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
 			conversationService := service.NewChatService(repo, handler)
-			server := grpc.NewConversationServer(conversationService)
-			res, err := server.List(context.Background(), &aiv1.ListReq{Uid: "123", Offset: 0, Limit: 2})
+			server := grpc.NewChatServer(conversationService)
+			res, err := server.List(context.Background(), &aiv1.ListRequest{Uid: 123, Offset: 0, Limit: 2})
 			require.NoError(t, err)
-			assert.Equal(t, len(res.Conversations), 1)
+			assert.Equal(t, len(res.Chats), 1)
 		})
 	}
 }
@@ -185,10 +185,10 @@ func (c *ConversationSuite) TestChat() {
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
 			conversationService := service.NewChatService(repo, handler)
-			server := grpc.NewConversationServer(conversationService)
+			server := grpc.NewChatServer(conversationService)
 
 			tc.before(handler, sn)
-			chat, err := server.Chat(context.Background(), &aiv1.LLMRequest{
+			chat, err := server.(context.Background(), &aiv1.Chat{
 				Sn: sn,
 				Message: []*aiv1.Message{
 					{Content: "content1", Role: aiv1.Role_SYSTEM},
@@ -219,7 +219,7 @@ func (c *ConversationSuite) TestStream() {
 				streamChan <- domain.StreamEvent{Content: "event2", ReasoningContent: "reason1"}
 				close(streamChan)
 				handler.EXPECT().StreamHandle(gomock.Any(), gomock.Any()).Return(streamChan, nil)
-				err := c.db.Create(&dao.Chat{Title: "test1", Uid: "123"}).Error
+				err := c.db.Create(&dao.Chat{Title: "test1", Uid: 123}).Error
 				require.NoError(t, err)
 			},
 			after: func() {
@@ -240,19 +240,16 @@ func (c *ConversationSuite) TestStream() {
 			ctrl := gomock.NewController(t)
 			handler := mocks.NewMockHandler(ctrl)
 			conversationService := service.NewChatService(repo, handler)
-			server := grpc.NewConversationServer(conversationService)
+			server := grpc.NewChatServer(conversationService)
 			tc.before(handler)
 			mockStream := &mocks.MockStreamServer{Ctx: context.Background()}
-			err := server.Stream(&aiv1.LLMRequest{
+			err := server.Stream(&aiv1.StreamRequest{
 				Sn: "1",
-				Message: []*aiv1.Message{
-					{Content: "content1"},
-					{Content: "content2"},
-				},
+				Msg: &aiv1.Message{Content:"content1"},
 			}, mockStream)
 			require.NoError(t, err)
 			for i, event := range tc.want {
-				assert.Equal(t, event.Content, mockStream.Events[i].Content)
+				assert.Equal(t, event.Content, mockStream.Events[i])
 			}
 			tc.after()
 		})

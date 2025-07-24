@@ -36,22 +36,23 @@ func (h *ProviderHandler) PrivateRoutes(server *egin.Component) {
 	g.POST("/all", ginx.S(h.AllProviders))
 	g.POST("/model/save", ginx.BS(h.SaveModel))
 	g.POST("/save", ginx.BS(h.SaveProvider))
+	g.POST("/reload", ginx.S(h.ReloadCache))
 }
 
 func (h *ProviderHandler) AllProviders(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
 	provider, err := h.service.GetProviders(ctx)
 	if err != nil {
-		return ginx.Result{Code: 500, Msg: "内部错误"}, ginx.ErrNoResponse
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
 	list := h.toProviderList(provider)
 
-	return ginx.Result{Data: list}, nil
+	return ginx.Result{Code: 200, Data: list}, nil
 }
 
 func (h *ProviderHandler) SaveProvider(ctx *ginx.Context, req ProviderVO, sess session.Session) (ginx.Result, error) {
 	id, err := h.service.SaveProvider(ctx, h.toDomainProvider(req))
 	if err != nil {
-		return ginx.Result{Code: 500, Msg: "内部错误"}, ginx.ErrNoResponse
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
 	return ginx.Result{Code: 200, Data: id}, nil
 }
@@ -59,9 +60,17 @@ func (h *ProviderHandler) SaveProvider(ctx *ginx.Context, req ProviderVO, sess s
 func (h *ProviderHandler) SaveModel(ctx *ginx.Context, req ModelVO, sess session.Session) (ginx.Result, error) {
 	id, err := h.service.SaveModel(ctx, h.toDomainModel(req))
 	if err != nil {
-		return ginx.Result{Code: 500, Msg: "内部错误"}, ginx.ErrNoResponse
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
 	return ginx.Result{Code: 200, Data: id}, nil
+}
+
+func (h *ProviderHandler) ReloadCache(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
+	err := h.service.ReloadCache(ctx)
+	if err != nil {
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
+	}
+	return ginx.Result{Code: 200, Data: "刷新成功"}, nil
 }
 
 func (h *ProviderHandler) toProviderList(providers []domain.Provider) []ProviderVO {

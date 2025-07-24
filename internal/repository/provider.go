@@ -16,20 +16,31 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ekit/slice"
+	"github.com/gotomicro/ego/core/elog"
 )
 
 type ProviderRepo struct {
-	dao   *dao.ProviderDao
-	cache *cache.ProviderCache
+	dao    *dao.ProviderDao
+	cache  *cache.ProviderCache
+	logger *elog.Component
 }
 
 func NewProviderRepo(dao *dao.ProviderDao, cache *cache.ProviderCache) *ProviderRepo {
-	return &ProviderRepo{dao: dao, cache: cache}
+	provider := &ProviderRepo{dao: dao, cache: cache, logger: elog.DefaultLogger.With(elog.FieldComponent("ProviderRepo"))}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := provider.ReloadCache(ctx); err != nil {
+			provider.logger.Error("异步预热缓存失败", elog.FieldErr(err))
+		}
+	}()
+	return provider
 }
 
 func (p *ProviderRepo) SaveProvider(ctx context.Context, provider domain.Provider) (int64, error) {
@@ -47,7 +58,10 @@ func (p *ProviderRepo) SaveProvider(ctx context.Context, provider domain.Provide
 		Name:   provider.Name,
 		APIKey: provider.ApiKey,
 	})
-	return id, err
+	if err != nil {
+		p.logger.Error("更新 redis 失败", elog.Any("err", err), elog.Int("id", int(provider.ID)))
+	}
+	return id, nil
 }
 
 func (p *ProviderRepo) SaveModel(ctx context.Context, model domain.Model) (int64, error) {
@@ -70,8 +84,10 @@ func (p *ProviderRepo) SaveModel(ctx context.Context, model domain.Model) (int64
 		OutputPrice: model.OutputPrice,
 		PriceMode:   model.PriceMode,
 	})
-
-	return id, err
+	if err != nil {
+		p.logger.Error("更新 redis 失败", elog.Any("err", err), elog.Int("id", int(model.ID)))
+	}
+	return id, nil
 }
 
 func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, error) {
@@ -128,6 +144,23 @@ func (p *ProviderRepo) getModelByPid(ctx context.Context, pid int64) ([]domain.M
 	return p.toDomainModel(models), err
 }
 
+func (p *ProviderRepo) ReloadCache(ctx context.Context) error {
+	providers, err := p.GetProviders(ctx)
+	if err != nil {
+		return err
+	}
+
+	models, err := p.getAllModels(ctx)
+	if err != nil {
+		return err
+	}
+	err = p.cache.LoadAllFromDB(ctx, p.daoToProvider(providers), p.daoToModels(models))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (p *ProviderRepo) toProvider(list []cache.Provider) []domain.Provider {
 	return slice.Map[cache.Provider, domain.Provider](list, func(idx int, src cache.Provider) domain.Provider {
 		return domain.Provider{
@@ -165,6 +198,29 @@ func (p *ProviderRepo) toModel(list []cache.Model) []domain.Model {
 		return domain.Model{
 			ID:          src.Id,
 			Provider:    domain.Provider{ID: src.Pid},
+			InputPrice:  src.InputPrice,
+			OutputPrice: src.OutputPrice,
+			PriceMode:   src.PriceMode,
+		}
+	})
+}
+
+func (p *ProviderRepo) daoToProvider(providers []domain.Provider) []cache.Provider {
+	return slice.Map[domain.Provider, cache.Provider](providers, func(idx int, src domain.Provider) cache.Provider {
+		return cache.Provider{
+			Id:     src.ID,
+			Name:   src.Name,
+			APIKey: src.ApiKey,
+		}
+	})
+}
+
+func (p *ProviderRepo) daoToModels(models []domain.Model) []cache.Model {
+	return slice.Map[domain.Model, cache.Model](models, func(idx int, src domain.Model) cache.Model {
+		return cache.Model{
+			Id:          src.ID,
+			Name:        src.Name,
+			Pid:         src.Provider.ID,
 			InputPrice:  src.InputPrice,
 			OutputPrice: src.OutputPrice,
 			PriceMode:   src.PriceMode,

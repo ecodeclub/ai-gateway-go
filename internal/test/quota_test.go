@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/ai-gateway-go/internal/admin"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/test/mocks"
-	"github.com/ecodeclub/ai-gateway-go/internal/web"
 	"github.com/ecodeclub/ginx/session"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -64,7 +64,7 @@ func (q *QuotaSuite) SetupSuite() {
 	d := dao.NewQuotaDao(db)
 	repo := repository.NewQuotaRepo(d)
 	svc := service.NewQuotaService(repo)
-	handler := web.NewQuotaHandler(svc)
+	handler := admin.NewQuotaHandler(svc)
 	server := gin.Default()
 	handler.PrivateRoutes(server)
 	q.server = server

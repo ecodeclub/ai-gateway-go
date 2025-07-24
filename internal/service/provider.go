@@ -49,6 +49,10 @@ func (p *ProviderService) GetProviders(ctx context.Context) ([]domain.Provider, 
 	return p.repo.GetProviders(ctx)
 }
 
+func (p *ProviderService) ReloadCache(ctx context.Context) error {
+	return p.repo.ReloadCache(ctx)
+}
+
 func (p *ProviderService) Encrypt(plaintext string) (string, error) {
 	block, err := aes.NewCipher([]byte(p.secretKey))
 	if err != nil {
