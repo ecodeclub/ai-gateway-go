@@ -52,8 +52,14 @@ var (
 		admin.NewBizConfigHandler,
 	)
 
-	ProviderSet = wire.NewSet(admin.NewProviderHandler)
-	ModelSet    = wire.NewSet(repository.NewModelRepository)
+	ProviderSet = wire.NewSet(
+		dao.NewProviderDao,
+		cache.NewProviderCache,
+		repository.NewProviderRepo,
+		service.NewProviderService,
+		admin.NewProviderHandler,
+	)
+	ModelSet = wire.NewSet(repository.NewModelRepository)
 
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )

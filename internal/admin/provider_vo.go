@@ -17,10 +17,15 @@ package admin
 type ProviderVO struct {
 	ID     int64     `json:"id"`
 	Name   string    `json:"name"`
+	ApiKey string    `json:"api_key,omitempty"`
 	Models []ModelVO `json:"models"`
 }
 
 type ModelVO struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID          int64  `json:"id"`
+	Pid         int64  `json:"pid"`
+	Name        string `json:"name"`
+	InputPrice  int64  `json:"input_price"`
+	OutputPrice int64  `json:"output_price"`
+	PriceMode   string `json:"price_mode"`
 }

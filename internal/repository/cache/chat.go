@@ -48,9 +48,8 @@ func (c *ChatCache) AddMessages(ctx context.Context, chatSN string, messages ...
 		}
 		pipe.RPush(ctx, c.key(chatSN), jsonMsg)
 	}
-	_, err := pipe.Exec(ctx)
-
 	pipe.Expire(ctx, fmt.Sprintf(NameSpace, chatSN), DefaultExpiration)
+	_, err := pipe.Exec(ctx)
 	return err
 }
 

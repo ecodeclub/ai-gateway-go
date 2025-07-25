@@ -15,13 +15,17 @@
 package domain
 
 type Model struct {
-	ID       int64
-	Name     string
-	Provider Provider
+	ID          int64
+	Name        string
+	InputPrice  int64
+	OutputPrice int64
+	PriceMode   string
+	Provider    Provider
 }
 
 type Provider struct {
 	ID     int64
 	Name   string
+	ApiKey string
 	Models []Model
 }

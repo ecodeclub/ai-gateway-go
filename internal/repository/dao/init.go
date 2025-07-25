@@ -21,5 +21,8 @@ func InitTables(db *gorm.DB) error {
 		&InvocationConfig{},
 		&InvocationConfigVersion{},
 		&Chat{},
-		&Message{})
+		&Message{},
+		&Provider{},
+		&Model{},
+	)
 }
