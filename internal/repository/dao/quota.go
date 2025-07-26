@@ -183,7 +183,7 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 	}
 	// 从主额度扣
 	result := tx.Model(&Quota{}).
-		Where("uid = ? AND amount >= ?", uid, deductAmount).
+		Where("uid = ?", uid).
 		Updates(map[string]any{
 			"amount": gorm.Expr("amount - ?", deductAmount),
 			"utime":  now,
