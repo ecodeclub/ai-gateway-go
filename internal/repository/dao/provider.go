@@ -92,13 +92,19 @@ func (d *ProviderDao) GetProvider(ctx context.Context, id int64) (Provider, erro
 
 func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
 	var providers []Provider
-	err := d.db.WithContext(ctx).Model(&Provider{}).Find(&providers).Error
+	err := d.db.WithContext(ctx).
+		Model(&Provider{}).
+		Order("utime DESC").
+		Find(&providers).Error
 	return providers, err
 }
 
 func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
 	var models []Model
-	err := d.db.WithContext(ctx).Model(&Provider{}).Find(&models).Error
+	err := d.db.WithContext(ctx).
+		Model(&Provider{}).
+		Order("utime DESC").
+		Find(&models).Error
 	return models, err
 }
 
