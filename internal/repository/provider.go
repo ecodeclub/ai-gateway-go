@@ -45,7 +45,7 @@ func NewProviderRepo(dao *dao.ProviderDao, cache *cache.ProviderCache) *Provider
 
 func (p *ProviderRepo) SaveProvider(ctx context.Context, provider domain.Provider) (int64, error) {
 	id, err := p.dao.SaveProvider(ctx, dao.Provider{
-		Id:     provider.ID,
+		ID:     provider.ID,
 		Name:   provider.Name,
 		APIKey: provider.ApiKey,
 	})
@@ -66,7 +66,7 @@ func (p *ProviderRepo) SaveProvider(ctx context.Context, provider domain.Provide
 
 func (p *ProviderRepo) SaveModel(ctx context.Context, model domain.Model) (int64, error) {
 	id, err := p.dao.SaveModel(ctx, dao.Model{
-		Id:          model.ID,
+		ID:          model.ID,
 		Name:        model.Name,
 		InputPrice:  model.InputPrice,
 		OutputPrice: model.OutputPrice,
@@ -88,6 +88,22 @@ func (p *ProviderRepo) SaveModel(ctx context.Context, model domain.Model) (int64
 		p.logger.Error("更新 redis 失败", elog.Any("err", err), elog.Int("id", int(model.ID)))
 	}
 	return id, nil
+}
+
+func (p *ProviderRepo) GetProvider(ctx context.Context, id int64) (domain.Provider, error) {
+	provider, err := p.dao.GetProvider(ctx, id)
+	if err != nil {
+		return domain.Provider{}, err
+	}
+	return domain.Provider{ID: provider.ID, Name: provider.Name, ApiKey: provider.APIKey}, nil
+}
+
+func (p *ProviderRepo) GetModel(ctx context.Context, id int64) (domain.Model, error) {
+	model, err := p.dao.GetModel(ctx, id)
+	if err != nil {
+		return domain.Model{}, err
+	}
+	return domain.Model{ID: model.ID, Name: model.Name, InputPrice: model.InputPrice, OutputPrice: model.OutputPrice}, nil
 }
 
 func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, error) {
@@ -154,7 +170,7 @@ func (p *ProviderRepo) ReloadCache(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = p.cache.LoadAllFromDB(ctx, p.daoToProvider(providers), p.daoToModels(models))
+	err = p.cache.Refresh(ctx, p.daoToProvider(providers), p.daoToModels(models))
 	if err != nil {
 		return err
 	}
@@ -174,7 +190,7 @@ func (p *ProviderRepo) toProvider(list []cache.Provider) []domain.Provider {
 func (p *ProviderRepo) toDomainProvider(list []dao.Provider) []domain.Provider {
 	return slice.Map[dao.Provider, domain.Provider](list, func(idx int, src dao.Provider) domain.Provider {
 		return domain.Provider{
-			ID:     src.Id,
+			ID:     src.ID,
 			Name:   src.Name,
 			ApiKey: src.APIKey,
 		}
@@ -184,7 +200,7 @@ func (p *ProviderRepo) toDomainProvider(list []dao.Provider) []domain.Provider {
 func (p *ProviderRepo) toDomainModel(list []dao.Model) []domain.Model {
 	return slice.Map[dao.Model, domain.Model](list, func(idx int, src dao.Model) domain.Model {
 		return domain.Model{
-			ID:          src.Id,
+			ID:          src.ID,
 			Provider:    domain.Provider{ID: src.Pid},
 			OutputPrice: src.OutputPrice,
 			InputPrice:  src.InputPrice,

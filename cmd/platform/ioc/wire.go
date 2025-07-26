@@ -28,6 +28,7 @@ func InitApp() *App {
 		ChatSet,
 		InvocationConfigSet,
 		BizConfigSet,
+		SecretKeySet,
 		ProviderSet,
 		ModelSet,
 		wire.Struct(new(App), "*"),

@@ -39,7 +39,7 @@ func (d *ProviderDao) SaveProvider(ctx context.Context, provider Provider) (int6
 			"utime":   provider.Ctime,
 		}),
 	}).Create(&provider).Error
-	return provider.Id, err
+	return provider.ID, err
 }
 
 func (d *ProviderDao) SaveModel(ctx context.Context, model Model) (int64, error) {
@@ -57,7 +57,7 @@ func (d *ProviderDao) SaveModel(ctx context.Context, model Model) (int64, error)
 			"utime":        model.Ctime,
 		}),
 	}).Create(&model).Error
-	return model.Id, err
+	return model.ID, err
 }
 
 func (d *ProviderDao) GetModelByPid(ctx context.Context, pid int64) ([]Model, error) {
@@ -70,6 +70,24 @@ func (d *ProviderDao) GetModelByPid(ctx context.Context, pid int64) ([]Model, er
 		return nil, err
 	}
 	return model, nil
+}
+
+func (d *ProviderDao) GetModel(ctx context.Context, id int64) (Model, error) {
+	var model Model
+	err := d.db.WithContext(ctx).
+		Model(&model).
+		Where("id = ?", id).
+		First(&model).Error
+	return model, err
+}
+
+func (d *ProviderDao) GetProvider(ctx context.Context, id int64) (Provider, error) {
+	var provider Provider
+	err := d.db.WithContext(ctx).
+		Model(&Model{}).
+		Where("id = ?", id).
+		First(&provider).Error
+	return provider, err
 }
 
 func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
@@ -85,7 +103,7 @@ func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
 }
 
 type Provider struct {
-	Id     int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	ID     int64  `gorm:"column:id;primaryKey;autoIncrement"`
 	Name   string `gorm:"column:name"`
 	APIKey string `gorm:"colum:api_key"`
 	Ctime  int64  `gorm:"colum:ctime"`
@@ -97,7 +115,7 @@ func (Provider) TableName() string {
 }
 
 type Model struct {
-	Id          int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	ID          int64  `gorm:"column:id;primaryKey;autoIncrement"`
 	Name        string `gorm:"column:name"`
 	Pid         int64  `gorm:"column:pid"`
 	InputPrice  int64  `gorm:"column:input_price"`

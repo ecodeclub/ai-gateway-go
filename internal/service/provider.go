@@ -25,15 +25,17 @@ import (
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/gotomicro/ego/core/elog"
 )
 
 type ProviderService struct {
 	repo      *repository.ProviderRepo
 	secretKey string
+	logger    *elog.Component
 }
 
-func NewProviderService(repo *repository.ProviderRepo, key string) *ProviderService {
-	return &ProviderService{repo: repo, secretKey: key}
+func NewProviderService(repo *repository.ProviderRepo, secretKey string) *ProviderService {
+	return &ProviderService{repo: repo, secretKey: secretKey, logger: elog.DefaultLogger.With(elog.FieldComponent("ProviderService"))}
 }
 
 func (p *ProviderService) SaveProvider(ctx context.Context, provider domain.Provider) (int64, error) {
@@ -51,6 +53,25 @@ func (p *ProviderService) GetProviders(ctx context.Context) ([]domain.Provider, 
 
 func (p *ProviderService) ReloadCache(ctx context.Context) error {
 	return p.repo.ReloadCache(ctx)
+}
+
+func (p *ProviderService) GetProvider(ctx context.Context, id int64) (domain.Provider, error) {
+	provider, err := p.repo.GetProvider(ctx, id)
+	if err != nil {
+		return domain.Provider{}, err
+	}
+
+	decrypt, err := p.Decrypt(provider.ApiKey)
+	if err != nil {
+		p.logger.Error("decrypt 失败", elog.Any("decrypt", err))
+		decrypt = ""
+	}
+	provider.ApiKey = decrypt
+	return domain.Provider{}, nil
+}
+
+func (p *ProviderService) GetModel(ctx context.Context, id int64) (domain.Model, error) {
+	return p.repo.GetModel(ctx, id)
 }
 
 func (p *ProviderService) Encrypt(plaintext string) (string, error) {
