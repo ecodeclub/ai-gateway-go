@@ -119,8 +119,9 @@ func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, err
 		providers = p.toProvider(cacheProvider)
 	}
 
-	var models []domain.Model
 	for _, provider := range providers {
+		var models []domain.Model
+
 		cacheModels, err := p.cache.GetModelListByPid(ctx, provider.ID)
 		if err != nil {
 			models, err = p.getModelByPid(ctx, provider.ID)
@@ -161,7 +162,7 @@ func (p *ProviderRepo) getModelByPid(ctx context.Context, pid int64) ([]domain.M
 }
 
 func (p *ProviderRepo) ReloadCache(ctx context.Context) error {
-	providers, err := p.GetProviders(ctx)
+	providers, err := p.getAllProviders(ctx)
 	if err != nil {
 		return err
 	}
