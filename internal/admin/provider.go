@@ -128,7 +128,11 @@ func (h *ProviderHandler) toProviderVO(provider domain.Provider) ProviderVO {
 func (h *ProviderHandler) toModelVO(models []domain.Model) []ModelVO {
 	return slice.Map[domain.Model, ModelVO](models, func(idx int, src domain.Model) ModelVO {
 		return ModelVO{
-			ID: src.ID,
+			ID:          src.ID,
+			Name:        src.Name,
+			InputPrice:  src.InputPrice,
+			OutputPrice: src.OutputPrice,
+			PriceMode:   src.PriceMode,
 		}
 	})
 }
