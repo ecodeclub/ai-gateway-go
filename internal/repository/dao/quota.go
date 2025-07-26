@@ -100,7 +100,6 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
 		}
 
 		return tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"amount": gorm.Expr("amount + ?", quota.Amount),
 				"utime":  now,

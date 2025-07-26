@@ -9,6 +9,10 @@ grpc:
 mysql:
   dsn: "你的dsn"
 
+provider:
+  encrypt:
+    key: "生成一个"
+
 redis:
   addr: "你的redis地址"
 

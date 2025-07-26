@@ -12,20 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package admin
+package test
 
-type ProviderVO struct {
-	ID     int64     `json:"id"`
-	Name   string    `json:"name"`
-	ApiKey string    `json:"apiKey,omitempty"`
-	Models []ModelVO `json:"models"`
+import "github.com/stretchr/testify/suite"
+
+type ProviderTestSuite struct {
+	suite.Suite
 }
 
-type ModelVO struct {
-	ID          int64  `json:"id"`
-	Pid         int64  `json:"pid"`
-	Name        string `json:"name"`
-	InputPrice  int64  `json:"inputPrice"`
-	OutputPrice int64  `json:"outputPrice"`
-	PriceMode   string `json:"price_mode"`
+func (s *ProviderTestSuite) SetupSuite() {
+
 }

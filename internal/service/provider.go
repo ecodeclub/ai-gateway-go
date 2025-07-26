@@ -37,7 +37,11 @@ func NewProviderService(repo *repository.ProviderRepo, key string) *ProviderServ
 }
 
 func (p *ProviderService) SaveProvider(ctx context.Context, provider domain.Provider) (int64, error) {
-	provider.ApiKey, _ = p.Encrypt(p.secretKey)
+	var err error
+	provider.ApiKey, err = p.Encrypt(p.secretKey)
+	if err != nil {
+		return 0, err
+	}
 	return p.repo.SaveProvider(ctx, provider)
 }
 

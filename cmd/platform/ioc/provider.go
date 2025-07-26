@@ -12,20 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package admin
+package ioc
 
-type ProviderVO struct {
-	ID     int64     `json:"id"`
-	Name   string    `json:"name"`
-	ApiKey string    `json:"apiKey,omitempty"`
-	Models []ModelVO `json:"models"`
-}
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/gotomicro/ego/core/econf"
+)
 
-type ModelVO struct {
-	ID          int64  `json:"id"`
-	Pid         int64  `json:"pid"`
-	Name        string `json:"name"`
-	InputPrice  int64  `json:"inputPrice"`
-	OutputPrice int64  `json:"outputPrice"`
-	PriceMode   string `json:"price_mode"`
+func initProvider(repo *repository.ProviderRepo) *service.ProviderService {
+	type Config struct {
+		Encrypt struct {
+			Key string
+		} `yaml:"encrypt"`
+	}
+
+	var cfg Config
+	err := econf.UnmarshalKey("provider", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	return service.NewProviderService(repo, cfg.Encrypt.Key)
 }

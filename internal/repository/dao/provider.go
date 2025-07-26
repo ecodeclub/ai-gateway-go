@@ -80,7 +80,7 @@ func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
 
 func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
 	var models []Model
-	err := d.db.WithContext(ctx).Model(&Provider{}).Find(&models).Error
+	err := d.db.WithContext(ctx).Find(&models).Error
 	return models, err
 }
 
