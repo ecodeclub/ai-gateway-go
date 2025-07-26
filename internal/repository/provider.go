@@ -202,6 +202,7 @@ func (p *ProviderRepo) toDomainModel(list []dao.Model) []domain.Model {
 	return slice.Map[dao.Model, domain.Model](list, func(idx int, src dao.Model) domain.Model {
 		return domain.Model{
 			ID:          src.ID,
+			Name:        src.Name,
 			Provider:    domain.Provider{ID: src.Pid},
 			OutputPrice: src.OutputPrice,
 			InputPrice:  src.InputPrice,
@@ -214,6 +215,7 @@ func (p *ProviderRepo) toModel(list []cache.Model) []domain.Model {
 	return slice.Map[cache.Model, domain.Model](list, func(idx int, src cache.Model) domain.Model {
 		return domain.Model{
 			ID:          src.Id,
+			Name:        src.Name,
 			Provider:    domain.Provider{ID: src.Pid},
 			InputPrice:  src.InputPrice,
 			OutputPrice: src.OutputPrice,
