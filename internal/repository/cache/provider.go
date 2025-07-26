@@ -80,7 +80,7 @@ func (p *ProviderCache) GetModelListByPid(ctx context.Context, pid int64) ([]Mod
 	return models, nil
 }
 
-func (p *ProviderCache) Refresh(ctx context.Context, providers []Provider, models []Model) error {
+func (p *ProviderCache) ReLoad(ctx context.Context, providers []Provider, models []Model) error {
 	pipe := p.rdb.TxPipeline()
 
 	pipe.Del(ctx, ProviderAllKey)

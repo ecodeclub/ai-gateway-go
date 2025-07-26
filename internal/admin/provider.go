@@ -120,6 +120,7 @@ func (h *ProviderHandler) toProviderVO(provider domain.Provider) ProviderVO {
 	return ProviderVO{
 		ID:     provider.ID,
 		Name:   provider.Name,
+		ApiKey: provider.ApiKey,
 		Models: h.toModelVO(provider.Models),
 	}
 }

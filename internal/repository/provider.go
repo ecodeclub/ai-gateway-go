@@ -170,7 +170,7 @@ func (p *ProviderRepo) ReloadCache(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = p.cache.Refresh(ctx, p.daoToProvider(providers), p.daoToModels(models))
+	err = p.cache.ReLoad(ctx, p.daoToProvider(providers), p.daoToModels(models))
 	if err != nil {
 		return err
 	}

@@ -48,7 +48,21 @@ func (p *ProviderService) SaveModel(ctx context.Context, model domain.Model) (in
 }
 
 func (p *ProviderService) GetProviders(ctx context.Context) ([]domain.Provider, error) {
-	return p.repo.GetProviders(ctx)
+	providers, err := p.repo.GetProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, provider := range providers {
+		decrypt, err := p.Decrypt(provider.ApiKey)
+		if err != nil {
+			p.logger.Error("decrypt 失败", elog.Any("decrypt", err), elog.Int64("providerId", provider.ID))
+			decrypt = ""
+		}
+		provider.ApiKey = decrypt
+	}
+
+	return providers, nil
 }
 
 func (p *ProviderService) ReloadCache(ctx context.Context) error {
