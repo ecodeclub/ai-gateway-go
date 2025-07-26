@@ -47,8 +47,8 @@ func (p *ProviderService) SaveModel(ctx context.Context, model domain.Model) (in
 	return p.repo.SaveModel(ctx, model)
 }
 
-func (p *ProviderService) GetProviders(ctx context.Context) ([]domain.Provider, error) {
-	providers, err := p.repo.GetProviders(ctx)
+func (p *ProviderService) GetAll(ctx context.Context) ([]domain.Provider, error) {
+	providers, err := p.repo.GetAll(ctx)
 	if err != nil {
 		return nil, err
 	}

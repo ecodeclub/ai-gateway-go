@@ -106,7 +106,7 @@ func (p *ProviderRepo) GetModel(ctx context.Context, id int64) (domain.Model, er
 	return domain.Model{ID: model.ID, Name: model.Name, InputPrice: model.InputPrice, OutputPrice: model.OutputPrice}, nil
 }
 
-func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, error) {
+func (p *ProviderRepo) GetAll(ctx context.Context) ([]domain.Provider, error) {
 	var providers []domain.Provider
 
 	cacheProvider, err := p.cache.GetAllProvider(ctx)
@@ -129,7 +129,7 @@ func (p *ProviderRepo) GetProviders(ctx context.Context) ([]domain.Provider, err
 				return nil, err
 			}
 		} else {
-			provider.Models = p.toModel(cacheModels)
+			models = p.toModel(cacheModels)
 		}
 		provider.Models = models
 	}

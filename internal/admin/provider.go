@@ -33,7 +33,7 @@ func NewProviderHandler(svc *service.ProviderService) *ProviderHandler {
 
 func (h *ProviderHandler) PrivateRoutes(server *egin.Component) {
 	provider := server.Group("/provider")
-	provider.POST("/all", ginx.S(h.AllProviders))
+	provider.POST("/all", ginx.S(h.GetAll))
 	provider.POST("/save", ginx.BS(h.SaveProvider))
 	provider.GET("/detail/:id", ginx.S(h.GetProvider))
 	provider.POST("/reload", ginx.S(h.ReloadCache))
@@ -43,8 +43,8 @@ func (h *ProviderHandler) PrivateRoutes(server *egin.Component) {
 	model.GET("/detail/:id", ginx.S(h.GetModel))
 }
 
-func (h *ProviderHandler) AllProviders(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
-	provider, err := h.service.GetProviders(ctx)
+func (h *ProviderHandler) GetAll(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
+	provider, err := h.service.GetAll(ctx)
 	if err != nil {
 		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
