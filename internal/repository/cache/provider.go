@@ -22,19 +22,19 @@ func NewProviderCache(rdb redis.Cmdable) *ProviderCache {
 }
 
 func (p *ProviderCache) AddProvider(ctx context.Context, provider Provider) error {
-	field := p.getProviderField(provider)
+	field := p.getProviderField(provider.ID)
 	jsonData, err := json.Marshal(provider)
 	if err != nil {
 		return err
 	}
 	return p.rdb.HSet(ctx, ProviderAllKey, field, jsonData).Err()
 }
-func (p *ProviderCache) getProviderField(provider Provider) string {
-	return fmt.Sprintf("%s:%d", provider.Name, provider.Id)
+func (p *ProviderCache) getProviderField(id int64) string {
+	return fmt.Sprintf("provider:%d", id)
 }
 
 func (p *ProviderCache) AddModel(ctx context.Context, model Model) error {
-	field := p.modelKey(model.Name, model.Id)
+	field := p.getModelField(model.ID)
 	jsonData, err := json.Marshal(model)
 	if err != nil {
 		return err
@@ -43,8 +43,8 @@ func (p *ProviderCache) AddModel(ctx context.Context, model Model) error {
 	return p.rdb.HSet(ctx, key, field, jsonData).Err()
 }
 
-func (p *ProviderCache) modelKey(name string, id int64) string {
-	return fmt.Sprintf("%s:%d", name, id)
+func (p *ProviderCache) getModelField(id int64) string {
+	return fmt.Sprintf("model:%d", id)
 }
 
 func (p *ProviderCache) GetAllProvider(ctx context.Context) ([]Provider, error) {
@@ -80,7 +80,7 @@ func (p *ProviderCache) GetModelListByPid(ctx context.Context, pid int64) ([]Mod
 	return models, nil
 }
 
-func (p *ProviderCache) LoadAllFromDB(ctx context.Context, providers []Provider, models []Model) error {
+func (p *ProviderCache) Reload(ctx context.Context, providers []Provider, models []Model) error {
 	pipe := p.rdb.TxPipeline()
 
 	pipe.Del(ctx, ProviderAllKey)
@@ -91,9 +91,9 @@ func (p *ProviderCache) LoadAllFromDB(ctx context.Context, providers []Provider,
 		if err != nil {
 			return err
 		}
-		field := p.getProviderField(provider)
+		field := p.getProviderField(provider.ID)
 		providerFields[field] = data
-		pipe.Del(ctx, fmt.Sprintf(ProviderKey, provider.Id))
+		pipe.Del(ctx, fmt.Sprintf(ProviderKey, provider.ID))
 	}
 	if len(providerFields) > 0 {
 		pipe.HSet(ctx, ProviderAllKey, providerFields)
@@ -104,7 +104,7 @@ func (p *ProviderCache) LoadAllFromDB(ctx context.Context, providers []Provider,
 		if err != nil {
 			return err
 		}
-		field := p.modelKey(model.Name, model.Id)
+		field := p.getModelField(model.ID)
 		pipe.HSet(ctx, fmt.Sprintf(ProviderKey, model.Pid), field, data)
 	}
 
@@ -113,13 +113,13 @@ func (p *ProviderCache) LoadAllFromDB(ctx context.Context, providers []Provider,
 }
 
 type Provider struct {
-	Id     int64  `json:"id,omitempty"`
-	Name   string `json:"name,omitempty"`
-	APIKey string `json:"api_key,omitempty"`
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	APIKey string `json:"api_key"`
 }
 
 type Model struct {
-	Id          int64  `json:"id,omitempty"`
+	ID          int64  `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Pid         int64  `json:"pid,omitempty"`
 	InputPrice  int64  `json:"input_price,omitempty"`
