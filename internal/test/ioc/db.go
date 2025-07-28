@@ -12,14 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+package ioc
 
-import "github.com/stretchr/testify/suite"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"os"
+)
 
-type ProviderTestSuite struct {
-  suite.Suite
-}
-
-func (s *ProviderTestSuite) SetupSuite() {
-
+// InitDB 初始化数据库并自动建表
+func InitDB() *gorm.DB {
+	dsn := os.Getenv("MYSQL_DSN")
+	if dsn == "" {
+		dsn = "root:root@tcp(localhost:13306)/ai_gateway_platform"
+	}
+	db, err := gorm.Open(mysql.Open(dsn))
+	if err != nil {
+		panic(err)
+	}
+	err = dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }

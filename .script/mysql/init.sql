@@ -12,5 +12,4 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
-create database if not exists ai_gateway_go;
 create database if not exists ai_gateway_platform;

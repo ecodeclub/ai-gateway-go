@@ -15,56 +15,56 @@
 package ioc
 
 import (
-  "github.com/ecodeclub/ai-gateway-go/internal/admin"
-  igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
-  "github.com/ecodeclub/ai-gateway-go/internal/repository"
-  "github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
-  "github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
-  "github.com/ecodeclub/ai-gateway-go/internal/service"
-  "github.com/google/wire"
-  "github.com/gotomicro/ego/server/egin"
-  "github.com/gotomicro/ego/server/egrpc"
+	"github.com/ecodeclub/ai-gateway-go/internal/admin"
+	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
+	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/google/wire"
+	"github.com/gotomicro/ego/server/egin"
+	"github.com/gotomicro/ego/server/egrpc"
 )
 
 var (
-  BaseSet = wire.NewSet(
-    InitRedis, InitDB, InitSession,
-    InitGin,
-    InitGrpcServer)
-  LLMSet  = wire.NewSet(initLLMHandler)
-  ChatSet = wire.NewSet(
-    dao.NewChatDAO,
-    cache.NewChatCache,
-    repository.NewChatRepo,
-    service.NewChatService,
-    igrpc.NewChatServer,
-  )
-  InvocationConfigSet = wire.NewSet(
-    dao.NewInvocationConfigDAO,
-    repository.NewInvocationConfigRepo,
-    service.NewInvocationConfigService,
-    admin.NewInvocationConfigHandler,
-  )
-  BizConfigSet = wire.NewSet(
-    dao.NewBizConfigDAO,
-    repository.NewBizConfigRepository,
-    service.NewBizConfigService,
-    admin.NewBizConfigHandler,
-  )
+	BaseSet = wire.NewSet(
+		InitRedis, InitDB, InitSession,
+		InitGin,
+		InitGrpcServer)
+	LLMSet  = wire.NewSet(initLLMHandler)
+	ChatSet = wire.NewSet(
+		dao.NewChatDAO,
+		cache.NewChatCache,
+		repository.NewChatRepo,
+		service.NewChatService,
+		igrpc.NewChatServer,
+	)
+	InvocationConfigSet = wire.NewSet(
+		dao.NewInvocationConfigDAO,
+		repository.NewInvocationConfigRepo,
+		service.NewInvocationConfigService,
+		admin.NewInvocationConfigHandler,
+	)
+	BizConfigSet = wire.NewSet(
+		dao.NewBizConfigDAO,
+		repository.NewBizConfigRepository,
+		service.NewBizConfigService,
+		admin.NewBizConfigHandler,
+	)
 
-  ProviderSet = wire.NewSet(
-    dao.NewProviderDao,
-    cache.NewProviderCache,
-    repository.NewProviderRepo,
-    initProvider,
-    admin.NewProviderHandler,
-  )
-  ModelSet = wire.NewSet(repository.NewModelRepository)
+	ProviderSet = wire.NewSet(
+		dao.NewProviderDao,
+		cache.NewProviderCache,
+		repository.NewProviderRepo,
+		initProvider,
+		admin.NewProviderHandler,
+	)
+	ModelSet = wire.NewSet(repository.NewModelRepository)
 
-  MockSet = wire.NewSet(admin.NewMockHandler)
+	MockSet = wire.NewSet(admin.NewMockHandler)
 )
 
 type App struct {
-  GrpcSever *egrpc.Component
-  GinServer *egin.Component
+	GrpcSever *egrpc.Component
+	GinServer *egin.Component
 }

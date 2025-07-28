@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+package ioc
 
-import "github.com/stretchr/testify/suite"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
+)
 
-type ProviderTestSuite struct {
-  suite.Suite
-}
-
-func (s *ProviderTestSuite) SetupSuite() {
-
+// TestOnly 这里增加字段，记得要在 wire 里面的 FieldsOf 里面增加对应的字段名字
+type TestOnly struct {
+	LLM llm.Handler
 }

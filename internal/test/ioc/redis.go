@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+package ioc
 
-import "github.com/stretchr/testify/suite"
+import (
+	"github.com/redis/go-redis/v9"
+	"os"
+)
 
-type ProviderTestSuite struct {
-  suite.Suite
-}
-
-func (s *ProviderTestSuite) SetupSuite() {
-
+func InitRedis() redis.Cmdable {
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+	return redis.NewClient(&redis.Options{
+		Addr: addr,
+	})
 }
