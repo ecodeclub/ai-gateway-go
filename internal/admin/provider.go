@@ -32,15 +32,19 @@ func NewProviderHandler(svc *service.ProviderService) *ProviderHandler {
 }
 
 func (h *ProviderHandler) PrivateRoutes(server *egin.Component) {
-	g := server.Group("/providers")
-	g.POST("/all", ginx.S(h.AllProviders))
-	g.POST("/model/save", ginx.BS(h.SaveModel))
-	g.POST("/save", ginx.BS(h.SaveProvider))
-	g.POST("/reload", ginx.S(h.ReloadCache))
+	provider := server.Group("/provider")
+	provider.POST("/all", ginx.S(h.GetAll))
+	provider.POST("/save", ginx.BS(h.SaveProvider))
+	provider.GET("/detail/:id", ginx.S(h.GetProvider))
+	provider.POST("/reload", ginx.S(h.ReloadCache))
+
+	model := server.Group("/model")
+	model.GET("/save", ginx.BS(h.SaveModel))
+	model.GET("/detail/:id", ginx.S(h.GetModel))
 }
 
-func (h *ProviderHandler) AllProviders(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
-	provider, err := h.service.GetProviders(ctx)
+func (h *ProviderHandler) GetAll(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
+	provider, err := h.service.GetAll(ctx)
 	if err != nil {
 		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
@@ -65,6 +69,39 @@ func (h *ProviderHandler) SaveModel(ctx *ginx.Context, req ModelVO, sess session
 	return ginx.Result{Code: 200, Data: id}, nil
 }
 
+func (h *ProviderHandler) GetModel(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
+	id, err := ctx.Param("id").AsInt64()
+	if err != nil {
+		return ginx.Result{Code: 400, Msg: "无效输入"}, err
+	}
+	model, err := h.service.GetModel(ctx, id)
+	if err != nil {
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
+	}
+	return ginx.Result{
+		Code: 200,
+		Data: ModelVO{
+			ID:          model.ID,
+			Name:        model.Name,
+			InputPrice:  model.InputPrice,
+			OutputPrice: model.OutputPrice,
+			PriceMode:   model.PriceMode,
+		},
+	}, nil
+}
+
+func (h *ProviderHandler) GetProvider(ctx *ginx.Context, sees session.Session) (ginx.Result, error) {
+	id, err := ctx.Param("id").AsInt64()
+	if err != nil {
+		return ginx.Result{Code: 400, Msg: "无效输入"}, err
+	}
+	provider, err := h.service.GetProvider(ctx, id)
+	if err != nil {
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
+	}
+	return ginx.Result{Code: 200, Data: ProviderVO{ID: id, Name: provider.Name, ApiKey: provider.ApiKey}}, nil
+}
+
 func (h *ProviderHandler) ReloadCache(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
 	err := h.service.ReloadCache(ctx)
 	if err != nil {
@@ -83,6 +120,7 @@ func (h *ProviderHandler) toProviderVO(provider domain.Provider) ProviderVO {
 	return ProviderVO{
 		ID:     provider.ID,
 		Name:   provider.Name,
+		ApiKey: provider.ApiKey,
 		Models: h.toModelVO(provider.Models),
 	}
 }
@@ -90,7 +128,11 @@ func (h *ProviderHandler) toProviderVO(provider domain.Provider) ProviderVO {
 func (h *ProviderHandler) toModelVO(models []domain.Model) []ModelVO {
 	return slice.Map[domain.Model, ModelVO](models, func(idx int, src domain.Model) ModelVO {
 		return ModelVO{
-			ID: src.ID,
+			ID:          src.ID,
+			Name:        src.Name,
+			InputPrice:  src.InputPrice,
+			OutputPrice: src.OutputPrice,
+			PriceMode:   src.PriceMode,
 		}
 	})
 }

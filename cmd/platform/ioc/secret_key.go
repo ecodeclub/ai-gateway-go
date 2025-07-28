@@ -1,5 +1,3 @@
-//go:build wireinject
-
 // Copyright 2023 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,21 +15,18 @@
 package ioc
 
 import (
-	"github.com/google/wire"
+	"github.com/gotomicro/ego/core/econf"
 )
 
-func InitApp() *App {
-	wire.Build(
-		BaseSet,
-		MockSet,
-		LLMSet,
-		ChatSet,
-		InvocationConfigSet,
-		BizConfigSet,
-		SecretKeySet,
-		ProviderSet,
-		ModelSet,
-		wire.Struct(new(App), "*"),
-	)
-	return new(App)
+func initSecretKey() string {
+	type SecretKeyConfig struct {
+		SecretKey string `json:"secret_key"`
+	}
+	var cfg SecretKeyConfig
+
+	err := econf.UnmarshalKey("secret", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	return cfg.SecretKey
 }
