@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ func (h *ProviderHandler) GetAll(ctx *ginx.Context, sess session.Session) (ginx.
 	}
 	list := h.toProviderList(provider)
 
-	return ginx.Result{Code: 200, Data: list}, nil
+	return ginx.Result{Data: list}, nil
 }
 
 func (h *ProviderHandler) SaveProvider(ctx *ginx.Context, req ProviderVO, sess session.Session) (ginx.Result, error) {
@@ -58,7 +58,7 @@ func (h *ProviderHandler) SaveProvider(ctx *ginx.Context, req ProviderVO, sess s
 	if err != nil {
 		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
-	return ginx.Result{Code: 200, Data: id}, nil
+	return ginx.Result{Msg: "OK", Data: id}, nil
 }
 
 func (h *ProviderHandler) SaveModel(ctx *ginx.Context, req ModelVO, sess session.Session) (ginx.Result, error) {
@@ -66,7 +66,40 @@ func (h *ProviderHandler) SaveModel(ctx *ginx.Context, req ModelVO, sess session
 	if err != nil {
 		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
-	return ginx.Result{Code: 200, Data: id}, nil
+	return ginx.Result{Data: id}, nil
+}
+
+func (h *ProviderHandler) GetModel(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
+	id, err := ctx.Param("id").AsInt64()
+	if err != nil {
+		return ginx.Result{Code: 400, Msg: "无效输入"}, err
+	}
+	model, err := h.service.GetModel(ctx, id)
+	if err != nil {
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
+	}
+	return ginx.Result{
+
+		Data: ModelVO{
+			ID:          model.ID,
+			Name:        model.Name,
+			InputPrice:  model.InputPrice,
+			OutputPrice: model.OutputPrice,
+			PriceMode:   model.PriceMode,
+		},
+	}, nil
+}
+
+func (h *ProviderHandler) GetProvider(ctx *ginx.Context, sees session.Session) (ginx.Result, error) {
+	id, err := ctx.Param("id").AsInt64()
+	if err != nil {
+		return ginx.Result{Code: 400, Msg: "无效输入"}, err
+	}
+	provider, err := h.service.GetProvider(ctx, id)
+	if err != nil {
+		return ginx.Result{Code: 500, Msg: "内部错误"}, err
+	}
+	return ginx.Result{Data: ProviderVO{ID: id, Name: provider.Name, ApiKey: provider.ApiKey}}, nil
 }
 
 func (h *ProviderHandler) GetModel(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
@@ -107,7 +140,7 @@ func (h *ProviderHandler) ReloadCache(ctx *ginx.Context, sess session.Session) (
 	if err != nil {
 		return ginx.Result{Code: 500, Msg: "内部错误"}, err
 	}
-	return ginx.Result{Code: 200, Data: "刷新成功"}, nil
+	return ginx.Result{Data: "刷新成功"}, nil
 }
 
 func (h *ProviderHandler) toProviderList(providers []domain.Provider) []ProviderVO {

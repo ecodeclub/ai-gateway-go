@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,7 +39,11 @@ func NewProviderService(repo *repository.ProviderRepo, secretKey string) *Provid
 }
 
 func (p *ProviderService) SaveProvider(ctx context.Context, provider domain.Provider) (int64, error) {
-	provider.ApiKey, _ = p.Encrypt(p.secretKey)
+	var err error
+	provider.ApiKey, err = p.Encrypt(p.secretKey)
+	if err != nil {
+		return 0, err
+	}
 	return p.repo.SaveProvider(ctx, provider)
 }
 

@@ -1,4 +1,4 @@
-# Copyright 2021 ecodeclub
+# Copyright 2025 ecodeclub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ jobs:
 
       - name: Check
         run: |
-          make check
+          make fmt
           if [ -n "$(git status --porcelain)" ]; then
              echo >&2 "错误: 请在本地运行命令'make check'后再提交."
              exit 1

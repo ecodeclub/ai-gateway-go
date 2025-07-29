@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright 2021 ecodeclub
+# Copyright 2025 ecodeclub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,5 +19,13 @@
 # This script does not handle file names that contain spaces.
 
 # Pre-commit configuration
+
+RESULT=$(make check)
+printf "执行检查中...\n"
+
+if [ -n "$RESULT" ]; then
+  echo >&2 "[ERROR]: 有文件发生变更，请将变更文件添加到本次提交中"
+  exit 1
+fi
 
 exit 0

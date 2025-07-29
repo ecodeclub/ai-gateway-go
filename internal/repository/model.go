@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
 package repository
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"strconv"
+
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 
 type ModelRepository struct {
