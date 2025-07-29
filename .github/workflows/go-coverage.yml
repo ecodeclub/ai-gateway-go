@@ -41,35 +41,8 @@ jobs:
         with:
           go-version: "1.24.2"
 
-      - name: Start Docker Compose
-        run: |
-          docker compose -f ./.script/docker-compose.yaml -p myapp up -d
-
-      - name: Test for MySQL
-        run: |
-          # 等待MySQL服务就绪（最多尝试30次，每次等待2秒）
-          timeout=60
-          elapsed=0
-          until docker exec myapp-mysql8-1 mysqladmin -uroot -proot -h127.0.0.1 ping; do
-          sleep 2
-          elapsed=$((elapsed + 2))
-          if [ $elapsed -ge $timeout ]; then
-          echo "MySQL未在${timeout}秒内启动！"
-          exit 1
-          fi
-          done
-
-          # MySQL就绪后执行命令
-          docker exec myapp-mysql8-1 mysql -uroot -proot -h127.0.0.1 -e "SHOW DATABASES;"
-
-      - name: Build
-        run: go build -v ./...
-
       - name: Test
-        run: go test -race -coverprofile=cover.out -v ./...
-
-      - name: Stop Docker Compose
-        run: docker compose -f ./.script/docker-compose.yaml down
+        run: make e2e
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
