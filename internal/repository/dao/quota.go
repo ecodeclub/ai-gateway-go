@@ -53,13 +53,12 @@ func (QuotaRecord) TableName() string {
 }
 
 type Quota struct {
-	ID            int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	UID           int64  `gorm:"column:uid"`
-	Key           string `gorm:"column:key;uniqueIndex;type:varchar(256)"`
-	Amount        int64  `gorm:"column:amount"`
-	LastClearTime int64  `gorm:"column:last_clear_time"`
-	Ctime         int64  `gorm:"column:ctime"`
-	Utime         int64  `gorm:"column:utime"`
+	ID            int64 `gorm:"primaryKey;autoIncrement;column:id"`
+	UID           int64 `gorm:"column:uid"`
+	Amount        int64 `gorm:"column:amount"`
+	LastClearTime int64 `gorm:"column:last_clear_time"`
+	Ctime         int64 `gorm:"column:ctime"`
+	Utime         int64 `gorm:"column:utime"`
 }
 
 func (Quota) TableName() string {
@@ -81,14 +80,14 @@ func (dao *QuotaDao) CreateTempQuota(ctx context.Context, quota TempQuota) error
 	return dao.db.WithContext(ctx).Create(&quota).Error
 }
 
-func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
+func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) error {
 	now := time.Now().Unix()
 	quota.Utime = now
 
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().Unix()
 		record := QuotaRecord{
-			Key:    quota.Key,
+			Key:    key,
 			Uid:    quota.UID,
 			Amount: quota.Amount,
 			Ctime:  now,
@@ -99,13 +98,19 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
 			return err
 		}
 
-		return tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
+		err = tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "uid"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"amount": gorm.Expr("amount + ?", quota.Amount),
 				"utime":  now,
 			}),
 		}).Create(&quota).Error
+		if err != nil {
+			return err
+		}
+		return tx.Model(&Quota{}).
+			Where("key = ? AND amount > 0", key).
+			Update("last_clear_time", now).Error
 	})
 }
 
@@ -181,13 +186,20 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 			return nil
 		}
 	}
-	// 从主额度扣
-	result := tx.Model(&Quota{}).
-		Where("uid = ?", uid).
-		Updates(map[string]any{
+	quota := Quota{
+		UID:    uid,
+		Amount: -deductAmount,
+		Utime:  now,
+	}
+	// 如果存在对应的用户, 那么直接扣, 如果不存在那么初始化为负数
+	result := tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "uid"}},
+		DoUpdates: clause.Assignments(map[string]any{
 			"amount": gorm.Expr("amount - ?", deductAmount),
 			"utime":  now,
-		})
+		}),
+	}).Create(&quota)
+
 	if result.Error != nil {
 		return result.Error
 	}

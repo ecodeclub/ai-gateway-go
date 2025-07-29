@@ -31,7 +31,7 @@ func NewQuotaRepo(dao *dao.QuotaDao) *QuotaRepo {
 }
 
 func (q *QuotaRepo) AddQuota(ctx context.Context, quota domain.Quota) error {
-	return q.dao.AddQuota(ctx, dao.Quota{UID: quota.Uid, Amount: quota.Amount, Key: quota.Key})
+	return q.dao.AddQuota(ctx, quota.Key, dao.Quota{UID: quota.Uid, Amount: quota.Amount})
 }
 
 func (q *QuotaRepo) CreateTempQuota(ctx context.Context, quota domain.TempQuota) error {
