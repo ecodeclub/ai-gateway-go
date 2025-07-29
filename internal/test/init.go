@@ -1,5 +1,3 @@
-//go:build wireinject
-
 // Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ioc
+package test
 
-import (
-	"github.com/google/wire"
-)
+import "github.com/gotomicro/ego"
 
-func InitApp() *App {
-	wire.Build(
-		BaseSet,
-		MockSet,
-		LLMSet,
-		ChatSet,
-		InvocationConfigSet,
-		BizConfigSet,
-		ProviderSet,
-		wire.Struct(new(App), "*"),
-	)
-	return new(App)
+func init() {
+	ego.New(ego.WithArguments([]string{"--config=config.yaml"}))
 }

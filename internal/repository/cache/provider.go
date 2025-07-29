@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -14,22 +15,35 @@ const (
 )
 
 type ProviderCache struct {
-	rdb redis.Cmdable
+	rdb        redis.Cmdable
+	expiration time.Duration
 }
 
 func NewProviderCache(rdb redis.Cmdable) *ProviderCache {
-	return &ProviderCache{rdb: rdb}
+	// 默认永不过期
+	return &ProviderCache{rdb: rdb, expiration: 0}
 }
 
-func (p *ProviderCache) AddProvider(ctx context.Context, provider Provider) error {
-	field := p.getProviderField(provider.ID)
+func (p *ProviderCache) SetProvider(ctx context.Context, provider Provider) error {
+	key := p.providerKey(provider.ID)
 	jsonData, err := json.Marshal(provider)
 	if err != nil {
 		return err
 	}
-	return p.rdb.HSet(ctx, ProviderAllKey, field, jsonData).Err()
+	return p.rdb.Set(ctx, key, jsonData, p.expiration).Err()
 }
-func (p *ProviderCache) getProviderField(id int64) string {
+
+func (p *ProviderCache) GetProvider(ctx context.Context, id int64) (Provider, error) {
+	bs, err := p.rdb.Get(ctx, p.providerKey(id)).Bytes()
+	if err != nil {
+		return Provider{}, err
+	}
+	var provider Provider
+	err = json.Unmarshal(bs, &provider)
+	return provider, err
+}
+
+func (p *ProviderCache) providerKey(id int64) string {
 	return fmt.Sprintf("provider:%d", id)
 }
 
@@ -47,39 +61,6 @@ func (p *ProviderCache) getModelField(id int64) string {
 	return fmt.Sprintf("model:%d", id)
 }
 
-func (p *ProviderCache) GetAllProvider(ctx context.Context) ([]Provider, error) {
-	result, err := p.rdb.HGetAll(ctx, ProviderAllKey).Result()
-	if err != nil {
-		return nil, err
-	}
-	providers := make([]Provider, 0, len(result))
-	for _, val := range result {
-		var provider Provider
-		if err := json.Unmarshal([]byte(val), &provider); err != nil {
-			continue
-		}
-		providers = append(providers, provider)
-	}
-	return providers, nil
-}
-
-func (p *ProviderCache) GetModelListByPid(ctx context.Context, pid int64) ([]Model, error) {
-	result, err := p.rdb.HGetAll(ctx, fmt.Sprintf(ProviderKey, pid)).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	models := make([]Model, 0, len(result))
-	for _, val := range result {
-		var model Model
-		if err := json.Unmarshal([]byte(val), &model); err != nil {
-			continue
-		}
-		models = append(models, model)
-	}
-	return models, nil
-}
-
 func (p *ProviderCache) Reload(ctx context.Context, providers []Provider, models []Model) error {
 	pipe := p.rdb.TxPipeline()
 
@@ -91,7 +72,7 @@ func (p *ProviderCache) Reload(ctx context.Context, providers []Provider, models
 		if err != nil {
 			return err
 		}
-		field := p.getProviderField(provider.ID)
+		field := p.providerKey(provider.ID)
 		providerFields[field] = data
 		pipe.Del(ctx, fmt.Sprintf(ProviderKey, provider.ID))
 	}
@@ -115,14 +96,14 @@ func (p *ProviderCache) Reload(ctx context.Context, providers []Provider, models
 type Provider struct {
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
-	APIKey string `json:"api_key"`
+	APIKey string `json:"apiKey"`
 }
 
 type Model struct {
 	ID          int64  `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Pid         int64  `json:"pid,omitempty"`
-	InputPrice  int64  `json:"input_price,omitempty"`
-	OutputPrice int64  `json:"output_price,omitempty"`
-	PriceMode   string `json:"price_mode,omitempty"`
+	InputPrice  int64  `json:"inputPrice,omitempty"`
+	OutputPrice int64  `json:"outputPrice,omitempty"`
+	PriceMode   string `json:"priceMode,omitempty"`
 }

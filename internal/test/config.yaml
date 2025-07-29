@@ -1,0 +1,11 @@
+# 基本的数据库等的配置不在这里，在具体的 test/ioc 文件内
+grpc:
+  server:
+    port: 9002
+
+provider:
+  encrypt:
+    key: "6ebp4qunN13NznqCbtLspAnZrQ9JBhnY"
+
+admin:
+  port: 9080

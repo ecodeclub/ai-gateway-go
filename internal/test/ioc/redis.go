@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,18 @@
 package ioc
 
 import (
-	"github.com/redis/go-redis/v9"
+	"log"
 	"os"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func InitRedis() redis.Cmdable {
-	addr := os.Getenv("REDIS_ADDR")
+	addr := os.Getenv("TEST_REDIS_ADDR")
 	if addr == "" {
 		addr = "localhost:6379"
 	}
+	log.Print("测试 Redis：" + addr)
 	return redis.NewClient(&redis.Options{
 		Addr: addr,
 	})

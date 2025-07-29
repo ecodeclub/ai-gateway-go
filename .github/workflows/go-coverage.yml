@@ -1,4 +1,4 @@
-# Copyright 2021 ecodeclub
+# Copyright 2025 ecodeclub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ jobs:
           exit 1
           fi
           done
-          
+
           # MySQL就绪后执行命令
           docker exec myapp-mysql8-1 mysql -uroot -proot -h127.0.0.1 -e "SHOW DATABASES;"
 

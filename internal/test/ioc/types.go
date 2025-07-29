@@ -1,5 +1,3 @@
-//go:build wireinject
-
 // Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,19 +15,15 @@
 package ioc
 
 import (
-	"github.com/google/wire"
+	"github.com/gotomicro/ego/server/egin"
+	"github.com/gotomicro/ego/server/egrpc"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 )
 
-func InitApp() *App {
-	wire.Build(
-		BaseSet,
-		MockSet,
-		LLMSet,
-		ChatSet,
-		InvocationConfigSet,
-		BizConfigSet,
-		ProviderSet,
-		wire.Struct(new(App), "*"),
-	)
-	return new(App)
+type TestApp struct {
+	GrpcSever *egrpc.Component
+	GinServer *egin.Component
+	DB        *gorm.DB
+	Rdb       redis.Cmdable
 }

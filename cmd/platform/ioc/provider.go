@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"github.com/gotomicro/ego/core/econf"
 )
 
-func initProvider(repo *repository.ProviderRepo) *service.ProviderService {
+func InitProvider(repo *repository.ProviderRepo) *service.ProviderService {
 	type Config struct {
 		Encrypt struct {
 			Key string

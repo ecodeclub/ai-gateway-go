@@ -1,6 +1,6 @@
 //go:build wireinject
 
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,20 +23,20 @@ import (
 
 // InitApp 总体上这里的 app 都是从 platform 下的 ioc 复制过来的
 // 只有一些需要 mock 的组件，才会作为参数传递进去
-func InitApp(to TestOnly) *ioc.App {
+func InitApp(to TestOnly) *TestApp {
 	wire.Build(
 		InitGin,
 		InitDB,
 		InitRedis,
+		InitSession,
 		ioc.InitGrpcServer,
 		ioc.MockSet,
 		ioc.ChatSet,
 		ioc.InvocationConfigSet,
 		ioc.BizConfigSet,
 		ioc.ProviderSet,
-		ioc.ModelSet,
 		wire.FieldsOf(new(TestOnly), "LLM"),
-		wire.Struct(new(ioc.App), "*"),
+		wire.Struct(new(TestApp), "*"),
 	)
-	return new(ioc.App)
+	return new(TestApp)
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,18 +15,21 @@
 package ioc
 
 import (
+	"log"
+	"os"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"os"
 )
 
 // InitDB 初始化数据库并自动建表
 func InitDB() *gorm.DB {
-	dsn := os.Getenv("MYSQL_DSN")
+	dsn := os.Getenv("TEST_MYSQL_DSN")
 	if dsn == "" {
 		dsn = "root:root@tcp(localhost:13306)/ai_gateway_platform"
 	}
+	log.Print("测试 MySQL：" + dsn)
 	db, err := gorm.Open(mysql.Open(dsn))
 	if err != nil {
 		panic(err)

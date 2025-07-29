@@ -1,5 +1,3 @@
-//go:build wireinject
-
 // Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ioc
+package test
 
-import (
-	"github.com/google/wire"
-)
-
-func InitApp() *App {
-	wire.Build(
-		BaseSet,
-		MockSet,
-		LLMSet,
-		ChatSet,
-		InvocationConfigSet,
-		BizConfigSet,
-		ProviderSet,
-		wire.Struct(new(App), "*"),
-	)
-	return new(App)
+// Result 是一个 ginx.Result 的泛型设计
+type Result[T any] struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data T      `json:"data"`
 }
