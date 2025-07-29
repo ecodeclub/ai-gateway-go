@@ -27,7 +27,7 @@ services:
       #      注意这里我映射为了 13306 端口
       - "13306:3306"
   redis:
-    image: 'bitnami/redis:latest'
+    image: 'bitnami/redis:8.0.3'
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     ports:

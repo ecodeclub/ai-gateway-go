@@ -14,8 +14,23 @@
 
 package test
 
-import "github.com/gotomicro/ego"
+import (
+	"bytes"
+	_ "embed"
+
+	"github.com/gotomicro/ego/core/econf"
+	"gopkg.in/yaml.v3"
+)
+
+var (
+	//go:embed config.yaml
+	cfg string
+)
 
 func init() {
-	ego.New(ego.WithArguments([]string{"--config=config.yaml"}))
+	// 用这种形式来规避运行部分测试加载配置失败的问题
+	err := econf.LoadFromReader(bytes.NewReader([]byte(cfg)), yaml.Unmarshal)
+	if err != nil {
+		panic(err)
+	}
 }
