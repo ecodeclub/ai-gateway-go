@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,12 +52,11 @@ var (
 		admin.NewBizConfigHandler,
 	)
 
-	SecretKeySet = wire.NewSet(initSecretKey())
-	ProviderSet  = wire.NewSet(
+	ProviderSet = wire.NewSet(
 		dao.NewProviderDao,
 		cache.NewProviderCache,
 		repository.NewProviderRepo,
-		service.NewProviderService,
+		InitProvider,
 		admin.NewProviderHandler,
 	)
 	//ModelSet = wire.NewSet(repository.NewModelRepository)

@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package repository
 import (
 	"context"
 	"time"
+
+	"github.com/ecodeclub/ekit/mapx"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
@@ -54,7 +56,7 @@ func (p *ProviderRepo) SaveProvider(ctx context.Context, provider domain.Provide
 	if err != nil {
 		return 0, err
 	}
-	err = p.cache.AddProvider(ctx, cache.Provider{
+	err = p.cache.SetProvider(ctx, cache.Provider{
 		ID:     id,
 		Name:   provider.Name,
 		APIKey: provider.ApiKey,
@@ -107,34 +109,38 @@ func (p *ProviderRepo) GetModel(ctx context.Context, id int64) (domain.Model, er
 	return domain.Model{ID: model.ID, Name: model.Name, InputPrice: model.InputPrice, OutputPrice: model.OutputPrice}, nil
 }
 
+// GetAll 不会经过缓存，因为它目前只会用于管理后台。
 func (p *ProviderRepo) GetAll(ctx context.Context) ([]domain.Provider, error) {
-	var providers []domain.Provider
-
-	cacheProvider, err := p.cache.GetAllProvider(ctx)
-	if err != nil {
+	var (
+		eg        errgroup.Group
+		providers []domain.Provider
+		models    []domain.Model
+	)
+	eg.Go(func() error {
+		var err error
 		providers, err = p.getAllProviders(ctx)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		providers = p.toProvider(cacheProvider)
+		return err
+	})
+
+	eg.Go(func() error {
+		var err error
+		models, err = p.getAllModels(ctx)
+		return err
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	res := mapx.NewMultiBuiltinMap[int64, domain.Model](len(models))
+	for _, model := range models {
+		_ = res.Put(model.Pid, model)
 	}
 
 	for _, provider := range providers {
-		var models []domain.Model
-
-		cacheModels, err := p.cache.GetModelListByPid(ctx, provider.ID)
-		if err != nil {
-			models, err = p.getModelByPid(ctx, provider.ID)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			models = p.toModel(cacheModels)
-		}
-		provider.Models = models
+		ms, _ := res.Get(provider.ID)
+		provider.Models = ms
 	}
-
 	return providers, nil
 }
 
@@ -151,7 +157,7 @@ func (p *ProviderRepo) getAllModels(ctx context.Context) ([]domain.Model, error)
 	if err != nil {
 		return nil, err
 	}
-	return p.toDomainModel(models), err
+	return p.toDomainModels(models), err
 }
 
 func (p *ProviderRepo) getModelByPid(ctx context.Context, pid int64) ([]domain.Model, error) {
@@ -159,7 +165,7 @@ func (p *ProviderRepo) getModelByPid(ctx context.Context, pid int64) ([]domain.M
 	if err != nil {
 		return nil, err
 	}
-	return p.toDomainModel(models), err
+	return p.toDomainModels(models), err
 }
 
 func (p *ProviderRepo) ReloadCache(ctx context.Context) error {
@@ -207,17 +213,22 @@ func (p *ProviderRepo) toDomainProvider(list []dao.Provider) []domain.Provider {
 	})
 }
 
-func (p *ProviderRepo) toDomainModel(list []dao.Model) []domain.Model {
+func (p *ProviderRepo) toDomainModels(list []dao.Model) []domain.Model {
 	return slice.Map[dao.Model, domain.Model](list, func(idx int, src dao.Model) domain.Model {
-		return domain.Model{
-			ID:          src.ID,
-			Name:        src.Name,
-			Provider:    domain.Provider{ID: src.Pid},
-			OutputPrice: src.OutputPrice,
-			InputPrice:  src.InputPrice,
-			PriceMode:   src.PriceMode,
-		}
+		return p.toDomainModel(src)
 	})
+}
+
+func (p *ProviderRepo) toDomainModel(m dao.Model) domain.Model {
+	return domain.Model{
+		ID:          m.ID,
+		Name:        m.Name,
+		Pid:         m.Pid,
+		Provider:    domain.Provider{ID: m.Pid},
+		OutputPrice: m.OutputPrice,
+		InputPrice:  m.InputPrice,
+		PriceMode:   m.PriceMode,
+	}
 }
 
 func (p *ProviderRepo) toModel(list []cache.Model) []domain.Model {

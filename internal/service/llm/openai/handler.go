@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/gotomicro/ego/core/elog"
 	"github.com/openai/openai-go"

@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/sn"
 	"golang.org/x/sync/errgroup"
-	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"

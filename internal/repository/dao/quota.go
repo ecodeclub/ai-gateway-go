@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -100,7 +100,6 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
 		}
 
 		return tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"amount": gorm.Expr("amount + ?", quota.Amount),
 				"utime":  now,

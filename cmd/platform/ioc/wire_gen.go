@@ -33,12 +33,15 @@ func InitApp() *App {
 	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizConfigRepository := repository.NewBizConfigRepository(bizConfigDAO)
-	modelRepository := repository.NewModelRepository()
-	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, modelRepository)
+	providerDao := dao.NewProviderDao(db)
+	providerCache := cache.NewProviderCache(cmdable)
+	providerRepo := repository.NewProviderRepo(providerDao, providerCache)
+	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, providerRepo)
 	invocationConfigHandler := admin.NewInvocationConfigHandler(invocationConfigService)
 	bizConfigService := service.NewBizConfigService(bizConfigRepository)
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
-	providerHandler := admin.NewProviderHandler()
+	providerService := InitProvider(providerRepo)
+	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
 	app := &App{
 		GrpcSever: component,

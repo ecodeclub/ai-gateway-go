@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,24 @@ package service
 
 import (
 	"context"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"golang.org/x/sync/errgroup"
 )
 
 type InvocationConfigService struct {
-	repo      *repository.InvocationConfigRepo
-	bizRepo   *repository.BizConfigRepository
-	modelRepo *repository.ModelRepository
+	repo         *repository.InvocationConfigRepo
+	bizRepo      *repository.BizConfigRepository
+	providerRepo *repository.ProviderRepo
 }
 
 func NewInvocationConfigService(repo *repository.InvocationConfigRepo,
-	bizRepo *repository.BizConfigRepository, modelRepo *repository.ModelRepository) *InvocationConfigService {
+	bizRepo *repository.BizConfigRepository, providerRepo *repository.ProviderRepo) *InvocationConfigService {
 	return &InvocationConfigService{
-		repo:      repo,
-		bizRepo:   bizRepo,
-		modelRepo: modelRepo}
+		repo:         repo,
+		bizRepo:      bizRepo,
+		providerRepo: providerRepo}
 }
 
 func (s *InvocationConfigService) Save(ctx context.Context, cfg domain.InvocationConfig) (int64, error) {
@@ -138,7 +139,7 @@ func (s *InvocationConfigService) GetVersion(ctx context.Context, versionID int6
 	if err != nil {
 		return domain.InvocationCfgVersion{}, err
 	}
-	model, err := s.modelRepo.FindById(res.Model.ID)
+	model, err := s.providerRepo.GetModel(ctx, res.Model.ID)
 	if err != nil {
 		return domain.InvocationCfgVersion{}, err
 	}

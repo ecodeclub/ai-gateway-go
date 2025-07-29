@@ -1,4 +1,4 @@
-// Copyright 2021 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,6 +31,9 @@ func NewProviderDao(db *gorm.DB) *ProviderDao {
 }
 
 func (d *ProviderDao) SaveProvider(ctx context.Context, provider Provider) (int64, error) {
+	now := time.Now().UnixMilli()
+	provider.Utime = now
+	provider.Ctime = now
 	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.Assignments(map[string]any{
@@ -84,7 +87,6 @@ func (d *ProviderDao) GetModel(ctx context.Context, id int64) (Model, error) {
 func (d *ProviderDao) GetProvider(ctx context.Context, id int64) (Provider, error) {
 	var provider Provider
 	err := d.db.WithContext(ctx).
-		Model(&Model{}).
 		Where("id = ?", id).
 		First(&provider).Error
 	return provider, err
@@ -102,7 +104,6 @@ func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
 func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
 	var models []Model
 	err := d.db.WithContext(ctx).
-		Model(&Provider{}).
 		Order("utime DESC").
 		Find(&models).Error
 	return models, err

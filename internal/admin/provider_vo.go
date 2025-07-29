@@ -1,4 +1,4 @@
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package admin
 type ProviderVO struct {
 	ID     int64     `json:"id"`
 	Name   string    `json:"name"`
-	ApiKey string    `json:"api_key,omitempty"`
+	ApiKey string    `json:"apiKey,omitempty"`
 	Models []ModelVO `json:"models"`
 }
 
@@ -25,7 +25,7 @@ type ModelVO struct {
 	ID          int64  `json:"id"`
 	Pid         int64  `json:"pid"`
 	Name        string `json:"name"`
-	InputPrice  int64  `json:"input_price"`
-	OutputPrice int64  `json:"output_price"`
+	InputPrice  int64  `json:"inputPrice"`
+	OutputPrice int64  `json:"outputPrice"`
 	PriceMode   string `json:"price_mode"`
 }

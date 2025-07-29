@@ -1,6 +1,6 @@
 //go:build wireinject
 
-// Copyright 2023 ecodeclub
+// Copyright 2025 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,9 +28,7 @@ func InitApp() *App {
 		ChatSet,
 		InvocationConfigSet,
 		BizConfigSet,
-		SecretKeySet,
 		ProviderSet,
-		ModelSet,
 		wire.Struct(new(App), "*"),
 	)
 	return new(App)
