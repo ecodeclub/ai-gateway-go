@@ -18,8 +18,9 @@ package chat.v1;
 option go_package = "v1/chat;chatv1";
 
 message StreamRequest {
-  string sn = 1;
-  Message msg = 2;
+  int64 uid = 1;
+  string sn = 2;
+  Message msg = 3;
 }
 
 message StreamResponse {

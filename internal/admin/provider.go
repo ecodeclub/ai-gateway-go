@@ -102,39 +102,6 @@ func (h *ProviderHandler) GetProvider(ctx *ginx.Context, sees session.Session) (
 	return ginx.Result{Data: ProviderVO{ID: id, Name: provider.Name, ApiKey: provider.ApiKey}}, nil
 }
 
-func (h *ProviderHandler) GetModel(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
-	id, err := ctx.Param("id").AsInt64()
-	if err != nil {
-		return ginx.Result{Code: 400, Msg: "无效输入"}, err
-	}
-	model, err := h.service.GetModel(ctx, id)
-	if err != nil {
-		return ginx.Result{Code: 500, Msg: "内部错误"}, err
-	}
-	return ginx.Result{
-		Code: 200,
-		Data: ModelVO{
-			ID:          model.ID,
-			Name:        model.Name,
-			InputPrice:  model.InputPrice,
-			OutputPrice: model.OutputPrice,
-			PriceMode:   model.PriceMode,
-		},
-	}, nil
-}
-
-func (h *ProviderHandler) GetProvider(ctx *ginx.Context, sees session.Session) (ginx.Result, error) {
-	id, err := ctx.Param("id").AsInt64()
-	if err != nil {
-		return ginx.Result{Code: 400, Msg: "无效输入"}, err
-	}
-	provider, err := h.service.GetProvider(ctx, id)
-	if err != nil {
-		return ginx.Result{Code: 500, Msg: "内部错误"}, err
-	}
-	return ginx.Result{Code: 200, Data: ProviderVO{ID: id, Name: provider.Name, ApiKey: provider.ApiKey}}, nil
-}
-
 func (h *ProviderHandler) ReloadCache(ctx *ginx.Context, sess session.Session) (ginx.Result, error) {
 	err := h.service.ReloadCache(ctx)
 	if err != nil {

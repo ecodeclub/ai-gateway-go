@@ -109,7 +109,7 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) erro
 			return err
 		}
 		return tx.Model(&Quota{}).
-			Where("key = ? AND amount > 0", key).
+			Where("uid = ? AND amount > 0", quota.UID).
 			Update("last_clear_time", now).Error
 	})
 }
@@ -117,7 +117,7 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) erro
 func (dao *QuotaDao) GetQuotaByUid(ctx context.Context, uid int64) (Quota, error) {
 	var quota Quota
 	err := dao.db.WithContext(ctx).
-		Where("uid = ? and end_time >= ?", uid).
+		Where("uid = ?", uid).
 		First(&quota).Error
 	if err != nil {
 		return Quota{}, err

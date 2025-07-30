@@ -16,6 +16,7 @@ package service
 
 import (
 	"context"
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"time"
 
 	"github.com/gotomicro/ego/core/elog"
@@ -26,9 +27,11 @@ import (
 )
 
 type ChatService struct {
-	repo   *repository.ChatRepo
-	handle llm.Handler
-	logger *elog.Component
+	repo         *repository.ChatRepo
+	handle       llm.Handler
+	logger       *elog.Component
+	N            int64
+	quotaService QuotaService
 }
 
 func NewChatService(repo *repository.ChatRepo, handler llm.Handler) *ChatService {
@@ -49,7 +52,14 @@ func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error
 	return c.repo.Detail(ctx, sn)
 }
 
-func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.Message) (chan domain.StreamEvent, error) {
+func (c *ChatService) Stream(ctx context.Context, sn string, uid int64, messages []domain.Message) (chan domain.StreamEvent, error) {
+	h, err := c.quotaService.HasEnoughQuota(ctx, c.N, uid)
+	if err != nil {
+		return nil, err
+	}
+	if !h {
+		return nil, errs.ErrAccountOverdue
+	}
 	ch := make(chan domain.StreamEvent, 10)
 
 	cs, err := c.repo.GetHistoryMessageList(ctx, sn)
@@ -70,13 +80,13 @@ func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.M
 	}
 
 	go func() {
-		conent := ""
+		content := ""
 		reasoningContent := ""
 		defer func() {
 			saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			err1 := c.repo.AddMessages(saveCtx, sn, []domain.Message{{
-				Content:          conent,
+				Content:          content,
 				ReasoningContent: reasoningContent,
 			}})
 			if err1 != nil {
@@ -93,7 +103,7 @@ func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.M
 					return
 				}
 				reasoningContent += value.ReasoningContent
-				conent += value.Content
+				content += value.Content
 				ch <- value
 			}
 		}
