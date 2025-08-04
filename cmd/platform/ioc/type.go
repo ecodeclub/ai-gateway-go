@@ -52,7 +52,8 @@ var (
 		admin.NewBizConfigHandler,
 	)
 
-	ProviderSet = wire.NewSet(
+	SecretKeySet = wire.NewSet(initSecretKey())
+	ProviderSet  = wire.NewSet(
 		dao.NewProviderDao,
 		cache.NewProviderCache,
 		repository.NewProviderRepo,

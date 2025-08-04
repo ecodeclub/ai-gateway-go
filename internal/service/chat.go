@@ -16,6 +16,7 @@ package service
 
 import (
 	"context"
+	"github.com/ecodeclub/ai-gateway-go/errs"
 	"time"
 
 	"github.com/gotomicro/ego/core/elog"
@@ -26,9 +27,12 @@ import (
 )
 
 type ChatService struct {
-	repo   *repository.ChatRepo
-	handle llm.Handler
-	logger *elog.Component
+	repo            *repository.ChatRepo
+	handle          llm.Handler
+	logger          *elog.Component
+	N               int64
+	quotaService    QuotaService
+	providerService ProviderService
 }
 
 func NewChatService(repo *repository.ChatRepo, handler llm.Handler) *ChatService {
@@ -49,7 +53,26 @@ func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error
 	return c.repo.Detail(ctx, sn)
 }
 
-func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.Message) (chan domain.StreamEvent, error) {
+func (c *ChatService) Stream(
+	ctx context.Context,
+	sn string,
+	uid int64,
+	modelId int64,
+	messages []domain.Message,
+) (chan domain.StreamEvent, error) {
+	h, err := c.quotaService.HasEnoughQuota(ctx, c.N, uid)
+	if err != nil {
+		return nil, err
+	}
+	if !h {
+		return nil, errs.ErrAccountOverdue
+	}
+
+	model, err := c.getModel(modelId)
+	if err != nil {
+		return nil, err
+	}
+
 	ch := make(chan domain.StreamEvent, 10)
 
 	cs, err := c.repo.GetHistoryMessageList(ctx, sn)
@@ -70,18 +93,24 @@ func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.M
 	}
 
 	go func() {
-		conent := ""
+		content := ""
 		reasoningContent := ""
+		var (
+			inputToken  int64
+			outputToken int64
+		)
 		defer func() {
 			saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			err1 := c.repo.AddMessages(saveCtx, sn, []domain.Message{{
-				Content:          conent,
+				Content:          content,
 				ReasoningContent: reasoningContent,
 			}})
 			if err1 != nil {
 				c.logger.Error("写入数据库失败", elog.FieldErr(err))
 			}
+			amount := model.InputPrice*inputToken + model.OutputPrice*outputToken
+			c.deduct(uid, sn, amount)
 		}()
 		for {
 			select {
@@ -93,10 +122,27 @@ func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.M
 					return
 				}
 				reasoningContent += value.ReasoningContent
-				conent += value.Content
+				content += value.Content
+				inputToken += value.InputToken
+				outputToken += value.OutputToken
 				ch <- value
 			}
 		}
 	}()
 	return ch, err
+}
+
+func (c *ChatService) getModel(modelId int64) (domain.Model, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return c.providerService.GetModel(ctx, modelId)
+}
+
+func (c *ChatService) deduct(uid int64, key string, amount int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err := c.quotaService.Deduct(ctx, uid, amount, key)
+	if err != nil {
+		c.logger.Error("扣减失败", elog.FieldErr(err))
+	}
 }

@@ -19,4 +19,6 @@ type StreamEvent struct {
 	Content          string
 	Done             bool
 	Error            error
+	InputToken       int64
+	OutputToken      int64
 }
