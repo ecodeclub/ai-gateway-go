@@ -38,8 +38,9 @@ const (
 type StreamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Uid           int64                  `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
-	Sn            string   `protobuf:"bytes,2,opt,name=sn,proto3" json:"sn,omitempty"`
-	Msg           *Message `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`
+	Sn            string                 `protobuf:"bytes,2,opt,name=sn,proto3" json:"sn,omitempty"`
+	ModelId       int64    `protobuf:"varint,3,opt,name=modelId,proto3" json:"modelId,omitempty"`
+	Msg           *Message `protobuf:"bytes,4,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -86,6 +87,13 @@ func (x *StreamRequest) GetSn() string {
 		return x.Sn
 	}
 	return ""
+}
+
+func (x *StreamRequest) GetModelId() int64 {
+	if x != nil {
+		return x.ModelId
+	}
+	return 0
 }
 
 func (x *StreamRequest) GetMsg() *Message {
@@ -652,11 +660,12 @@ var File_api_proto_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_api_proto_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/proto/chat/v1/chat.proto\x12\achat.v1\"U\n" +
+	"\x1capi/proto/chat/v1/chat.proto\x12\achat.v1\"o\n" +
 	"\rStreamRequest\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\x03R\x03uid\x12\x0e\n" +
-	"\x02sn\x18\x02 \x01(\tR\x02sn\x12\"\n" +
-	"\x03msg\x18\x03 \x01(\v2\x10.chat.v1.MessageR\x03msg\"\x7f\n" +
+	"\x02sn\x18\x02 \x01(\tR\x02sn\x12\x18\n" +
+	"\amodelId\x18\x03 \x01(\x03R\amodelId\x12\"\n" +
+	"\x03msg\x18\x04 \x01(\v2\x10.chat.v1.MessageR\x03msg\"\x7f\n" +
 	"\x0eStreamResponse\x12\x14\n" +
 	"\x05final\x18\x01 \x01(\bR\x05final\x12+\n" +
 	"\x11reasoning_content\x18\x02 \x01(\tR\x10reasoningContent\x12\x18\n" +

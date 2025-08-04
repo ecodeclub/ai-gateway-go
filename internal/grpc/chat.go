@@ -74,6 +74,7 @@ func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamSer
 		ctx,
 		request.GetSn(),
 		request.GetUid(),
+		request.GetModelId(),
 		c.toDomainMessage([]*ai.Message{request.GetMsg()}))
 	if err != nil {
 		if errors.Is(err, errs.ErrAccountOverdue) {
