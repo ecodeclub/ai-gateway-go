@@ -25,10 +25,11 @@ func InitApp() *App {
 		BaseSet,
 		MockSet,
 		LLMSet,
+		QuotaSet,
+		ProviderSet,
 		ChatSet,
 		InvocationConfigSet,
 		BizConfigSet,
-		ProviderSet,
 		wire.Struct(new(App), "*"),
 	)
 	return new(App)

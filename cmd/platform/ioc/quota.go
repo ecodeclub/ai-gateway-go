@@ -12,13 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package domain
+package ioc
 
-type StreamEvent struct {
-	ReasoningContent string
-	Content          string
-	Done             bool
-	Error            error
-	InputToken       int64
-	OutputToken      int64
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/gotomicro/ego/core/econf"
+)
+
+func InitQuota(repo *repository.QuotaRepo) *service.QuotaService {
+	type QuotaConfig struct {
+		MaxDebt int64 `yaml:"maxDebt"`
+	}
+	var cfg QuotaConfig
+	err := econf.UnmarshalKey("quota", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	return service.NewQuotaService(repo, cfg.MaxDebt)
 }

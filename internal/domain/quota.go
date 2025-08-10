@@ -18,7 +18,7 @@ type Quota struct {
 	Amount        int64
 	Key           string
 	Uid           int64
-	LastClearTime int64
+	DebtStartTime int64
 }
 
 type TempQuota struct {
