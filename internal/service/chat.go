@@ -17,6 +17,7 @@ package service
 import (
 	"context"
 	"github.com/ecodeclub/ai-gateway-go/errs"
+	"math"
 	"time"
 
 	"github.com/gotomicro/ego/core/elog"
@@ -30,15 +31,23 @@ type ChatService struct {
 	repo            *repository.ChatRepo
 	handle          llm.Handler
 	logger          *elog.Component
-	N               int64
-	quotaService    QuotaService
-	providerService ProviderService
+	quotaService    *QuotaService
+	providerService *ProviderService
 }
 
-func NewChatService(repo *repository.ChatRepo, handler llm.Handler) *ChatService {
-	return &ChatService{repo: repo,
-		handle: handler,
-		logger: elog.DefaultLogger.With(elog.String("component", "ChatService"))}
+func NewChatService(
+	repo *repository.ChatRepo,
+	handler llm.Handler,
+	quotaService *QuotaService,
+	provider *ProviderService,
+) *ChatService {
+	return &ChatService{
+		repo:            repo,
+		handle:          handler,
+		quotaService:    quotaService,
+		providerService: provider,
+		logger:          elog.DefaultLogger.With(elog.String("component", "ChatService")),
+	}
 }
 
 func (c *ChatService) Save(ctx context.Context, chat domain.Chat) (string, error) {
@@ -57,10 +66,11 @@ func (c *ChatService) Stream(
 	ctx context.Context,
 	sn string,
 	uid int64,
+	key string,
 	modelId int64,
 	messages []domain.Message,
 ) (chan domain.StreamEvent, error) {
-	h, err := c.quotaService.HasEnoughQuota(ctx, c.N, uid)
+	h, err := c.quotaService.HasEnoughQuota(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +119,11 @@ func (c *ChatService) Stream(
 			if err1 != nil {
 				c.logger.Error("写入数据库失败", elog.FieldErr(err))
 			}
-			amount := model.InputPrice*inputToken + model.OutputPrice*outputToken
-			c.deduct(uid, sn, amount)
+			amount := int64(
+				float64(model.InputPrice)*float64(inputToken)/1000 +
+					float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
+			)
+			c.deduct(uid, key, amount)
 		}()
 		for {
 			select {
@@ -118,13 +131,13 @@ func (c *ChatService) Stream(
 				return
 			case value, ok := <-event:
 				if !ok || value.Done {
+					inputToken += value.InputToken
+					outputToken += value.OutputToken
 					ch <- domain.StreamEvent{Done: true}
 					return
 				}
 				reasoningContent += value.ReasoningContent
 				content += value.Content
-				inputToken += value.InputToken
-				outputToken += value.OutputToken
 				ch <- value
 			}
 		}
@@ -139,10 +152,21 @@ func (c *ChatService) getModel(modelId int64) (domain.Model, error) {
 }
 
 func (c *ChatService) deduct(uid int64, key string, amount int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	err := c.quotaService.Deduct(ctx, uid, amount, key)
-	if err != nil {
-		c.logger.Error("扣减失败", elog.FieldErr(err))
+
+	maxRetry := 3
+
+	for i := 0; i < maxRetry; i++ {
+		err := c.quotaService.Deduct(ctx, uid, amount, key)
+		if err != nil {
+			c.logger.Error("扣减失败",
+				elog.FieldErr(err),
+				elog.Int64("uid", uid),
+				elog.String("key", key),
+				elog.Int64("amount", amount),
+			)
+		}
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
 	}
 }

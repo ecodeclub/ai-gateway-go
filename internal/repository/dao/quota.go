@@ -56,7 +56,7 @@ type Quota struct {
 	ID            int64 `gorm:"primaryKey;autoIncrement;column:id"`
 	UID           int64 `gorm:"column:uid"`
 	Amount        int64 `gorm:"column:amount"`
-	LastClearTime int64 `gorm:"column:last_clear_time"`
+	DebtStartTime int64 `gorm:"column:debt_start_time"`
 	Ctime         int64 `gorm:"column:ctime"`
 	Utime         int64 `gorm:"column:utime"`
 }
@@ -187,10 +187,18 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 		}
 	}
 	quota := Quota{
-		UID:    uid,
-		Amount: -deductAmount,
-		Utime:  now,
+		UID:           uid,
+		Amount:        -deductAmount,
+		Utime:         now,
+		DebtStartTime: now,
 	}
+	err := tx.Where("uid = ? and amount < ?", uid, deductAmount).Updates(map[string]any{
+		"debt_start_time": now,
+	}).Error
+	if err != nil {
+		return err
+	}
+
 	// 如果存在对应的用户, 那么直接扣, 如果不存在那么初始化为负数
 	result := tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "uid"}},
@@ -207,8 +215,4 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 		return errs.ErrInsufficientBalance
 	}
 	return nil
-}
-
-func InitQuotaTable(db *gorm.DB) error {
-	return db.AutoMigrate(&Quota{}, &TempQuota{}, &QuotaRecord{})
 }

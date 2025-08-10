@@ -31,7 +31,23 @@ var (
 		InitRedis, InitDB, InitSession,
 		InitGin,
 		InitGrpcServer)
-	LLMSet  = wire.NewSet(initLLMHandler)
+
+	LLMSet = wire.NewSet(initLLMHandler)
+
+	ProviderSet = wire.NewSet(
+		dao.NewProviderDao,
+		cache.NewProviderCache,
+		repository.NewProviderRepo,
+		InitProvider,
+		admin.NewProviderHandler,
+	)
+
+	QuotaSet = wire.NewSet(
+		dao.NewQuotaDao,
+		repository.NewQuotaRepo,
+		InitQuota,
+	)
+
 	ChatSet = wire.NewSet(
 		dao.NewChatDAO,
 		cache.NewChatCache,
@@ -39,6 +55,7 @@ var (
 		service.NewChatService,
 		igrpc.NewChatServer,
 	)
+
 	InvocationConfigSet = wire.NewSet(
 		dao.NewInvocationConfigDAO,
 		repository.NewInvocationConfigRepo,
@@ -51,16 +68,6 @@ var (
 		service.NewBizConfigService,
 		admin.NewBizConfigHandler,
 	)
-
-	SecretKeySet = wire.NewSet(initSecretKey())
-	ProviderSet  = wire.NewSet(
-		dao.NewProviderDao,
-		cache.NewProviderCache,
-		repository.NewProviderRepo,
-		InitProvider,
-		admin.NewProviderHandler,
-	)
-	//ModelSet = wire.NewSet(repository.NewModelRepository)
 
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )

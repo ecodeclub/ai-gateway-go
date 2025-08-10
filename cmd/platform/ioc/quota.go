@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dao
+package ioc
 
-import "gorm.io/gorm"
+import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/gotomicro/ego/core/econf"
+)
 
-func InitTables(db *gorm.DB) error {
-	return db.AutoMigrate(&BizConfig{},
-		&InvocationConfig{},
-		&InvocationConfigVersion{},
-		&Chat{},
-		&Message{},
-		&Provider{},
-		&Model{},
-		&Quota{},
-		&TempQuota{},
-		&QuotaRecord{},
-	)
+func InitQuota(repo *repository.QuotaRepo) *service.QuotaService {
+	type QuotaConfig struct {
+		MaxDebt int64 `yaml:"maxDebt"`
+	}
+	var cfg QuotaConfig
+	err := econf.UnmarshalKey("quota", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	return service.NewQuotaService(repo, cfg.MaxDebt)
 }
