@@ -3,8 +3,8 @@ package openai
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/slice"
 	"github.com/gotomicro/ego/core/elog"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -33,6 +33,22 @@ func NewHandler(apikey string, baseURL string, model string) *Handler {
 		logger: elog.DefaultLogger,
 		model:  model,
 	}
+}
+
+func (h *Handler) Chat(ctx context.Context, messages []domain.Message) (domain.ChatResponse, error) {
+	params := openai.ChatCompletionNewParams{
+		Messages: h.toOpenAIMessage(messages),
+		Model:    h.model,
+	}
+	res, err := h.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+	return domain.ChatResponse{
+		Response: domain.Message{
+			Content: res.Choices[0].Message.Content,
+		},
+	}, err
 }
 
 func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error) {
@@ -85,4 +101,17 @@ func (h *Handler) recv(eventCh chan domain.StreamEvent,
 	eventCh <- domain.StreamEvent{
 		Done: true,
 	}
+}
+
+func (h *Handler) toOpenAIMessage(messages []domain.Message) []openai.ChatCompletionMessageParamUnion {
+	return slice.Map(messages, func(idx int, src domain.Message) openai.ChatCompletionMessageParamUnion {
+		switch src.Role {
+		case domain.USER:
+			return openai.UserMessage(src.Content)
+		case domain.SYSTEM:
+			return openai.SystemMessage(src.Content)
+		default:
+			return openai.ChatCompletionMessageParamUnion{}
+		}
+	})
 }

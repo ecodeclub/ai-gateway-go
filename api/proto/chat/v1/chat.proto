@@ -36,10 +36,10 @@ service Service {
   // 会更新传入过来的字段，没有传递的字段将会被忽略
   // 如果没有对应的 SN，则会执行创建的语义
   rpc Save(SaveRequest) returns (SaveResponse);
-
   // 这部分是真的发起会话
   // Stream 是采用流式接口发起一轮对话
   rpc Stream(StreamRequest) returns (stream StreamResponse);
+  rpc Chat(StreamRequest) returns (ChatResponse);
 }
 
 message SaveRequest {

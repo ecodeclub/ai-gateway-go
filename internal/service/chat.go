@@ -100,3 +100,29 @@ func (c *ChatService) Stream(ctx context.Context, sn string, messages []domain.M
 	}()
 	return ch, err
 }
+
+func (c *ChatService) Chat(ctx context.Context, sn string, messages []domain.Message) (domain.ChatResponse, error) {
+	err := c.repo.AddMessages(ctx, sn, messages)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+	chat, err := c.handle.Chat(ctx, messages)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+	go func() {
+		newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		err1 := c.repo.AddMessages(newCtx, sn, []domain.Message{
+			{Content: chat.Response.Content},
+		})
+		if err1 != nil {
+			c.logger.Error("写入数据库失败",
+				elog.FieldErr(err),
+				elog.String("sn", sn),
+				elog.String("content", chat.Response.Content),
+			)
+		}
+	}()
+	return chat, err
+}
