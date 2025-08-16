@@ -59,8 +59,6 @@ var (
 		InitProvider,
 		admin.NewProviderHandler,
 	)
-	//ModelSet = wire.NewSet(repository.NewModelRepository)
-
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )
 
