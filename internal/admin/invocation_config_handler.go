@@ -15,6 +15,8 @@
 package admin
 
 import (
+	"fmt"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ekit/slice"
@@ -37,18 +39,18 @@ func (h *InvocationConfigHandler) PrivateRoutes(server *egin.Component) {
 	g := server.Group("/invocation-configs")
 	g.POST("/save", ginx.BS(h.Save))
 	g.POST("/list", ginx.BS(h.List))
-	g.POST("/basic", ginx.BS(h.Basic))
-	g.POST("/versions/list", ginx.BS(h.ListVersions))
+	g.POST("/detail", ginx.BS(h.Detail))
 	g.POST("/versions/save", ginx.BS(h.SaveVersion))
+	g.POST("/versions/list", ginx.BS(h.ListVersions))
 	g.POST("/versions/detail", ginx.BS[IDReq](h.VersionDetail))
 	g.POST("/versions/activate", ginx.BS[IDReq](h.ActivateVersion))
-	g.POST("/fork", ginx.B(h.Fork))
+	g.POST("/versions/fork", ginx.B(h.ForkVersion))
 }
 
 func (h *InvocationConfigHandler) PublicRoutes(_ *gin.Engine) {}
 
-func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req SaveInvocationConfigReq, sess session.Session) (ginx.Result, error) {
-	id, err := h.svc.Save(ctx, req.Cfg.toDomain())
+func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req SaveInvocationConfigReq, _ session.Session) (ginx.Result, error) {
+	id, err := h.svc.Save(ctx.Request.Context(), req.Cfg.toDomain())
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -58,8 +60,23 @@ func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req SaveInvocationConf
 	}, nil
 }
 
-func (h *InvocationConfigHandler) Basic(ctx *ginx.Context, req IDReq, sess session.Session) (ginx.Result, error) {
-	res, err := h.svc.Get(ctx, req.ID)
+func (h *InvocationConfigHandler) List(ctx *ginx.Context, req ListInvocationConfigReq, _ session.Session) (ginx.Result, error) {
+	cfgs, total, err := h.svc.List(ctx.Request.Context(), req.Offset, req.Limit)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	return ginx.Result{
+		Data: ginx.DataList[InvocationConfigVO]{
+			List: slice.Map(cfgs, func(_ int, src domain.InvocationConfig) InvocationConfigVO {
+				return newInvocationVO(src)
+			}),
+			Total: total,
+		},
+	}, nil
+}
+
+func (h *InvocationConfigHandler) Detail(ctx *ginx.Context, req IDReq, _ session.Session) (ginx.Result, error) {
+	res, err := h.svc.Detail(ctx.Request.Context(), req.ID)
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -68,74 +85,12 @@ func (h *InvocationConfigHandler) Basic(ctx *ginx.Context, req IDReq, sess sessi
 	}, nil
 }
 
-// Delete 删除整个 prompt
-func (h *InvocationConfigHandler) Delete(ctx *ginx.Context, req DeleteReq) (ginx.Result, error) {
-	err := h.svc.Delete(ctx, req.ID)
-	if err != nil {
-		return systemErrorResult, err
+func (h *InvocationConfigHandler) SaveVersion(ctx *ginx.Context, req SaveInvocationConfigVersionReq, _ session.Session) (ginx.Result, error) {
+	version := req.Version.toDomain()
+	if !version.Status.IsValid() {
+		return systemErrorResult, fmt.Errorf("版本状态非法：%q", version.Status.String())
 	}
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
-func (h *InvocationConfigHandler) DeleteVersion(ctx *ginx.Context, req DeleteVersionReq) (ginx.Result, error) {
-	err := h.svc.DeleteVersion(ctx, req.VersionID)
-	if err != nil {
-		return systemErrorResult, err
-	}
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
-// UpdatePrompt 更新 prompt 的基本信息
-func (h *InvocationConfigHandler) UpdatePrompt(ctx *ginx.Context, req UpdatePromptReq) (ginx.Result, error) {
-	prompt := domain.InvocationConfig{
-		ID:          req.ID,
-		Name:        req.Name,
-		Description: req.Description,
-	}
-	err := h.svc.UpdateInfo(ctx, prompt)
-	if err != nil {
-		return systemErrorResult, err
-	}
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
-func (h *InvocationConfigHandler) UpdateVersion(ctx *ginx.Context, req UpdateVersionReq) (ginx.Result, error) {
-	version := domain.InvocationCfgVersion{
-		ID:           req.VersionID,
-		Prompt:       req.Content,
-		SystemPrompt: req.SystemContent,
-		Temperature:  req.Temperature,
-		TopP:         req.TopN,
-		MaxTokens:    req.MaxTokens,
-	}
-	err := h.svc.UpdateVersion(ctx, version)
-	if err != nil {
-		return systemErrorResult, err
-	}
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
-func (h *InvocationConfigHandler) Publish(ctx *ginx.Context, req PublishReq) (ginx.Result, error) {
-	err := h.svc.Publish(ctx, req.VersionID, req.Label)
-	if err != nil {
-		return systemErrorResult, err
-	}
-	return ginx.Result{
-		Msg: "OK",
-	}, nil
-}
-
-// Fork 新增一个版本
-func (h *InvocationConfigHandler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Result, error) {
-	id, err := h.svc.Fork(ctx, req.VersionID)
+	id, err := h.svc.SaveVersion(ctx.Request.Context(), version)
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -145,46 +100,23 @@ func (h *InvocationConfigHandler) Fork(ctx *ginx.Context, req ForkReq) (ginx.Res
 	}, nil
 }
 
-func (h *InvocationConfigHandler) List(ctx *ginx.Context, req ListInvocationConfigReq, sess session.Session) (ginx.Result, error) {
-	cfgs, total, err := h.svc.List(ctx, req.Offset, req.Limit)
+func (h *InvocationConfigHandler) ListVersions(ctx *ginx.Context, req ListInvocationConfigVersionsReq, _ session.Session) (ginx.Result, error) {
+	list, total, err := h.svc.ListVersions(ctx.Request.Context(), req.InvID, req.Offset, req.Limit)
 	if err != nil {
 		return systemErrorResult, err
 	}
 	return ginx.Result{
-		Data: ginx.DataList[InvocationConfigVO]{
-			List: slice.Map(cfgs, func(idx int, src domain.InvocationConfig) InvocationConfigVO {
-				return newInvocationVO(src)
-			}),
-			Total: total,
-		},
-	}, nil
-}
-
-func (h *InvocationConfigHandler) ListVersions(ctx *ginx.Context, req ListInvocationConfigVersionsReq, sess session.Session) (ginx.Result, error) {
-	list, total, err := h.svc.ListVersions(ctx, req.InvID, req.Offset, req.Limit)
-	return ginx.Result{
-		Data: ginx.DataList[InvocationCfgVersionVO]{
-			List: slice.Map(list, func(idx int, src domain.InvocationCfgVersion) InvocationCfgVersionVO {
+		Data: ginx.DataList[InvocationConfigVersionVO]{
+			List: slice.Map(list, func(idx int, src domain.InvocationConfigVersion) InvocationConfigVersionVO {
 				return newInvocationCfgVersion(src)
 			}),
 			Total: total,
 		},
-	}, err
-}
-
-func (h *InvocationConfigHandler) SaveVersion(ctx *ginx.Context, req SaveInvocationConfigVersionReq, sess session.Session) (ginx.Result, error) {
-	id, err := h.svc.SaveVersion(ctx, req.Version.toDomain())
-	if err != nil {
-		return systemErrorResult, err
-	}
-	return ginx.Result{
-		Msg:  "OK",
-		Data: id,
 	}, nil
 }
 
-func (h *InvocationConfigHandler) VersionDetail(ctx *ginx.Context, req IDReq, sess session.Session) (ginx.Result, error) {
-	res, err := h.svc.GetVersion(ctx, req.ID)
+func (h *InvocationConfigHandler) VersionDetail(ctx *ginx.Context, req IDReq, _ session.Session) (ginx.Result, error) {
+	res, err := h.svc.VersionDetail(ctx.Request.Context(), req.ID)
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -193,12 +125,23 @@ func (h *InvocationConfigHandler) VersionDetail(ctx *ginx.Context, req IDReq, se
 	}, nil
 }
 
-func (h *InvocationConfigHandler) ActivateVersion(ctx *ginx.Context, req IDReq, sess session.Session) (ginx.Result, error) {
-	err := h.svc.ActivateVersion(ctx, req.ID)
+func (h *InvocationConfigHandler) ActivateVersion(ctx *ginx.Context, req IDReq, _ session.Session) (ginx.Result, error) {
+	err := h.svc.ActivateVersion(ctx.Request.Context(), req.ID)
 	if err != nil {
 		return systemErrorResult, err
 	}
 	return ginx.Result{
 		Msg: "OK",
+	}, nil
+}
+
+func (h *InvocationConfigHandler) ForkVersion(ctx *ginx.Context, req IDReq) (ginx.Result, error) {
+	id, err := h.svc.ForkVersion(ctx.Request.Context(), req.ID)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	return ginx.Result{
+		Msg:  "OK",
+		Data: id,
 	}, nil
 }
