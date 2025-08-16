@@ -19,6 +19,7 @@ import (
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"golang.org/x/sync/errgroup"
 )
 
 type BizConfigService struct {
@@ -35,10 +36,26 @@ func (s *BizConfigService) Save(ctx context.Context, req domain.BizConfig) (int6
 	return s.repo.Save(ctx, req)
 }
 
-func (s *BizConfigService) GetByID(ctx context.Context, id int64) (domain.BizConfig, error) {
-	return s.repo.GetByID(ctx, id)
+func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domain.BizConfig, int64, error) {
+	var (
+		eg    errgroup.Group
+		res   []domain.BizConfig
+		total int64
+	)
+	eg.Go(func() error {
+		var err error
+		res, err = s.repo.List(ctx, offset, limit)
+		return err
+	})
+	eg.Go(func() error {
+		var err error
+		total, err = s.repo.Count(ctx)
+		return err
+	})
+	err := eg.Wait()
+	return res, total, err
 }
 
-func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domain.BizConfig, int, error) {
-	return s.repo.List(ctx, offset, limit)
+func (s *BizConfigService) Detail(ctx context.Context, id int64) (domain.BizConfig, error) {
+	return s.repo.GetByID(ctx, id)
 }
