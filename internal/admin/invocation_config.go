@@ -49,8 +49,8 @@ func (h *InvocationConfigHandler) PrivateRoutes(server *egin.Component) {
 
 func (h *InvocationConfigHandler) PublicRoutes(_ *gin.Engine) {}
 
-func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req SaveInvocationConfigReq, _ session.Session) (ginx.Result, error) {
-	id, err := h.svc.Save(ctx.Request.Context(), req.Cfg.toDomain())
+func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req InvocationConfigVO, _ session.Session) (ginx.Result, error) {
+	id, err := h.svc.Save(ctx.Request.Context(), req.toDomain())
 	if err != nil {
 		return systemErrorResult, err
 	}
@@ -60,7 +60,7 @@ func (h *InvocationConfigHandler) Save(ctx *ginx.Context, req SaveInvocationConf
 	}, nil
 }
 
-func (h *InvocationConfigHandler) List(ctx *ginx.Context, req ListInvocationConfigReq, _ session.Session) (ginx.Result, error) {
+func (h *InvocationConfigHandler) List(ctx *ginx.Context, req ListReq, _ session.Session) (ginx.Result, error) {
 	cfgs, total, err := h.svc.List(ctx.Request.Context(), req.Offset, req.Limit)
 	if err != nil {
 		return systemErrorResult, err
@@ -85,8 +85,8 @@ func (h *InvocationConfigHandler) Detail(ctx *ginx.Context, req IDReq, _ session
 	}, nil
 }
 
-func (h *InvocationConfigHandler) SaveVersion(ctx *ginx.Context, req SaveInvocationConfigVersionReq, _ session.Session) (ginx.Result, error) {
-	version := req.Version.toDomain()
+func (h *InvocationConfigHandler) SaveVersion(ctx *ginx.Context, req InvocationConfigVersionVO, _ session.Session) (ginx.Result, error) {
+	version := req.toDomain()
 	if !version.Status.IsValid() {
 		return systemErrorResult, fmt.Errorf("版本状态非法：%q", version.Status.String())
 	}

@@ -165,7 +165,7 @@ func (s *InvocationConfigTestSuite) TestConfig_Save() {
 	testCases := []struct {
 		name     string
 		before   func(t *testing.T)
-		req      admin.SaveInvocationConfigReq
+		req      admin.InvocationConfigVO
 		after    func(t *testing.T, expected admin.InvocationConfigVO)
 		wantCode int
 		wantRes  Result[int64]
@@ -173,13 +173,11 @@ func (s *InvocationConfigTestSuite) TestConfig_Save() {
 		{
 			name:   "新建成功",
 			before: func(t *testing.T) {},
-			req: admin.SaveInvocationConfigReq{
-				Cfg: admin.InvocationConfigVO{
-					ID:          1,
-					Name:        "test-invocation-1",
-					BizID:       1,
-					Description: "test-invocation-1",
-				},
+			req: admin.InvocationConfigVO{
+				ID:          1,
+				Name:        "test-invocation-1",
+				BizID:       1,
+				Description: "test-invocation-1",
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVO) {
 				t.Helper()
@@ -210,13 +208,11 @@ func (s *InvocationConfigTestSuite) TestConfig_Save() {
 				})
 				require.NoError(t, err)
 			},
-			req: admin.SaveInvocationConfigReq{
-				Cfg: admin.InvocationConfigVO{
-					ID:          2,
-					Name:        "update-test-invocation-2",
-					BizID:       2,
-					Description: "update-test-invocation-2",
-				},
+			req: admin.InvocationConfigVO{
+				ID:          2,
+				Name:        "update-test-invocation-2",
+				BizID:       2,
+				Description: "update-test-invocation-2",
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVO) {
 				t.Helper()
@@ -234,7 +230,7 @@ func (s *InvocationConfigTestSuite) TestConfig_Save() {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.before(t)
-			defer tc.after(t, tc.req.Cfg)
+			defer tc.after(t, tc.req)
 
 			req, err := http.NewRequest(http.MethodPost,
 				"/invocation-configs/save", iox.NewJSONReader(tc.req))
@@ -293,7 +289,7 @@ func (s *InvocationConfigTestSuite) TestConfig_List() {
 		}
 	}
 
-	req := admin.ListInvocationConfigReq{
+	req := admin.ListReq{
 		Offset: 0,
 		Limit:  5,
 	}
@@ -393,7 +389,7 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 	testCases := []struct {
 		name     string
 		before   func(t *testing.T)
-		req      admin.SaveInvocationConfigVersionReq
+		req      admin.InvocationConfigVersionVO
 		after    func(t *testing.T, expected admin.InvocationConfigVersionVO)
 		wantCode int
 		wantRes  Result[int64]
@@ -413,20 +409,19 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 				})
 				require.NoError(t, err)
 			},
-			req: admin.SaveInvocationConfigVersionReq{
-				Version: admin.InvocationConfigVersionVO{
-					ID:           1,
-					InvID:        10,
-					ModelID:      1,
-					Version:      "v1",
-					Prompt:       "prompt1",
-					SystemPrompt: "systemPrompt1",
-					JSONSchema:   "jsonSchema1",
-					Temperature:  1,
-					TopP:         2,
-					MaxTokens:    100,
-					Status:       domain.InvocationCfgVersionStatusDraft.String(),
-				},
+			req: admin.InvocationConfigVersionVO{
+
+				ID:           1,
+				InvID:        10,
+				ModelID:      1,
+				Version:      "v1",
+				Prompt:       "prompt1",
+				SystemPrompt: "systemPrompt1",
+				JSONSchema:   "jsonSchema1",
+				Temperature:  1,
+				TopP:         2,
+				MaxTokens:    100,
+				Status:       domain.InvocationCfgVersionStatusDraft.String(),
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVersionVO) {
 				t.Helper()
@@ -474,20 +469,18 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 				})
 				require.NoError(t, err)
 			},
-			req: admin.SaveInvocationConfigVersionReq{
-				Version: admin.InvocationConfigVersionVO{
-					ID:           2,
-					InvID:        11,
-					ModelID:      3,
-					Version:      "v3",
-					Prompt:       "prompt3",
-					SystemPrompt: "systemPrompt3",
-					JSONSchema:   "jsonSchema3",
-					Temperature:  3,
-					TopP:         3,
-					MaxTokens:    300,
-					Status:       domain.InvocationCfgVersionStatusDraft.String(),
-				},
+			req: admin.InvocationConfigVersionVO{
+				ID:           2,
+				InvID:        11,
+				ModelID:      3,
+				Version:      "v3",
+				Prompt:       "prompt3",
+				SystemPrompt: "systemPrompt3",
+				JSONSchema:   "jsonSchema3",
+				Temperature:  3,
+				TopP:         3,
+				MaxTokens:    300,
+				Status:       domain.InvocationCfgVersionStatusDraft.String(),
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVersionVO) {
 				t.Helper()
@@ -504,23 +497,21 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 		{
 			name:   "状态非法",
 			before: func(t *testing.T) {},
-			req: admin.SaveInvocationConfigVersionReq{
-				Version: admin.InvocationConfigVersionVO{
-					ID:                1,
-					InvID:             10,
-					ModelID:           1,
-					ModelName:         "mode1",
-					ModelProviderID:   3,
-					ModelProviderName: "provider1",
-					Version:           "v1",
-					Prompt:            "prompt1",
-					SystemPrompt:      "systemPrompt1",
-					JSONSchema:        "jsonSchema1",
-					Temperature:       1,
-					TopP:              2,
-					MaxTokens:         100,
-					Status:            "invalid",
-				},
+			req: admin.InvocationConfigVersionVO{
+				ID:                1,
+				InvID:             10,
+				ModelID:           1,
+				ModelName:         "mode1",
+				ModelProviderID:   3,
+				ModelProviderName: "provider1",
+				Version:           "v1",
+				Prompt:            "prompt1",
+				SystemPrompt:      "systemPrompt1",
+				JSONSchema:        "jsonSchema1",
+				Temperature:       1,
+				TopP:              2,
+				MaxTokens:         100,
+				Status:            "invalid",
 			},
 			after:    func(t *testing.T, expected admin.InvocationConfigVersionVO) {},
 			wantCode: 500,
@@ -532,7 +523,7 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.before(t)
-			defer tc.after(t, tc.req.Version)
+			defer tc.after(t, tc.req)
 			req, err := http.NewRequest(http.MethodPost,
 				"/invocation-configs/versions/save", iox.NewJSONReader(tc.req))
 			require.NoError(t, err)
