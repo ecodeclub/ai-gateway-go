@@ -109,19 +109,6 @@ func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigV
 	}
 }
 
-type SaveInvocationConfigReq struct {
-	Cfg InvocationConfigVO `json:"cfg"`
-}
-
-type ListInvocationConfigReq struct {
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
-}
-
-type SaveInvocationConfigVersionReq struct {
-	Version InvocationConfigVersionVO `json:"version"`
-}
-
 type ListInvocationConfigVersionsReq struct {
 	InvID  int64 `json:"invID"`
 	Offset int   `json:"offset"`
