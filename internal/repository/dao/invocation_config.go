@@ -16,6 +16,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -23,6 +24,31 @@ import (
 
 	"gorm.io/gorm"
 )
+
+type InvocationConfig struct {
+	ID          int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	Name        string `gorm:"column:name"`
+	BizID       int64  `gorm:"column:biz_id"`
+	Description string `gorm:"column:description"`
+	Ctime       int64  `gorm:"column:ctime"`
+	Utime       int64  `gorm:"column:utime"`
+}
+
+type InvocationConfigVersion struct {
+	ID           int64            `gorm:"column:id;primaryKey;autoIncrement"`
+	InvID        int64            `gorm:"column:inv_id;index"`
+	ModelID      int64            `gorm:"column:model_id"`
+	Version      string           `gorm:"column:version;type:varchar(255)"`
+	Prompt       string           `gorm:"column:prompt"`
+	SystemPrompt string           `gorm:"column:system_prompt"`
+	JSONSchema   sql.Null[string] `gorm:"column:json_schema;type:longText;comment:'结构化数据的JSONSchema'"`
+	Temperature  float32          `gorm:"column:temperature"`
+	TopP         float32          `gorm:"column:top_p"`
+	MaxTokens    int              `gorm:"column:max_tokens"`
+	Status       string           `gorm:"column:status;"`
+	Ctime        int64            `gorm:"column:ctime"`
+	Utime        int64            `gorm:"column:utime"`
+}
 
 type InvocationConfigDAO struct {
 	db *gorm.DB
@@ -36,92 +62,14 @@ func (p *InvocationConfigDAO) Save(ctx context.Context, cfg InvocationConfig) (i
 	now := time.Now().UnixMilli()
 	cfg.Ctime, cfg.Utime = now, now
 	err := p.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "biz_id"}),
+		DoUpdates: clause.AssignmentColumns([]string{"name", "biz_id", "description", "utime"}),
 	}).Create(&cfg).Error
 	return cfg.ID, err
 }
 
-func (p *InvocationConfigDAO) FindByID(ctx context.Context, id int64) (InvocationConfig, error) {
-	var res InvocationConfig
-	err := p.db.WithContext(ctx).Where("id = ?", id).First(&res).Error
-	return res, err
-}
-
-func (p *InvocationConfigDAO) UpdatePrompt(ctx context.Context, value InvocationConfig) error {
-	// 更新非零值
-	value.Utime = time.Now().UnixMilli()
-	return p.db.WithContext(ctx).Model(&InvocationConfig{}).Where("id = ?", value.ID).Updates(value).Error
-}
-
-func (p *InvocationConfigDAO) UpdateVersion(ctx context.Context, value InvocationConfigVersion) error {
-	// 更新非零值
-	value.Utime = time.Now().UnixMilli()
-	return p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", value.ID).Updates(value).Error
-}
-
-func (p *InvocationConfigDAO) Delete(ctx context.Context, id int64) error {
-	return p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		now := time.Now().UnixMilli()
-		err := tx.Model(&InvocationConfig{}).Where("id = ?", id).Updates(map[string]any{
-			"status": 0,
-			"utime":  now,
-		}).Error
-		if err != nil {
-			return err
-		}
-		return tx.Model(&InvocationConfigVersion{}).Where("prompt_id = ?", id).Updates(map[string]any{
-			"status": 0,
-			"utime":  now,
-		}).Error
-	})
-}
-
-func (p *InvocationConfigDAO) DeleteVersion(ctx context.Context, versionID int64) error {
-	return p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", versionID).Updates(map[string]any{
-		"status": 0,
-		"utime":  time.Now().UnixMilli(),
-	}).Error
-}
-
-func (p *InvocationConfigDAO) UpdateActiveVersion(ctx context.Context, versionID int64, label string) error {
-	var id int64
-	err := p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", versionID).Select("prompt_id").First(&id).Error
-	if err != nil {
-		return err
-	}
-
-	return p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		now := time.Now().UnixMilli()
-		err := tx.Model(&InvocationConfig{}).Where("id = ?", id).Updates(map[string]any{
-			"active_version": versionID,
-			"utime":          now,
-		}).Error
-		if err != nil {
-			return err
-		}
-		return tx.Model(&InvocationConfigVersion{}).Where("id = ?", versionID).Updates(map[string]any{
-			"label": label,
-			"utime": now,
-		}).Error
-	})
-}
-
-func (p *InvocationConfigDAO) InsertVersion(ctx context.Context, version InvocationConfigVersion) error {
-	now := time.Now().UnixMilli()
-	version.Ctime = now
-	version.Utime = now
-	return p.db.WithContext(ctx).Create(&version).Error
-}
-
-func (p *InvocationConfigDAO) GetByVersionID(ctx context.Context, versionID int64) (InvocationConfigVersion, error) {
-	var res InvocationConfigVersion
-	err := p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", versionID).First(&res).Error
-	return res, err
-}
-
-func (p *InvocationConfigDAO) List(ctx context.Context, offset int, limit int) ([]InvocationConfig, error) {
+func (p *InvocationConfigDAO) List(ctx context.Context, offset, limit int) ([]InvocationConfig, error) {
 	var res []InvocationConfig
-	err := p.db.WithContext(ctx).Offset(offset).Limit(limit).Find(&res).Error
+	err := p.db.WithContext(ctx).Offset(offset).Limit(limit).Order("utime DESC").Find(&res).Error
 	return res, err
 }
 
@@ -131,7 +79,34 @@ func (p *InvocationConfigDAO) Count(ctx context.Context) (int, error) {
 	return int(res), err
 }
 
-func (p *InvocationConfigDAO) GetVersions(ctx context.Context, invID int64, offset int, limit int) ([]InvocationConfigVersion, error) {
+func (p *InvocationConfigDAO) GetByID(ctx context.Context, id int64) (InvocationConfig, error) {
+	var res InvocationConfig
+	err := p.db.WithContext(ctx).Where("id = ?", id).First(&res).Error
+	return res, err
+}
+
+func (p *InvocationConfigDAO) SaveVersion(ctx context.Context, version InvocationConfigVersion) (int64, error) {
+	now := time.Now().UnixMilli()
+	version.Utime = now
+	version.Ctime = now
+	err := p.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{
+			"inv_id",
+			"model_id",
+			"version",
+			"prompt",
+			"system_prompt",
+			"json_schema",
+			"temperature",
+			"top_p",
+			"max_tokens",
+			"status",
+			"utime"}),
+	}).Save(&version).Error
+	return version.ID, err
+}
+
+func (p *InvocationConfigDAO) ListVersions(ctx context.Context, invID int64, offset, limit int) ([]InvocationConfigVersion, error) {
 	var res []InvocationConfigVersion
 	err := p.db.WithContext(ctx).Where("inv_id = ?", invID).
 		Order("utime DESC").Offset(offset).Limit(limit).Find(&res).Error
@@ -145,16 +120,10 @@ func (p *InvocationConfigDAO) CountVersions(ctx context.Context, invID int64) (i
 	return int(res), err
 }
 
-func (p *InvocationConfigDAO) SaveVersion(ctx context.Context, version InvocationConfigVersion) (int64, error) {
-	now := time.Now().UnixMilli()
-	version.Utime = now
-	version.Ctime = now
-	err := p.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.AssignmentColumns([]string{
-			"prompt", "system_prompt", "temperature", "top_p", "max_tokens",
-			"status", "utime"}),
-	}).Save(&version).Error
-	return version.ID, err
+func (p *InvocationConfigDAO) GetVersionByD(ctx context.Context, id int64) (InvocationConfigVersion, error) {
+	var res InvocationConfigVersion
+	err := p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", id).First(&res).Error
+	return res, err
 }
 
 func (p *InvocationConfigDAO) ActivateVersion(ctx context.Context, id int64) error {
@@ -166,8 +135,8 @@ func (p *InvocationConfigDAO) ActivateVersion(ctx context.Context, id int64) err
 			return err
 		}
 		// 把之前激活的取消
-		err = tx.Model(&InvocationConfigVersion{}).Where("inv_id=? AND status= ?", version.InvID, domain.InvocationCfgVersionStatusActive).
-			Updates(map[string]interface{}{
+		err = tx.Model(&InvocationConfigVersion{}).Where("inv_id = ? AND status = ?", version.InvID, domain.InvocationCfgVersionStatusActive.String()).
+			Updates(map[string]any{
 				"status": domain.InvocationCfgVersionStatusDraft.String(),
 				"utime":  now,
 			}).Error
@@ -180,28 +149,4 @@ func (p *InvocationConfigDAO) ActivateVersion(ctx context.Context, id int64) err
 			"utime":  now,
 		}).Error
 	})
-}
-
-type InvocationConfig struct {
-	ID          int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Name        string `gorm:"column:name"`
-	BizID       int64  `gorm:"column:biz_id"`
-	Description string `gorm:"column:description"`
-	Ctime       int64  `gorm:"column:ctime"`
-	Utime       int64  `gorm:"column:utime"`
-}
-
-type InvocationConfigVersion struct {
-	ID           int64   `gorm:"column:id;primaryKey;autoIncrement"`
-	InvID        int64   `gorm:"column:inv_id;index"`
-	ModelID      int64   `gorm:"column:model_id"`
-	Version      string  `gorm:"column:version;type:varchar(255)"`
-	Prompt       string  `gorm:"column:prompt"`
-	SystemPrompt string  `gorm:"column:system_prompt"`
-	Temperature  float32 `gorm:"column:temperature"`
-	TopP         float32 `gorm:"column:top_p"`
-	MaxTokens    int     `gorm:"column:max_tokens"`
-	Status       string  `gorm:"column:status;"`
-	Ctime        int64   `gorm:"column:ctime"`
-	Utime        int64   `gorm:"column:utime"`
 }
