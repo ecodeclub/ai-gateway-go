@@ -16,12 +16,11 @@ package domain
 
 type Model struct {
 	ID          int64
-	Pid         int64
+	Provider    Provider
 	Name        string
 	InputPrice  int64
 	OutputPrice int64
 	PriceMode   string
-	Provider    Provider
 }
 
 type Provider struct {

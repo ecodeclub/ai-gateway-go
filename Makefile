@@ -15,10 +15,18 @@ endif
 
 .PHONY: e2e
 e2e:
-	@docker compose -f ./.script/docker-compose.yaml up -d
-	@go	test -race -v -failfast -coverprofile=cover.out ./...
-	@docker compose -f ./.script/docker-compose.yaml down
+	@$(MAKE) e2e_down
+	@$(MAKE) e2e_up
+	@go test -race -failfast -tags=e2e -count=1 -coverprofile=cover.out -coverpkg=./... ./...
+	@$(MAKE) e2e_down
 
+.PHONY: e2e_up
+e2e_up:
+	docker compose -p ai_gateway_platform -f ./.script/docker-compose.yaml up -d
+
+.PHONY: e2e_down
+e2e_down:
+	docker compose -p ai_gateway_platform -f ./.script/docker-compose.yaml down -v
 
 .PHONY:	fmt
 fmt:

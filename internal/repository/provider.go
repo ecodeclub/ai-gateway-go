@@ -71,6 +71,7 @@ func (p *ProviderRepo) SaveModel(ctx context.Context, model domain.Model) (int64
 	id, err := p.dao.SaveModel(ctx, dao.Model{
 		ID:          model.ID,
 		Name:        model.Name,
+		Pid:         model.Provider.ID,
 		InputPrice:  model.InputPrice,
 		OutputPrice: model.OutputPrice,
 		PriceMode:   model.PriceMode,
@@ -134,7 +135,7 @@ func (p *ProviderRepo) GetAll(ctx context.Context) ([]domain.Provider, error) {
 
 	res := mapx.NewMultiBuiltinMap[int64, domain.Model](len(models))
 	for _, model := range models {
-		_ = res.Put(model.Pid, model)
+		_ = res.Put(model.Provider.ID, model)
 	}
 
 	for _, provider := range providers {
@@ -223,7 +224,6 @@ func (p *ProviderRepo) toDomainModel(m dao.Model) domain.Model {
 	return domain.Model{
 		ID:          m.ID,
 		Name:        m.Name,
-		Pid:         m.Pid,
 		Provider:    domain.Provider{ID: m.Pid},
 		OutputPrice: m.OutputPrice,
 		InputPrice:  m.InputPrice,
