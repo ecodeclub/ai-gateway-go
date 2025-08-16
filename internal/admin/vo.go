@@ -17,3 +17,8 @@ package admin
 type IDReq struct {
 	ID int64 `json:"id"`
 }
+
+type ListReq struct {
+	Offset int `json:"offset"`
+	Limit  int `json:"limit"`
+}
