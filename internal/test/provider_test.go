@@ -58,7 +58,7 @@ func (s *ProviderTestSuite) TearDownTest() {
 		fmt.Println(err)
 	}
 	// 清空 Redis 缓存
-	s.TestApp.Rdb.FlushDB(ctx)
+	s.Rdb.FlushDB(ctx)
 }
 
 func (s *ProviderTestSuite) TestProviderSave() {
