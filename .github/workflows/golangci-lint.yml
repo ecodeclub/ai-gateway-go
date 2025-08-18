@@ -38,4 +38,4 @@ jobs:
         with:
           version: v2.0
           only-new-issues: true
-          args: --disable gofumpt
+          args: --formatters-disable gofumpt
