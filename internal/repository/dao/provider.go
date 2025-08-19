@@ -22,93 +22,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type ProviderDao struct {
-	db *gorm.DB
-}
-
-func NewProviderDao(db *gorm.DB) *ProviderDao {
-	return &ProviderDao{db: db}
-}
-
-func (d *ProviderDao) SaveProvider(ctx context.Context, provider Provider) (int64, error) {
-	now := time.Now().UnixMilli()
-	provider.Utime = now
-	provider.Ctime = now
-	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"api_key": provider.APIKey,
-			"name":    provider.Name,
-			"utime":   provider.Ctime,
-		}),
-	}).Create(&provider).Error
-	return provider.ID, err
-}
-
-func (d *ProviderDao) SaveModel(ctx context.Context, model Model) (int64, error) {
-	now := time.Now().Unix()
-	model.Ctime = now
-	model.Utime = now
-
-	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"pid":          model.Pid,
-			"input_price":  model.InputPrice,
-			"output_price": model.OutputPrice,
-			"price_mode":   model.PriceMode,
-			"utime":        model.Ctime,
-		}),
-	}).Create(&model).Error
-	return model.ID, err
-}
-
-func (d *ProviderDao) GetModelByPid(ctx context.Context, pid int64) ([]Model, error) {
-	var model []Model
-	err := d.db.WithContext(ctx).Model(&Model{}).
-		Where("pid = ?", pid).
-		Find(&model).Error
-
-	if err != nil {
-		return nil, err
-	}
-	return model, nil
-}
-
-func (d *ProviderDao) GetModel(ctx context.Context, id int64) (Model, error) {
-	var model Model
-	err := d.db.WithContext(ctx).
-		Model(&model).
-		Where("id = ?", id).
-		First(&model).Error
-	return model, err
-}
-
-func (d *ProviderDao) GetProvider(ctx context.Context, id int64) (Provider, error) {
-	var provider Provider
-	err := d.db.WithContext(ctx).
-		Where("id = ?", id).
-		First(&provider).Error
-	return provider, err
-}
-
-func (d *ProviderDao) GetAllProviders(ctx context.Context) ([]Provider, error) {
-	var providers []Provider
-	err := d.db.WithContext(ctx).
-		Model(&Provider{}).
-		Order("utime DESC").
-		Find(&providers).Error
-	return providers, err
-}
-
-func (d *ProviderDao) GetAllModel(ctx context.Context) ([]Model, error) {
-	var models []Model
-	err := d.db.WithContext(ctx).
-		Order("utime DESC").
-		Find(&models).Error
-	return models, err
-}
-
 type Provider struct {
 	ID     int64  `gorm:"column:id;primaryKey;autoIncrement"`
 	Name   string `gorm:"column:name"`
@@ -134,4 +47,74 @@ type Model struct {
 
 func (Model) TableName() string {
 	return "models"
+}
+
+type ProviderDAO struct {
+	db *gorm.DB
+}
+
+func NewProviderDAO(db *gorm.DB) *ProviderDAO {
+	return &ProviderDAO{db: db}
+}
+
+func (d *ProviderDAO) SaveProvider(ctx context.Context, provider Provider) (int64, error) {
+	now := time.Now().UnixMilli()
+	provider.Utime = now
+	provider.Ctime = now
+	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{
+			"api_key",
+			"name",
+			"utime",
+		}),
+	}).Create(&provider).Error
+	return provider.ID, err
+}
+
+func (d *ProviderDAO) ListProviders(ctx context.Context, offset, limit int) ([]Provider, error) {
+	var providers []Provider
+	err := d.db.WithContext(ctx).Model(&Provider{}).Order("utime DESC").
+		Offset(offset).Limit(limit).Find(&providers).Error
+	return providers, err
+}
+
+func (d *ProviderDAO) CountProviders(ctx context.Context) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&Provider{}).Count(&count).Error
+	return count, err
+}
+
+func (d *ProviderDAO) GetProvider(ctx context.Context, id int64) (Provider, error) {
+	var provider Provider
+	err := d.db.WithContext(ctx).Where("id = ?", id).First(&provider).Error
+	return provider, err
+}
+
+func (d *ProviderDAO) GetModelsByPid(ctx context.Context, pid int64) ([]Model, error) {
+	var model []Model
+	err := d.db.WithContext(ctx).Model(&Model{}).Where("pid = ?", pid).Order("id DESC").Find(&model).Error
+	return model, err
+}
+
+func (d *ProviderDAO) SaveModel(ctx context.Context, model Model) (int64, error) {
+	now := time.Now().Unix()
+	model.Ctime = now
+	model.Utime = now
+	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{
+			"pid",
+			"name",
+			"input_price",
+			"output_price",
+			"price_mode",
+			"utime",
+		}),
+	}).Create(&model).Error
+	return model.ID, err
+}
+
+func (d *ProviderDAO) GetModel(ctx context.Context, id int64) (Model, error) {
+	var model Model
+	err := d.db.WithContext(ctx).Model(&model).Where("id = ?", id).First(&model).Error
+	return model, err
 }

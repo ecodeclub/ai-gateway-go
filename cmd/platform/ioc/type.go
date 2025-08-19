@@ -53,9 +53,8 @@ var (
 	)
 
 	ProviderSet = wire.NewSet(
-		dao.NewProviderDao,
-		cache.NewProviderCache,
-		repository.NewProviderRepo,
+		dao.NewProviderDAO,
+		repository.NewProviderRepository,
 		InitProvider,
 		admin.NewProviderHandler,
 	)

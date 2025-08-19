@@ -24,7 +24,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/admin"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
-	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	"github.com/ecodeclub/ekit/iox"
@@ -89,18 +88,18 @@ func (s *InvocationConfigTestSuite) SetupSuite() {
 	})
 	s.NoError(err)
 
-	providerRepo := repository.NewProviderRepo(dao.NewProviderDao(s.DB), cache.NewProviderCache(s.Rdb))
+	providerRepo := repository.NewProviderRepository(dao.NewProviderDAO(s.DB))
 	provider3 := domain.Provider{
 		ID:     3,
 		Name:   "provider3",
-		ApiKey: "apikey3",
+		APIKey: "apikey3",
 	}
 	_, err = providerRepo.SaveProvider(ctx, provider3)
 	s.NoError(err)
 	provider4 := domain.Provider{
 		ID:     4,
 		Name:   "provider4",
-		ApiKey: "apikey4",
+		APIKey: "apikey4",
 	}
 	_, err = providerRepo.SaveProvider(ctx, provider4)
 	s.NoError(err)
@@ -688,18 +687,20 @@ func (s *InvocationConfigTestSuite) TestVersion_Detail() {
 				require.NotZero(t, actual.Ctime)
 				actual.Utime, actual.Ctime = 0, 0
 				require.Equal(t, admin.InvocationConfigVersionVO{
-					ID:           9,
-					InvID:        13,
-					ModelID:      2,
-					ModelName:    "model2",
-					Version:      fmt.Sprintf("v%d", 9),
-					Prompt:       fmt.Sprintf("prompt%d", 9),
-					SystemPrompt: fmt.Sprintf("systemPrompt%d", 9),
-					JSONSchema:   fmt.Sprintf("jsonSchema%d", 9),
-					Temperature:  float32(9),
-					TopP:         float32(9),
-					MaxTokens:    9 * 100,
-					Status:       domain.InvocationCfgVersionStatusActive.String(),
+					ID:                9,
+					InvID:             13,
+					ModelID:           2,
+					ModelProviderID:   3,
+					ModelProviderName: "provider3",
+					ModelName:         "model2",
+					Version:           fmt.Sprintf("v%d", 9),
+					Prompt:            fmt.Sprintf("prompt%d", 9),
+					SystemPrompt:      fmt.Sprintf("systemPrompt%d", 9),
+					JSONSchema:        fmt.Sprintf("jsonSchema%d", 9),
+					Temperature:       float32(9),
+					TopP:              float32(9),
+					MaxTokens:         9 * 100,
+					Status:            domain.InvocationCfgVersionStatusActive.String(),
 				}, actual)
 			},
 		},
