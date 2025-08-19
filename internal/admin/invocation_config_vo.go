@@ -15,7 +15,10 @@
 package admin
 
 import (
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/slice"
 )
 
 type InvocationConfigVO struct {
@@ -48,16 +51,23 @@ type InvocationConfigVersionVO struct {
 	ModelProviderID   int64  `json:"modelProviderID"`
 	ModelProviderName string `json:"modelProviderName"`
 
-	Version      string  `json:"version"`
-	Prompt       string  `json:"prompt"`
-	SystemPrompt string  `json:"systemPrompt"`
-	JSONSchema   string  `json:"jsonSchema"`
-	Temperature  float32 `json:"temperature"`
-	TopP         float32 `json:"topP"`
-	MaxTokens    int     `json:"maxTokens"`
-	Status       string  `json:"status"`
-	Ctime        int64   `json:"ctime"`
-	Utime        int64   `json:"utime"`
+	Version      string         `json:"version"`
+	Prompt       string         `json:"prompt"`
+	SystemPrompt string         `json:"systemPrompt"`
+	JSONSchema   string         `json:"jsonSchema"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
+	Functions    []FunctionVO   `json:"functions,omitempty"`
+	Temperature  float32        `json:"temperature"`
+	TopP         float32        `json:"topP"`
+	MaxTokens    int            `json:"maxTokens"`
+	Status       string         `json:"status"`
+	Ctime        int64          `json:"ctime"`
+	Utime        int64          `json:"utime"`
+}
+
+type FunctionVO struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
 }
 
 func (vo InvocationConfigVersionVO) toDomain() domain.InvocationConfigVersion {
@@ -69,10 +79,19 @@ func (vo InvocationConfigVersionVO) toDomain() domain.InvocationConfigVersion {
 		Prompt:       vo.Prompt,
 		SystemPrompt: vo.SystemPrompt,
 		JSONSchema:   vo.JSONSchema,
-		Temperature:  vo.Temperature,
-		TopP:         vo.TopP,
-		MaxTokens:    vo.MaxTokens,
-		Status:       domain.InvocationConfigVersionStatus(vo.Status),
+		Attributes:   vo.Attributes,
+		Functions: slice.Map(vo.Functions, func(_ int, src FunctionVO) domain.Function {
+			return domain.Function{
+				Name:       src.Name,
+				Definition: src.Definition,
+			}
+		}),
+		Temperature: vo.Temperature,
+		TopP:        vo.TopP,
+		MaxTokens:   vo.MaxTokens,
+		Status:      domain.InvocationConfigVersionStatus(vo.Status),
+		Ctime:       time.Time{},
+		Utime:       time.Time{},
 	}
 }
 
@@ -100,12 +119,19 @@ func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigV
 		Prompt:            v.Prompt,
 		SystemPrompt:      v.SystemPrompt,
 		JSONSchema:        v.JSONSchema,
-		Temperature:       v.Temperature,
-		TopP:              v.TopP,
-		MaxTokens:         v.MaxTokens,
-		Status:            v.Status.String(),
-		Ctime:             v.Ctime.UnixMilli(),
-		Utime:             v.Utime.UnixMilli(),
+		Attributes:        v.Attributes,
+		Functions: slice.Map(v.Functions, func(_ int, src domain.Function) FunctionVO {
+			return FunctionVO{
+				Name:       src.Name,
+				Definition: src.Definition,
+			}
+		}),
+		Temperature: v.Temperature,
+		TopP:        v.TopP,
+		MaxTokens:   v.MaxTokens,
+		Status:      v.Status.String(),
+		Ctime:       v.Ctime.UnixMilli(),
+		Utime:       v.Utime.UnixMilli(),
 	}
 }
 

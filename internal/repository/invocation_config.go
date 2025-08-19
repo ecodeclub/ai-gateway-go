@@ -17,6 +17,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/ecodeclub/ekit/slice"
@@ -83,6 +84,22 @@ func (p *InvocationConfigRepo) SaveVersion(ctx context.Context, version domain.I
 }
 
 func (p *InvocationConfigRepo) toVersionEntity(src domain.InvocationConfigVersion) dao.InvocationConfigVersion {
+	var attributes sql.Null[string]
+	if src.Attributes != nil {
+		attrBytes, _ := json.Marshal(src.Attributes)
+		attributes = sql.Null[string]{
+			V:     string(attrBytes),
+			Valid: true,
+		}
+	}
+	var functions sql.Null[string]
+	if src.Functions != nil {
+		funcBytes, _ := json.Marshal(src.Functions)
+		functions = sql.Null[string]{
+			V:     string(funcBytes),
+			Valid: true,
+		}
+	}
 	return dao.InvocationConfigVersion{
 		ID:           src.ID,
 		InvID:        src.Config.ID,
@@ -91,10 +108,14 @@ func (p *InvocationConfigRepo) toVersionEntity(src domain.InvocationConfigVersio
 		Prompt:       src.Prompt,
 		SystemPrompt: src.SystemPrompt,
 		JSONSchema:   sql.Null[string]{V: src.JSONSchema, Valid: src.JSONSchema != ""},
+		Attributes:   attributes,
+		Functions:    functions,
 		Temperature:  src.Temperature,
 		TopP:         src.TopP,
 		MaxTokens:    src.MaxTokens,
 		Status:       src.Status.String(),
+		Ctime:        0,
+		Utime:        0,
 	}
 }
 
@@ -110,14 +131,24 @@ func (p *InvocationConfigRepo) toDomainVersion(v dao.InvocationConfigVersion) do
 	if v.JSONSchema.Valid {
 		jsonSchema = v.JSONSchema.V
 	}
+	var attributes map[string]any
+	if v.Attributes.Valid {
+		_ = json.Unmarshal([]byte(v.Attributes.V), &attributes)
+	}
+	var functions []domain.Function
+	if v.Functions.Valid {
+		_ = json.Unmarshal([]byte(v.Functions.V), &functions)
+	}
 	return domain.InvocationConfigVersion{
 		ID:           v.ID,
 		Config:       domain.InvocationConfig{ID: v.InvID},
-		Version:      v.Version,
 		Model:        domain.Model{ID: v.ModelID},
+		Version:      v.Version,
 		Prompt:       v.Prompt,
 		SystemPrompt: v.SystemPrompt,
 		JSONSchema:   jsonSchema,
+		Attributes:   attributes,
+		Functions:    functions,
 		Temperature:  v.Temperature,
 		TopP:         v.TopP,
 		MaxTokens:    v.MaxTokens,

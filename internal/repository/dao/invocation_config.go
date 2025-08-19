@@ -42,6 +42,8 @@ type InvocationConfigVersion struct {
 	Prompt       string           `gorm:"column:prompt"`
 	SystemPrompt string           `gorm:"column:system_prompt"`
 	JSONSchema   sql.Null[string] `gorm:"column:json_schema;type:longText;comment:'结构化数据的JSONSchema'"`
+	Attributes   sql.Null[string] `gorm:"column:attributes;type:longText;comment:'用来渲染最终的Prompt'"`
+	Functions    sql.Null[string] `gorm:"column:functions;type:longText;comment:'函数调用定义'"`
 	Temperature  float32          `gorm:"column:temperature"`
 	TopP         float32          `gorm:"column:top_p"`
 	MaxTokens    int              `gorm:"column:max_tokens"`
@@ -97,6 +99,8 @@ func (p *InvocationConfigDAO) SaveVersion(ctx context.Context, version Invocatio
 			"prompt",
 			"system_prompt",
 			"json_schema",
+			"attributes",
+			"functions",
 			"temperature",
 			"top_p",
 			"max_tokens",

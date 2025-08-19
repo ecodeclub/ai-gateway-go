@@ -409,7 +409,6 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 				require.NoError(t, err)
 			},
 			req: admin.InvocationConfigVersionVO{
-
 				ID:           1,
 				InvID:        10,
 				ModelID:      1,
@@ -417,10 +416,23 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 				Prompt:       "prompt1",
 				SystemPrompt: "systemPrompt1",
 				JSONSchema:   "jsonSchema1",
-				Temperature:  1,
-				TopP:         2,
-				MaxTokens:    100,
-				Status:       domain.InvocationCfgVersionStatusDraft.String(),
+				Attributes: map[string]any{
+					"foo": "bar",
+				},
+				Functions: []admin.FunctionVO{
+					{
+						Name:       "ask_user",
+						Definition: "{'a':'b', 'c', 'd'}",
+					},
+					{
+						Name:       "echo",
+						Definition: "{'a':'b', 'c', 'd'}",
+					},
+				},
+				Temperature: 1,
+				TopP:        2,
+				MaxTokens:   100,
+				Status:      domain.InvocationCfgVersionStatusDraft.String(),
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVersionVO) {
 				t.Helper()
@@ -476,10 +488,23 @@ func (s *InvocationConfigTestSuite) TestVersion_Save() {
 				Prompt:       "prompt3",
 				SystemPrompt: "systemPrompt3",
 				JSONSchema:   "jsonSchema3",
-				Temperature:  3,
-				TopP:         3,
-				MaxTokens:    300,
-				Status:       domain.InvocationCfgVersionStatusDraft.String(),
+				Attributes: map[string]any{
+					"foo": "bar",
+				},
+				Functions: []admin.FunctionVO{
+					{
+						Name:       "ask_user",
+						Definition: "{'a':'b', 'c', 'd'}",
+					},
+					{
+						Name:       "echo",
+						Definition: "{'a':'b', 'c', 'd'}",
+					},
+				},
+				Temperature: 3,
+				TopP:        3,
+				MaxTokens:   300,
+				Status:      domain.InvocationCfgVersionStatusDraft.String(),
 			},
 			after: func(t *testing.T, expected admin.InvocationConfigVersionVO) {
 				t.Helper()
@@ -546,6 +571,13 @@ func (s *InvocationConfigTestSuite) assertVersion(t *testing.T, expected admin.I
 	assert.Equal(t, expected.Prompt, actual.Prompt)
 	assert.Equal(t, expected.SystemPrompt, actual.SystemPrompt)
 	assert.Equal(t, expected.JSONSchema, actual.JSONSchema)
+	assert.Equal(t, expected.Attributes, actual.Attributes)
+	if assert.Equal(t, len(expected.Functions), len(actual.Functions)) {
+		for i := range expected.Functions {
+			assert.Equal(t, expected.Functions[i].Name, actual.Functions[i].Name)
+			assert.Equal(t, expected.Functions[i].Definition, actual.Functions[i].Definition)
+		}
+	}
 	assert.Equal(t, expected.Temperature, actual.Temperature)
 	assert.Equal(t, expected.TopP, actual.TopP)
 	assert.Equal(t, expected.MaxTokens, actual.MaxTokens)
@@ -590,10 +622,23 @@ func (s *InvocationConfigTestSuite) TestVersion_List() {
 			Prompt:       fmt.Sprintf("prompt%d", id),
 			SystemPrompt: fmt.Sprintf("systemPrompt%d", id),
 			JSONSchema:   fmt.Sprintf("jsonSchema%d", id),
-			Temperature:  float32(id),
-			TopP:         float32(id),
-			MaxTokens:    int(id * 100),
-			Status:       domain.InvocationCfgVersionStatusDraft,
+			Attributes: map[string]any{
+				"foo": fmt.Sprintf("attr-%d", id),
+			},
+			Functions: []domain.Function{
+				{
+					Name:       "ask_user",
+					Definition: "{'a':'b', 'c', 'd'}",
+				},
+				{
+					Name:       "echo",
+					Definition: "## 标题1",
+				},
+			},
+			Temperature: float32(id),
+			TopP:        float32(id),
+			MaxTokens:   int(id * 100),
+			Status:      domain.InvocationCfgVersionStatusDraft,
 		})
 		require.NoError(t, err)
 		expected[total-i-1] = admin.InvocationConfigVersionVO{
@@ -604,10 +649,23 @@ func (s *InvocationConfigTestSuite) TestVersion_List() {
 			Prompt:       fmt.Sprintf("prompt%d", id),
 			SystemPrompt: fmt.Sprintf("systemPrompt%d", id),
 			JSONSchema:   fmt.Sprintf("jsonSchema%d", id),
-			Temperature:  float32(id),
-			TopP:         float32(id),
-			MaxTokens:    int(id * 100),
-			Status:       domain.InvocationCfgVersionStatusDraft.String(),
+			Attributes: map[string]any{
+				"foo": fmt.Sprintf("attr-%d", id),
+			},
+			Functions: []admin.FunctionVO{
+				{
+					Name:       "ask_user",
+					Definition: "{'a':'b', 'c', 'd'}",
+				},
+				{
+					Name:       "echo",
+					Definition: "## 标题1",
+				},
+			},
+			Temperature: float32(id),
+			TopP:        float32(id),
+			MaxTokens:   int(id * 100),
+			Status:      domain.InvocationCfgVersionStatusDraft.String(),
 		}
 	}
 
@@ -669,10 +727,23 @@ func (s *InvocationConfigTestSuite) TestVersion_Detail() {
 					Prompt:       fmt.Sprintf("prompt%d", 9),
 					SystemPrompt: fmt.Sprintf("systemPrompt%d", 9),
 					JSONSchema:   fmt.Sprintf("jsonSchema%d", 9),
-					Temperature:  float32(9),
-					TopP:         float32(9),
-					MaxTokens:    9 * 100,
-					Status:       domain.InvocationCfgVersionStatusActive,
+					Attributes: map[string]any{
+						"foo": fmt.Sprintf("attr-%d", 9),
+					},
+					Functions: []domain.Function{
+						{
+							Name:       "ask_user",
+							Definition: "{'a':'b', 'c', 'd'}",
+						},
+						{
+							Name:       "echo",
+							Definition: "## 标题1",
+						},
+					},
+					Temperature: float32(9),
+					TopP:        float32(9),
+					MaxTokens:   9 * 100,
+					Status:      domain.InvocationCfgVersionStatusActive,
 				})
 				require.NoError(t, err)
 			},
@@ -697,10 +768,23 @@ func (s *InvocationConfigTestSuite) TestVersion_Detail() {
 					Prompt:            fmt.Sprintf("prompt%d", 9),
 					SystemPrompt:      fmt.Sprintf("systemPrompt%d", 9),
 					JSONSchema:        fmt.Sprintf("jsonSchema%d", 9),
-					Temperature:       float32(9),
-					TopP:              float32(9),
-					MaxTokens:         9 * 100,
-					Status:            domain.InvocationCfgVersionStatusActive.String(),
+					Attributes: map[string]any{
+						"foo": fmt.Sprintf("attr-%d", 9),
+					},
+					Functions: []admin.FunctionVO{
+						{
+							Name:       "ask_user",
+							Definition: "{'a':'b', 'c', 'd'}",
+						},
+						{
+							Name:       "echo",
+							Definition: "## 标题1",
+						},
+					},
+					Temperature: float32(9),
+					TopP:        float32(9),
+					MaxTokens:   9 * 100,
+					Status:      domain.InvocationCfgVersionStatusActive.String(),
 				}, actual)
 			},
 		},

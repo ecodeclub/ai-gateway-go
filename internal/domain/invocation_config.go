@@ -65,10 +65,17 @@ type InvocationConfigVersion struct {
 	Prompt       string
 	SystemPrompt string
 	JSONSchema   string
+	Attributes   map[string]any
+	Functions    []Function
 	Temperature  float32
 	TopP         float32
 	MaxTokens    int
 	Status       InvocationConfigVersionStatus
 	Ctime        time.Time
 	Utime        time.Time
+}
+
+type Function struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
 }
