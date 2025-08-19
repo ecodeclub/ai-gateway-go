@@ -14,6 +14,15 @@
 
 package domain
 
+type Provider struct {
+	ID     int64
+	Name   string
+	APIKey string
+	Models []Model
+	Ctime  int64
+	Utime  int64
+}
+
 type Model struct {
 	ID          int64
 	Provider    Provider
@@ -21,11 +30,6 @@ type Model struct {
 	InputPrice  int64
 	OutputPrice int64
 	PriceMode   string
-}
-
-type Provider struct {
-	ID     int64
-	Name   string
-	ApiKey string
-	Models []Model
+	Ctime       int64
+	Utime       int64
 }

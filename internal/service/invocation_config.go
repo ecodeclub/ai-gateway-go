@@ -25,13 +25,13 @@ import (
 type InvocationConfigService struct {
 	repo         *repository.InvocationConfigRepo
 	bizRepo      *repository.BizConfigRepository
-	providerRepo *repository.ProviderRepo
+	providerRepo *repository.ProviderRepository
 }
 
 func NewInvocationConfigService(
 	repo *repository.InvocationConfigRepo,
 	bizRepo *repository.BizConfigRepository,
-	providerRepo *repository.ProviderRepo,
+	providerRepo *repository.ProviderRepository,
 ) *InvocationConfigService {
 	return &InvocationConfigService{
 		repo:         repo,
