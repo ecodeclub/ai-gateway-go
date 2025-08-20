@@ -34,14 +34,6 @@ var (
 
 	LLMSet = wire.NewSet(initLLMHandler)
 
-	ProviderSet = wire.NewSet(
-		dao.NewProviderDao,
-		cache.NewProviderCache,
-		repository.NewProviderRepo,
-		InitProvider,
-		admin.NewProviderHandler,
-	)
-
 	QuotaSet = wire.NewSet(
 		dao.NewQuotaDao,
 		repository.NewQuotaRepo,
