@@ -21,23 +21,16 @@ import (
 
 var (
 	// 模板相关错误
-	ErrTemplateEmpty    = errors.New("template is empty")
-	ErrTemplateTooLarge = errors.New("template size exceeds limit")
-	ErrTemplateInvalid  = errors.New("template syntax is invalid")
-	ErrRenderTimeout    = errors.New("template render timeout")
-	ErrOutputTooLarge   = errors.New("rendered output exceeds size limit")
+	ErrTemplateEmpty          = errors.New("模板内容为空")
+	ErrTemplateTooLarge       = errors.New("模板大小超出限制")
+	ErrTemplateRenderTimeout  = errors.New("模板渲染超时")
+	ErrTemplateOutputTooLarge = errors.New("模板输出大小超出限制")
 
-	// 上下文相关错误
-	ErrProviderNotFound = errors.New("context provider not found")
-	ErrProviderInvalid  = errors.New("context provider is invalid")
-	ErrDataNotFound     = errors.New("data not found in context")
-	ErrDataTypeInvalid  = errors.New("data type is invalid")
+	// 变量相关错误
+	ErrTemplateVariableInvalid = errors.New("模板变量无效")
 
 	// 函数相关错误
-	ErrFunctionNotFound   = errors.New("template function not found")
-	ErrFunctionNotAllowed = errors.New("template function not allowed")
-	ErrFunctionInvalid    = errors.New("template function is invalid")
-	ErrFunctionTimeout    = errors.New("template function execution timeout")
+	ErrTemplateFunctionInvalid = errors.New("模板函数无效")
 )
 
 // Error 模板错误的包装

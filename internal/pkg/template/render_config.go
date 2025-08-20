@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-// SecurityConfig 模板渲染安全配置
-type SecurityConfig struct {
+// Config 模板渲染配置
+type Config struct {
 	// 模板限制
 	MaxTemplateSize int           // 模板最大大小（字节）
 	MaxOutputSize   int           // 输出最大大小（字节）
@@ -35,9 +35,9 @@ type SecurityConfig struct {
 	MaxLoopCount    int // 最大循环次数
 }
 
-// DefaultSecurityConfig 返回默认安全配置
-func DefaultSecurityConfig() *SecurityConfig {
-	return &SecurityConfig{
+// DefaultConfig 返回默认配置
+func DefaultConfig() *Config {
+	return &Config{
 		MaxTemplateSize:  10 * 1024,       // 10KB
 		MaxOutputSize:    100 * 1024,      // 100KB
 		RenderTimeout:    time.Second * 5, // 5秒
@@ -49,9 +49,9 @@ func DefaultSecurityConfig() *SecurityConfig {
 	}
 }
 
-// StrictSecurityConfig 返回严格安全配置
-func StrictSecurityConfig() *SecurityConfig {
-	return &SecurityConfig{
+// StrictConfig 返回严格配置
+func StrictConfig() *Config {
+	return &Config{
 		MaxTemplateSize: 2 * 1024,        // 2KB
 		MaxOutputSize:   10 * 1024,       // 10KB
 		RenderTimeout:   time.Second * 2, // 2秒
@@ -67,7 +67,7 @@ func StrictSecurityConfig() *SecurityConfig {
 }
 
 // IsFunctionAllowed 检查函数是否被允许
-func (c *SecurityConfig) IsFunctionAllowed(funcName string) bool {
+func (c *Config) IsFunctionAllowed(funcName string) bool {
 	if len(c.AllowedFunctions) == 0 {
 		return true // 空白名单表示允许所有
 	}
@@ -81,7 +81,7 @@ func (c *SecurityConfig) IsFunctionAllowed(funcName string) bool {
 }
 
 // ValidateTemplateSize 验证模板大小
-func (c *SecurityConfig) ValidateTemplateSize(template string) error {
+func (c *Config) ValidateTemplateSize(template string) error {
 	if len(template) == 0 {
 		return ErrTemplateEmpty
 	}
@@ -92,9 +92,9 @@ func (c *SecurityConfig) ValidateTemplateSize(template string) error {
 }
 
 // ValidateOutputSize 验证输出大小
-func (c *SecurityConfig) ValidateOutputSize(output string) error {
+func (c *Config) ValidateOutputSize(output string) error {
 	if len(output) > c.MaxOutputSize {
-		return ErrOutputTooLarge
+		return ErrTemplateOutputTooLarge
 	}
 	return nil
 }
