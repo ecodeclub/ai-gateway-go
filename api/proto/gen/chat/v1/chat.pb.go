@@ -36,14 +36,14 @@ const (
 )
 
 type StreamRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sn            string                 `protobuf:"bytes,1,opt,name=sn,proto3" json:"sn,omitempty"`
-	ModelId       int64    `protobuf:"varint,2,opt,name=modelId,proto3" json:"modelId,omitempty"`
-	Msg           *Message `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`
-	Uid           int64    `protobuf:"varint,4,opt,name=uid,proto3" json:"uid,omitempty"`
-	Key           string                 `protobuf:"bytes,5,opt,name=key,proto3" json:"key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Sn                 string   `protobuf:"bytes,1,opt,name=sn,proto3" json:"sn,omitempty"`
+	Msg                *Message `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	InvocationConfigID int64    `protobuf:"varint,3,opt,name=invocationConfigID,proto3" json:"invocationConfigID,omitempty"`
+	Uid                int64                  `protobuf:"varint,4,opt,name=uid,proto3" json:"uid,omitempty"`
+	Key                string                 `protobuf:"bytes,5,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *StreamRequest) Reset() {
@@ -83,18 +83,18 @@ func (x *StreamRequest) GetSn() string {
 	return ""
 }
 
-func (x *StreamRequest) GetModelId() int64 {
-	if x != nil {
-		return x.ModelId
-	}
-	return 0
-}
-
 func (x *StreamRequest) GetMsg() *Message {
 	if x != nil {
 		return x.Msg
 	}
 	return nil
+}
+
+func (x *StreamRequest) GetInvocationConfigID() int64 {
+	if x != nil {
+		return x.InvocationConfigID
+	}
+	return 0
 }
 
 func (x *StreamRequest) GetUid() int64 {
@@ -668,11 +668,11 @@ var File_api_proto_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_api_proto_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/proto/chat/v1/chat.proto\x12\achat.v1\"\x81\x01\n" +
+	"\x1capi/proto/chat/v1/chat.proto\x12\achat.v1\"\x97\x01\n" +
 	"\rStreamRequest\x12\x0e\n" +
-	"\x02sn\x18\x01 \x01(\tR\x02sn\x12\x18\n" +
-	"\amodelId\x18\x02 \x01(\x03R\amodelId\x12\"\n" +
-	"\x03msg\x18\x03 \x01(\v2\x10.chat.v1.MessageR\x03msg\x12\x10\n" +
+	"\x02sn\x18\x01 \x01(\tR\x02sn\x12\"\n" +
+	"\x03msg\x18\x02 \x01(\v2\x10.chat.v1.MessageR\x03msg\x12.\n" +
+	"\x12invocationConfigID\x18\x03 \x01(\x03R\x12invocationConfigID\x12\x10\n" +
 	"\x03uid\x18\x04 \x01(\x03R\x03uid\x12\x10\n" +
 	"\x03key\x18\x05 \x01(\tR\x03key\"\x7f\n" +
 	"\x0eStreamResponse\x12\x14\n" +
