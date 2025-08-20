@@ -318,21 +318,21 @@ func (s *TemplateTestSuite) TestExtensibilityDemo() {
 	t := s.T()
 
 	// 创建自定义的渲染上下文
-	renderContext := NewTemplateContext(DefaultSecurityConfig())
+	renderContext := NewContext(DefaultSecurityConfig())
 
 	// 注册原始的data和attr提供者
-	_ = renderContext.RegisterProvider(NewDataProvider(map[string]any{
+	_ = renderContext.RegisterProvider(NewVariableProvider("data", map[string]any{
 		"name": "张三",
 		"age":  30,
 	}))
 
-	_ = renderContext.RegisterProvider(NewAttrProvider(map[string]any{
+	_ = renderContext.RegisterProvider(NewVariableProvider("attr", map[string]any{
 		"environment": "production",
 		"version":     "1.0.0",
 	}))
 
 	// 演示添加新的变量类型 - 用户信息
-	_ = renderContext.RegisterProvider(NewStaticProvider("user", map[string]any{
+	_ = renderContext.RegisterProvider(NewVariableProvider("user", map[string]any{
 		"id":          123,
 		"role":        "admin",
 		"loginAt":     "2024-01-01 10:30:00",
@@ -340,7 +340,7 @@ func (s *TemplateTestSuite) TestExtensibilityDemo() {
 	}))
 
 	// 演示添加新的变量类型 - 环境变量
-	_ = renderContext.RegisterProvider(NewStaticProvider("env", map[string]any{
+	_ = renderContext.RegisterProvider(NewVariableProvider("env", map[string]any{
 		"database_url": "mysql://localhost:3306/db",
 		"redis_url":    "redis://localhost:6379",
 		"debug":        true,
@@ -721,12 +721,12 @@ func (s *TemplateTestSuite) TestConvenienceMethods() {
 	}
 
 	// 测试便捷的Prompt渲染方法
-	promptResult, err := RenderPrompt(s.ctx, "Hello {{ .data.name }}, welcome to {{ .attr.company }}", data, attr)
+	promptResult, err := Render(s.ctx, "Hello {{ .data.name }}, welcome to {{ .attr.company }}", data, attr)
 	require.NoError(t, err)
 	assert.Equal(t, "Hello 李华, welcome to 示例公司", promptResult)
 
 	// 测试便捷的SystemPrompt渲染方法
-	systemPromptResult, err := RenderSystemPrompt(s.ctx, "You are helping {{ .data.name }} with {{ .attr.role }} tasks", data, attr)
+	systemPromptResult, err := Render(s.ctx, "You are helping {{ .data.name }} with {{ .attr.role }} tasks", data, attr)
 	require.NoError(t, err)
 	assert.Equal(t, "You are helping 李华 with 开发工程师 tasks", systemPromptResult)
 }

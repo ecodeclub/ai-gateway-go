@@ -23,16 +23,16 @@ import (
 	"text/template"
 )
 
-// TemplateRenderer 模板渲染器接口
-type TemplateRenderer interface {
+// Renderer 模板渲染器接口
+type Renderer interface {
 	// Render 渲染模板
-	Render(ctx context.Context, templateStr string, context *TemplateContext) (string, error)
+	Render(ctx context.Context, templateStr string, context *Context) (string, error)
 
 	// RegisterFunction 注册自定义函数
 	RegisterFunction(name string, fn any) error
 
 	// RegisterProvider 注册上下文提供者
-	RegisterProvider(provider ContextProvider) error
+	RegisterProvider(provider Provider) error
 
 	// ClearCache 清除模板缓存
 	ClearCache()
@@ -42,9 +42,9 @@ type TemplateRenderer interface {
 type DefaultTemplateRenderer struct {
 	mu        sync.RWMutex
 	config    *SecurityConfig
-	funcReg   *TemplateFuncRegistry
+	funcReg   *FunctionRegistry
 	templates map[string]*template.Template // 模板缓存
-	context   *TemplateContext
+	context   *Context
 }
 
 // NewDefaultRenderer 创建默认渲染器
@@ -57,18 +57,18 @@ func NewDefaultRenderer(config *SecurityConfig) *DefaultTemplateRenderer {
 		config:    config,
 		funcReg:   NewFuncRegistry(config),
 		templates: make(map[string]*template.Template),
-		context:   NewTemplateContext(config),
+		context:   NewContext(config),
 	}
 
 	// 注册默认的data和attr提供者
-	_ = renderer.context.RegisterProvider(NewDataProvider(nil))
-	_ = renderer.context.RegisterProvider(NewAttrProvider(nil))
+	_ = renderer.context.RegisterProvider(NewVariableProvider[map[string]any]("data", nil))
+	_ = renderer.context.RegisterProvider(NewVariableProvider[map[string]any]("attr", nil))
 
 	return renderer
 }
 
 // Render 渲染模板
-func (r *DefaultTemplateRenderer) Render(ctx context.Context, templateStr string, templateContext *TemplateContext) (string, error) {
+func (r *DefaultTemplateRenderer) Render(ctx context.Context, templateStr string, templateContext *Context) (string, error) {
 	// 验证模板大小
 	if err := r.config.ValidateTemplateSize(templateStr); err != nil {
 		return "", WrapError("render", templateStr, err)
@@ -117,7 +117,7 @@ func (r *DefaultTemplateRenderer) RegisterFunction(name string, fn any) error {
 }
 
 // RegisterProvider 注册上下文提供者
-func (r *DefaultTemplateRenderer) RegisterProvider(provider ContextProvider) error {
+func (r *DefaultTemplateRenderer) RegisterProvider(provider Provider) error {
 	return r.context.RegisterProvider(provider)
 }
 
@@ -128,7 +128,7 @@ func (r *DefaultTemplateRenderer) ClearCache() {
 
 	r.templates = make(map[string]*template.Template)
 	if r.context != nil {
-		r.context.ClearCache()
+		r.context.ClearAllCache()
 	}
 }
 
@@ -171,7 +171,7 @@ func (r *DefaultTemplateRenderer) parseTemplate(templateStr string) (*template.T
 }
 
 // buildRenderData 构建渲染数据
-func (r *DefaultTemplateRenderer) buildRenderData(ctx context.Context, templateContext *TemplateContext) (map[string]any, error) {
+func (r *DefaultTemplateRenderer) buildRenderData(ctx context.Context, templateContext *Context) (map[string]any, error) {
 	if templateContext == nil {
 		// 使用默认上下文
 		return r.context.BuildContext(ctx, nil)
@@ -218,41 +218,32 @@ func (r *DefaultTemplateRenderer) generateCacheKey(templateStr string) string {
 }
 
 // CreateRenderContext 创建渲染上下文的便捷方法
-func CreateRenderContext(data, attr map[string]any, config *SecurityConfig) *TemplateContext {
+func CreateRenderContext(data, attr map[string]any, config *SecurityConfig) *Context {
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
 
-	context := NewTemplateContext(config)
+	ctx := NewContext(config)
 
 	// 注册data和attr提供者
 	if data != nil {
-		_ = context.RegisterProvider(NewDataProvider(data))
+		_ = ctx.RegisterProvider(NewVariableProvider("data", data))
 	} else {
-		_ = context.RegisterProvider(NewDataProvider(make(map[string]any)))
+		_ = ctx.RegisterProvider(NewVariableProvider("data", make(map[string]any)))
 	}
 
 	if attr != nil {
-		_ = context.RegisterProvider(NewAttrProvider(attr))
+		_ = ctx.RegisterProvider(NewVariableProvider("attr", attr))
 	} else {
-		_ = context.RegisterProvider(NewAttrProvider(make(map[string]any)))
+		_ = ctx.RegisterProvider(NewVariableProvider("attr", make(map[string]any)))
 	}
 
-	return context
+	return ctx
 }
 
-// RenderPrompt 便捷的Prompt渲染方法
-func RenderPrompt(ctx context.Context, promptTemplate string, data, attr map[string]any) (string, error) {
+// Render 便捷的Prompt渲染方法
+func Render(ctx context.Context, promptTemplate string, data, attr map[string]any) (string, error) {
 	renderer := NewDefaultRenderer(DefaultSecurityConfig())
 	renderContext := CreateRenderContext(data, attr, nil)
-
 	return renderer.Render(ctx, promptTemplate, renderContext)
-}
-
-// RenderSystemPrompt 便捷的SystemPrompt渲染方法
-func RenderSystemPrompt(ctx context.Context, systemPromptTemplate string, data, attr map[string]any) (string, error) {
-	renderer := NewDefaultRenderer(DefaultSecurityConfig())
-	renderContext := CreateRenderContext(data, attr, nil)
-
-	return renderer.Render(ctx, systemPromptTemplate, renderContext)
 }

@@ -19,39 +19,31 @@ import (
 	"sync"
 )
 
-// ContextProvider 上下文提供者接口
-// 实现此接口可以向模板提供特定的数据源
-type ContextProvider interface {
-	// Name 返回提供者名称，用于模板中访问 {{ .name.xxx }}
-	Name() string
 
-	// Provide 提供数据，params包含初始化参数
-	Provide(ctx context.Context, params map[string]any) (any, error)
-}
 
-// TemplateContext 模板上下文，支持动态注册和管理多个数据提供者
-type TemplateContext struct {
+// Context 模板上下文，支持动态注册和管理多个数据提供者
+type Context struct {
 	mu        sync.RWMutex
-	providers map[string]ContextProvider
+	providers map[string]Provider
 	cache     map[string]any
 	config    *SecurityConfig
 }
 
-// NewTemplateContext 创建新的模板上下文
-func NewTemplateContext(config *SecurityConfig) *TemplateContext {
+// NewContext 创建新的模板上下文
+func NewContext(config *SecurityConfig) *Context {
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
 
-	return &TemplateContext{
-		providers: make(map[string]ContextProvider),
+	return &Context{
+		providers: make(map[string]Provider),
 		cache:     make(map[string]any),
 		config:    config,
 	}
 }
 
 // RegisterProvider 注册上下文提供者
-func (tc *TemplateContext) RegisterProvider(provider ContextProvider) error {
+func (tc *Context) RegisterProvider(provider Provider) error {
 	if provider == nil {
 		return ErrProviderInvalid
 	}
@@ -71,8 +63,8 @@ func (tc *TemplateContext) RegisterProvider(provider ContextProvider) error {
 	return nil
 }
 
-// GetProvider 获取指定名称的提供者
-func (tc *TemplateContext) GetProvider(name string) (ContextProvider, bool) {
+// Provider 获取指定名称的提供者
+func (tc *Context) Provider(name string) (Provider, bool) {
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 
@@ -81,7 +73,7 @@ func (tc *TemplateContext) GetProvider(name string) (ContextProvider, bool) {
 }
 
 // BuildContext 构建模板执行的上下文数据
-func (tc *TemplateContext) BuildContext(ctx context.Context, params map[string]any) (map[string]any, error) {
+func (tc *Context) BuildContext(ctx context.Context, params map[string]any) (map[string]any, error) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
@@ -109,8 +101,8 @@ func (tc *TemplateContext) BuildContext(ctx context.Context, params map[string]a
 	return result, nil
 }
 
-// ClearCache 清除所有缓存
-func (tc *TemplateContext) ClearCache() {
+// ClearAllCache 清除所有缓存
+func (tc *Context) ClearAllCache() {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
@@ -118,15 +110,15 @@ func (tc *TemplateContext) ClearCache() {
 }
 
 // ClearProviderCache 清除指定提供者的缓存
-func (tc *TemplateContext) ClearProviderCache(providerName string) {
+func (tc *Context) ClearProviderCache(providerName string) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
 	delete(tc.cache, providerName)
 }
 
-// ListProviders 列出所有已注册的提供者名称
-func (tc *TemplateContext) ListProviders() []string {
+// ProviderNames 列出所有已注册的提供者名称
+func (tc *Context) ProviderNames() []string {
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 

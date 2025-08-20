@@ -40,26 +40,26 @@ var (
 	ErrFunctionTimeout    = errors.New("template function execution timeout")
 )
 
-// TemplateError 模板错误的包装
-type TemplateError struct {
+// Error 模板错误的包装
+type Error struct {
 	Op       string // 操作名称
 	Template string // 模板内容（可能被截断）
 	Err      error  // 原始错误
 }
 
-func (e *TemplateError) Error() string {
+func (e *Error) Error() string {
 	if e.Template != "" {
 		return fmt.Sprintf("template %s error: %v (template: %s)", e.Op, e.Err, e.truncateTemplate())
 	}
 	return fmt.Sprintf("template %s error: %v", e.Op, e.Err)
 }
 
-func (e *TemplateError) Unwrap() error {
+func (e *Error) Unwrap() error {
 	return e.Err
 }
 
 // truncateTemplate 截断模板内容用于错误显示
-func (e *TemplateError) truncateTemplate() string {
+func (e *Error) truncateTemplate() string {
 	if len(e.Template) <= 50 {
 		return e.Template
 	}
@@ -71,7 +71,7 @@ func WrapError(op, template string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return &TemplateError{
+	return &Error{
 		Op:       op,
 		Template: template,
 		Err:      err,

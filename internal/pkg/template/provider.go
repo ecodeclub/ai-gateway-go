@@ -19,122 +19,43 @@ import (
 	"fmt"
 )
 
-// DataProvider 数据提供者，处理 {{ .data.xxx }} 语法
-// 用于提供LLM解析出的JSON结构化数据
-type DataProvider struct {
-	data map[string]any
+// Provider 上下文提供者接口
+// 实现此接口可以向模板提供特定的数据源
+type Provider interface {
+	// Name 返回提供者名称，用于模板中访问 {{ .name.xxx }}
+	Name() string
+	// Provide 提供数据，params包含初始化参数
+	Provide(ctx context.Context, params map[string]any) (any, error)
 }
 
-// NewDataProvider 创建数据提供者
-func NewDataProvider(data map[string]any) *DataProvider {
-	if data == nil {
-		data = make(map[string]any)
-	}
-	return &DataProvider{data: data}
-}
-
-// Name 返回提供者名称
-func (p *DataProvider) Name() string {
-	return "data"
-}
-
-// Provide 提供数据
-func (p *DataProvider) Provide(ctx context.Context, params map[string]any) (any, error) {
-	// 如果params中有新的data，则使用新的data
-	if newData, exists := params["data"]; exists {
-		if dataMap, ok := newData.(map[string]any); ok {
-			return dataMap, nil
-		}
-		return nil, fmt.Errorf("data must be map[string]any, got %T", newData)
-	}
-
-	// 否则返回初始化时的data
-	return p.data, nil
-}
-
-// SetData 更新数据
-func (p *DataProvider) SetData(data map[string]any) {
-	if data == nil {
-		data = make(map[string]any)
-	}
-	p.data = data
-}
-
-// AttrProvider 属性提供者，处理 {{ .attr.xxx }} 语法
-// 用于提供InvocationConfigVersion.Attributes中的配置数据
-type AttrProvider struct {
-	attributes map[string]any
-}
-
-// NewAttrProvider 创建属性提供者
-func NewAttrProvider(attributes map[string]any) *AttrProvider {
-	if attributes == nil {
-		attributes = make(map[string]any)
-	}
-	return &AttrProvider{attributes: attributes}
-}
-
-// Name 返回提供者名称
-func (p *AttrProvider) Name() string {
-	return "attr"
-}
-
-// Provide 提供属性数据
-func (p *AttrProvider) Provide(ctx context.Context, params map[string]any) (any, error) {
-	// 如果params中有新的attr，则使用新的attr
-	if newAttr, exists := params["attr"]; exists {
-		if attrMap, ok := newAttr.(map[string]any); ok {
-			return attrMap, nil
-		}
-		return nil, fmt.Errorf("attr must be map[string]any, got %T", newAttr)
-	}
-
-	// 否则返回初始化时的attributes
-	return p.attributes, nil
-}
-
-// SetAttributes 更新属性
-func (p *AttrProvider) SetAttributes(attributes map[string]any) {
-	if attributes == nil {
-		attributes = make(map[string]any)
-	}
-	p.attributes = attributes
-}
-
-// StaticProvider 静态数据提供者，用于提供固定的数据
-// 可以用于扩展，比如用户信息、环境变量等
-type StaticProvider struct {
+// VariableProvider 创建变量提供者，处理 {{ .data.xxx }} 语法
+type VariableProvider[T any] struct {
 	name string
-	data any
+	vals T
 }
 
-// NewStaticProvider 创建静态数据提供者
-func NewStaticProvider(name string, data any) *StaticProvider {
-	return &StaticProvider{
-		name: name,
-		data: data,
-	}
+// NewVariableProvider 创建变量提供者
+func NewVariableProvider[T any](name string, vals T) *VariableProvider[T] {
+	return &VariableProvider[T]{name: name, vals: vals}
 }
 
 // Name 返回提供者名称
-func (p *StaticProvider) Name() string {
+func (p *VariableProvider[T]) Name() string {
 	return p.name
 }
 
-// Provide 提供静态数据
-func (p *StaticProvider) Provide(ctx context.Context, params map[string]any) (any, error) {
-	// 检查params中是否有同名的数据，如果有则使用params中的
+// Provide 提供数据
+func (p *VariableProvider[T]) Provide(_ context.Context, params map[string]any) (any, error) {
+	// 如果params中有新的数据则使用新的
 	if newData, exists := params[p.name]; exists {
-		return newData, nil
+		if dataMap, ok := newData.(T); ok {
+			return dataMap, nil
+		}
+		var zero T
+		return nil, fmt.Errorf("变量%s必须是%T类型，当前是%T类型", p.name, zero, newData)
 	}
-
-	// 否则返回静态数据
-	return p.data, nil
-}
-
-// SetData 更新静态数据
-func (p *StaticProvider) SetData(data any) {
-	p.data = data
+	// 否则返回初始化时的
+	return p.vals, nil
 }
 
 // FunctionProvider 函数提供者，可以提供动态计算的数据

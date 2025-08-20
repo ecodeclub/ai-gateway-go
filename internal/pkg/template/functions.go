@@ -30,19 +30,19 @@ import (
 	"golang.org/x/text/language"
 )
 
-// TemplateFuncRegistry 模板函数注册器
-type TemplateFuncRegistry struct {
+// FunctionRegistry 模板函数注册器
+type FunctionRegistry struct {
 	functions map[string]any
 	config    *SecurityConfig
 }
 
 // NewFuncRegistry 创建函数注册器
-func NewFuncRegistry(config *SecurityConfig) *TemplateFuncRegistry {
+func NewFuncRegistry(config *SecurityConfig) *FunctionRegistry {
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
 
-	registry := &TemplateFuncRegistry{
+	registry := &FunctionRegistry{
 		functions: make(map[string]any),
 		config:    config,
 	}
@@ -53,7 +53,7 @@ func NewFuncRegistry(config *SecurityConfig) *TemplateFuncRegistry {
 }
 
 // Register 注册自定义函数
-func (r *TemplateFuncRegistry) Register(name string, fn any) error {
+func (r *FunctionRegistry) Register(name string, fn any) error {
 	if !r.config.IsFunctionAllowed(name) {
 		return ErrFunctionNotAllowed
 	}
@@ -68,7 +68,7 @@ func (r *TemplateFuncRegistry) Register(name string, fn any) error {
 }
 
 // GetFuncMap 获取所有函数供模板使用
-func (r *TemplateFuncRegistry) GetFuncMap() template.FuncMap {
+func (r *FunctionRegistry) GetFuncMap() template.FuncMap {
 	result := make(template.FuncMap)
 	for name, fn := range r.functions {
 		if r.config.IsFunctionAllowed(name) {
@@ -79,7 +79,7 @@ func (r *TemplateFuncRegistry) GetFuncMap() template.FuncMap {
 }
 
 // validateFunction 验证函数签名是否有效
-func (r *TemplateFuncRegistry) validateFunction(fn any) error {
+func (r *FunctionRegistry) validateFunction(fn any) error {
 	if fn == nil {
 		return ErrFunctionInvalid
 	}
@@ -107,7 +107,7 @@ func (r *TemplateFuncRegistry) validateFunction(fn any) error {
 }
 
 // registerBuiltinFunctions 注册所有内置函数
-func (r *TemplateFuncRegistry) registerBuiltinFunctions() {
+func (r *FunctionRegistry) registerBuiltinFunctions() {
 	// 字符串处理函数
 	r.functions["upper"] = strings.ToUpper
 	r.functions["lower"] = strings.ToLower
@@ -165,7 +165,7 @@ func (r *TemplateFuncRegistry) registerBuiltinFunctions() {
 }
 
 // 字符串处理函数实现
-func (r *TemplateFuncRegistry) truncateString(length int, text string) string {
+func (r *FunctionRegistry) truncateString(length int, text string) string {
 	if length <= 0 {
 		return ""
 	}
@@ -178,18 +178,18 @@ func (r *TemplateFuncRegistry) truncateString(length int, text string) string {
 	return string(runes[:length]) + "..."
 }
 
-func (r *TemplateFuncRegistry) joinStrings(sep string, elems []string) string {
+func (r *FunctionRegistry) joinStrings(sep string, elems []string) string {
 	return strings.Join(elems, sep)
 }
 
-func (r *TemplateFuncRegistry) titleCase(s string) string {
+func (r *FunctionRegistry) titleCase(s string) string {
 	// 使用unicode-aware的title case
 	caser := cases.Title(language.English)
 	return caser.String(s)
 }
 
 // 数学函数实现
-func (r *TemplateFuncRegistry) mathAdd(a, b any) (float64, error) {
+func (r *FunctionRegistry) mathAdd(a, b any) (float64, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return 0, err
@@ -201,7 +201,7 @@ func (r *TemplateFuncRegistry) mathAdd(a, b any) (float64, error) {
 	return aVal + bVal, nil
 }
 
-func (r *TemplateFuncRegistry) mathSub(a, b any) (float64, error) {
+func (r *FunctionRegistry) mathSub(a, b any) (float64, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return 0, err
@@ -213,7 +213,7 @@ func (r *TemplateFuncRegistry) mathSub(a, b any) (float64, error) {
 	return aVal - bVal, nil
 }
 
-func (r *TemplateFuncRegistry) mathMul(a, b any) (float64, error) {
+func (r *FunctionRegistry) mathMul(a, b any) (float64, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return 0, err
@@ -225,7 +225,7 @@ func (r *TemplateFuncRegistry) mathMul(a, b any) (float64, error) {
 	return aVal * bVal, nil
 }
 
-func (r *TemplateFuncRegistry) mathDiv(a, b any) (float64, error) {
+func (r *FunctionRegistry) mathDiv(a, b any) (float64, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return 0, err
@@ -240,7 +240,7 @@ func (r *TemplateFuncRegistry) mathDiv(a, b any) (float64, error) {
 	return aVal / bVal, nil
 }
 
-func (r *TemplateFuncRegistry) mathMod(a, b any) (float64, error) {
+func (r *FunctionRegistry) mathMod(a, b any) (float64, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return 0, err
@@ -256,15 +256,15 @@ func (r *TemplateFuncRegistry) mathMod(a, b any) (float64, error) {
 }
 
 // 比较函数实现
-func (r *TemplateFuncRegistry) equal(a, b any) bool {
+func (r *FunctionRegistry) equal(a, b any) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func (r *TemplateFuncRegistry) notEqual(a, b any) bool {
+func (r *FunctionRegistry) notEqual(a, b any) bool {
 	return !reflect.DeepEqual(a, b)
 }
 
-func (r *TemplateFuncRegistry) greaterThan(a, b any) (bool, error) {
+func (r *FunctionRegistry) greaterThan(a, b any) (bool, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return false, err
@@ -276,7 +276,7 @@ func (r *TemplateFuncRegistry) greaterThan(a, b any) (bool, error) {
 	return aVal > bVal, nil
 }
 
-func (r *TemplateFuncRegistry) greaterThanOrEqual(a, b any) (bool, error) {
+func (r *FunctionRegistry) greaterThanOrEqual(a, b any) (bool, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return false, err
@@ -288,7 +288,7 @@ func (r *TemplateFuncRegistry) greaterThanOrEqual(a, b any) (bool, error) {
 	return aVal >= bVal, nil
 }
 
-func (r *TemplateFuncRegistry) lessThan(a, b any) (bool, error) {
+func (r *FunctionRegistry) lessThan(a, b any) (bool, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return false, err
@@ -300,7 +300,7 @@ func (r *TemplateFuncRegistry) lessThan(a, b any) (bool, error) {
 	return aVal < bVal, nil
 }
 
-func (r *TemplateFuncRegistry) lessThanOrEqual(a, b any) (bool, error) {
+func (r *FunctionRegistry) lessThanOrEqual(a, b any) (bool, error) {
 	aVal, err := r.toFloat64(a)
 	if err != nil {
 		return false, err
@@ -313,7 +313,7 @@ func (r *TemplateFuncRegistry) lessThanOrEqual(a, b any) (bool, error) {
 }
 
 // 日期函数实现
-func (r *TemplateFuncRegistry) formatDate(layout string, date any) (string, error) {
+func (r *FunctionRegistry) formatDate(layout string, date any) (string, error) {
 	switch v := date.(type) {
 	case time.Time:
 		return v.Format(layout), nil
@@ -341,12 +341,12 @@ func (r *TemplateFuncRegistry) formatDate(layout string, date any) (string, erro
 	}
 }
 
-func (r *TemplateFuncRegistry) parseDate(dateStr, layout string) (time.Time, error) {
+func (r *FunctionRegistry) parseDate(dateStr, layout string) (time.Time, error) {
 	return time.Parse(layout, dateStr)
 }
 
 // JSON函数实现
-func (r *TemplateFuncRegistry) toJson(v any) (string, error) {
+func (r *FunctionRegistry) toJson(v any) (string, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -354,21 +354,21 @@ func (r *TemplateFuncRegistry) toJson(v any) (string, error) {
 	return string(data), nil
 }
 
-func (r *TemplateFuncRegistry) fromJson(jsonStr string) (any, error) {
+func (r *FunctionRegistry) fromJson(jsonStr string) (any, error) {
 	var result any
 	err := json.Unmarshal([]byte(jsonStr), &result)
 	return result, err
 }
 
 // 默认值函数实现
-func (r *TemplateFuncRegistry) defaultValue(value, defaultVal any) any {
+func (r *FunctionRegistry) defaultValue(value, defaultVal any) any {
 	if r.isEmpty(value) {
 		return defaultVal
 	}
 	return value
 }
 
-func (r *TemplateFuncRegistry) coalesce(values ...any) any {
+func (r *FunctionRegistry) coalesce(values ...any) any {
 	for _, v := range values {
 		if !r.isEmpty(v) {
 			return v
@@ -378,7 +378,7 @@ func (r *TemplateFuncRegistry) coalesce(values ...any) any {
 }
 
 // 编码函数实现
-func (r *TemplateFuncRegistry) base64Decode(encoded string) (string, error) {
+func (r *FunctionRegistry) base64Decode(encoded string) (string, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", err
@@ -387,11 +387,11 @@ func (r *TemplateFuncRegistry) base64Decode(encoded string) (string, error) {
 }
 
 // 类型转换函数实现
-func (r *TemplateFuncRegistry) toString(v any) string {
+func (r *FunctionRegistry) toString(v any) string {
 	return fmt.Sprintf("%v", v)
 }
 
-func (r *TemplateFuncRegistry) toInt(v any) (int64, error) {
+func (r *FunctionRegistry) toInt(v any) (int64, error) {
 	switch val := v.(type) {
 	case int:
 		return int64(val), nil
@@ -406,12 +406,12 @@ func (r *TemplateFuncRegistry) toInt(v any) (int64, error) {
 	}
 }
 
-func (r *TemplateFuncRegistry) toFloat(v any) (float64, error) {
+func (r *FunctionRegistry) toFloat(v any) (float64, error) {
 	return r.toFloat64(v)
 }
 
 // 集合函数实现
-func (r *TemplateFuncRegistry) length(v any) int {
+func (r *FunctionRegistry) length(v any) int {
 	val := reflect.ValueOf(v)
 	switch val.Kind() {
 	case reflect.Array, reflect.Slice, reflect.Map, reflect.String:
@@ -421,7 +421,7 @@ func (r *TemplateFuncRegistry) length(v any) int {
 	}
 }
 
-func (r *TemplateFuncRegistry) contains(collection, item any) bool {
+func (r *FunctionRegistry) contains(collection, item any) bool {
 	val := reflect.ValueOf(collection)
 	switch val.Kind() {
 	case reflect.Array, reflect.Slice:
@@ -436,12 +436,13 @@ func (r *TemplateFuncRegistry) contains(collection, item any) bool {
 		if str, ok := item.(string); ok {
 			return strings.Contains(val.String(), str)
 		}
+	default:
 	}
 	return false
 }
 
 // 辅助函数
-func (r *TemplateFuncRegistry) toFloat64(v any) (float64, error) {
+func (r *FunctionRegistry) toFloat64(v any) (float64, error) {
 	switch val := v.(type) {
 	case int:
 		return float64(val), nil
@@ -458,7 +459,7 @@ func (r *TemplateFuncRegistry) toFloat64(v any) (float64, error) {
 	}
 }
 
-func (r *TemplateFuncRegistry) isEmpty(v any) bool {
+func (r *FunctionRegistry) isEmpty(v any) bool {
 	if v == nil {
 		return true
 	}
