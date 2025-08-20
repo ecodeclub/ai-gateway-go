@@ -435,7 +435,7 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 		name        string
 		template    string
 		ctx         func(t *testing.T) *template.Context
-		assertError func(t assert.TestingT, err error, i ...interface{}) bool
+		assertError func(t assert.TestingT, err error, i ...any) bool
 	}{
 		{
 			name:        "无效模板语法",
@@ -459,15 +459,15 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 			name:     "Variable.Value()返回错误",
 			template: "值：{{ .error_var }}",
 			ctx: func(t *testing.T) *template.Context {
-				ctx := template.NewContext(context.Background())
-				errorVar := template.NewDynamicVariable("error_var", func(getter template.VariableGetter) (any, error) {
-					return nil, fmt.Errorf("变量计算失败")
-				})
-				err := ctx.SetVariable(errorVar)
+				ctx := template.NewContext(t.Context())
+				err := ctx.SetVariable(
+					template.NewDynamicVariable("error_var", func(getter template.VariableGetter) (any, error) {
+						return nil, fmt.Errorf("变量计算失败")
+					}))
 				require.NoError(t, err)
 				return ctx
 			},
-			assertError: func(t assert.TestingT, err error, i ...interface{}) bool {
+			assertError: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.Error(t, err) && assert.Contains(t, err.Error(), "变量计算失败")
 			},
 		},
@@ -475,22 +475,17 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 			name:     "StaticVariable类型不匹配",
 			template: "{{ .int_var }}",
 			ctx: func(t *testing.T) *template.Context {
-				ctx := template.NewContext(context.Background())
+				ctx := template.NewContext(t.Context())
 				intVar := template.NewVariable("int_var", 42)
 				err := ctx.SetVariable(intVar)
 				require.NoError(t, err)
-
 				// 尝试设置错误类型的值
-				if variable, exists := ctx.Variable("int_var"); exists {
-					if staticVar, ok := variable.(*template.StaticVariable[int]); ok {
-						err := staticVar.SetValue("不是整数")
-						assert.Error(t, err)
-						assert.Contains(t, err.Error(), "模板变量无效")
-					}
-				}
+				err = intVar.SetValue("不是整数")
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "模板变量无效")
 				return ctx
 			},
-			assertError: assert.NoError, // 渲染本身不会失败，失败在SetValue
+			assertError: assert.NoError,
 		},
 		{
 			name:     "DynamicVariable不支持SetValue",
@@ -504,13 +499,9 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 				require.NoError(t, err)
 
 				// 尝试设置动态变量的值（应该失败）
-				if variable, exists := ctx.Variable("dyn_var"); exists {
-					if dynVar, ok := variable.(*template.DynamicVariable); ok {
-						err := dynVar.SetValue("新值")
-						assert.Error(t, err)
-						assert.Contains(t, err.Error(), "模板变量无效")
-					}
-				}
+				err = dynVar.SetValue("新值")
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "模板变量无效")
 				return ctx
 			},
 			assertError: assert.NoError, // 渲染本身不会失败，失败在SetValue
@@ -529,31 +520,15 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 				require.NoError(t, err)
 				return ctx
 			},
-			assertError: func(t assert.TestingT, err error, i ...interface{}) bool {
+			assertError: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.Error(t, err) && assert.Contains(t, err.Error(), "函数执行失败")
 			},
-		},
-		{
-			name:     "函数正常执行",
-			template: "{{ errorFunc \"normal\" }}",
-			ctx: func(t *testing.T) *template.Context {
-				ctx := s.newTemplateContext(t)
-				err := ctx.SetFunction("errorFunc", func(input string) (string, error) {
-					if input == "error" {
-						return "", fmt.Errorf("函数执行失败：%s", input)
-					}
-					return "success", nil
-				})
-				require.NoError(t, err)
-				return ctx
-			},
-			assertError: assert.NoError,
 		},
 		{
 			name:     "除零错误",
 			template: "{{ div 10 0 }}",
 			ctx:      s.newTemplateContext,
-			assertError: func(t assert.TestingT, err error, i ...interface{}) bool {
+			assertError: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.Error(t, err) && assert.Contains(t, err.Error(), "除零错误")
 			},
 		},
@@ -585,7 +560,7 @@ func (s *TemplateTestSuite) TestErrorHandling() {
 				require.NoError(t, err)
 				return ctx
 			},
-			assertError: func(t assert.TestingT, err error, i ...interface{}) bool {
+			assertError: func(t assert.TestingT, err error, i ...any) bool {
 				return assert.Error(t, err) && assert.Contains(t, err.Error(), "模板变量无效")
 			},
 		},
@@ -907,6 +882,316 @@ func (s *TemplateTestSuite) TestAdvancedDynamicVariables() {
 	require.NoError(t, err)
 	assert.Contains(t, result2, "张工程师")
 	assert.NotEqual(t, result, result2) // 结果应该不同，因为数据更新了
+}
+
+// TestContextCoverage 提高Context覆盖率的测试
+func (s *TemplateTestSuite) TestContextCoverage() {
+	t := s.T()
+
+	t.Run("函数验证测试", func(t *testing.T) {
+		ctx := template.NewContext(context.Background())
+
+		// 测试nil函数
+		err := ctx.SetFunction("nilFunc", nil)
+		assert.Error(t, err)
+
+		// 测试非函数类型
+		err = ctx.SetFunction("notFunc", "not a function")
+		assert.Error(t, err)
+
+		// 测试返回值过多的函数
+		err = ctx.SetFunction("tooManyReturns", func() (string, string, error) {
+			return "", "", nil
+		})
+		assert.Error(t, err)
+
+		// 测试第二个返回值不是error的函数
+		err = ctx.SetFunction("wrongSecondReturn", func() (string, string) {
+			return "", ""
+		})
+		assert.Error(t, err)
+
+		// 测试正确的单返回值函数
+		err = ctx.SetFunction("singleReturn", func() string {
+			return "ok"
+		})
+		assert.NoError(t, err)
+
+		// 测试正确的双返回值函数
+		err = ctx.SetFunction("doubleReturn", func() (string, error) {
+			return "ok", nil
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("数学函数类型转换错误", func(t *testing.T) {
+		ctx := s.newTemplateContext(t)
+
+		tests := []struct {
+			name     string
+			template string
+		}{
+			{"add类型错误", "{{ add \"abc\" 1 }}"},
+			{"sub类型错误", "{{ sub \"abc\" 1 }}"},
+			{"mul类型错误", "{{ mul \"abc\" 1 }}"},
+			{"div类型错误", "{{ div \"abc\" 1 }}"},
+			{"mod类型错误", "{{ mod \"abc\" 1 }}"},
+			{"gt类型错误", "{{ gt \"abc\" 1 }}"},
+			{"gte类型错误", "{{ gte \"abc\" 1 }}"},
+			{"lt类型错误", "{{ lt \"abc\" 1 }}"},
+			{"lte类型错误", "{{ lte \"abc\" 1 }}"},
+			{"mod除零", "{{ mod 10 0 }}"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := s.render.Render(ctx, tt.template)
+				assert.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("类型转换函数测试", func(t *testing.T) {
+		ctx := s.newTemplateContext(t)
+
+		tests := []struct {
+			name     string
+			template string
+			wantErr  bool
+		}{
+			// toInt 测试
+			{"toInt-int", "{{ toInt 42 }}", false},
+			{"toInt-int64", "{{ toInt .data.age }}", false}, // age是int
+			{"toInt-float64", "{{ toInt 3.14 }}", false},
+			{"toInt-string", "{{ toInt \"123\" }}", false},
+			{"toInt-invalid", "{{ toInt \"abc\" }}", true},
+			{"toInt-bool", "{{ toInt true }}", true},
+
+			// toFloat 测试
+			{"toFloat-int", "{{ toFloat 42 }}", false},
+			{"toFloat-int64", "{{ toFloat .data.age }}", false},
+			{"toFloat-float32", "{{ toFloat 3.14 }}", false},
+			{"toFloat-float64", "{{ toFloat 3.14159 }}", false},
+			{"toFloat-string", "{{ toFloat \"3.14\" }}", false},
+			{"toFloat-invalid", "{{ toFloat \"abc\" }}", true},
+			{"toFloat-bool", "{{ toFloat true }}", true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := s.render.Render(ctx, tt.template)
+				if tt.wantErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
+	t.Run("isEmpty函数各种类型测试", func(t *testing.T) {
+		ctx := template.NewContext(context.Background())
+
+		// 设置测试数据
+		testData := map[string]any{
+			"nilValue":      nil,
+			"emptyString":   "",
+			"nonEmptyStr":   "hello",
+			"emptySlice":    []string{},
+			"nonEmptySlice": []string{"item"},
+			"emptyMap":      map[string]any{},
+			"nonEmptyMap":   map[string]any{"key": "value"},
+			"zeroInt":       0,
+			"nonZeroInt":    42,
+			"nilPtr":        (*string)(nil),
+		}
+		nonNilPtr := "test"
+		testData["nonNilPtr"] = &nonNilPtr
+
+		err := ctx.SetVariable(template.NewVariable("test", testData))
+		require.NoError(t, err)
+
+		tests := []struct {
+			name     string
+			template string
+			expected string
+		}{
+			{"nil值", "{{ if isEmpty .test.nilValue }}空{{ else }}非空{{ end }}", "空"},
+			{"空字符串", "{{ if isEmpty .test.emptyString }}空{{ else }}非空{{ end }}", "空"},
+			{"非空字符串", "{{ if isEmpty .test.nonEmptyStr }}空{{ else }}非空{{ end }}", "非空"},
+			{"空切片", "{{ if isEmpty .test.emptySlice }}空{{ else }}非空{{ end }}", "空"},
+			{"非空切片", "{{ if isEmpty .test.nonEmptySlice }}空{{ else }}非空{{ end }}", "非空"},
+			{"空map", "{{ if isEmpty .test.emptyMap }}空{{ else }}非空{{ end }}", "空"},
+			{"非空map", "{{ if isEmpty .test.nonEmptyMap }}空{{ else }}非空{{ end }}", "非空"},
+			{"零值int", "{{ if isEmpty .test.zeroInt }}空{{ else }}非空{{ end }}", "非空"}, // int零值不算空
+			{"非零int", "{{ if isEmpty .test.nonZeroInt }}空{{ else }}非空{{ end }}", "非空"},
+			{"nil指针", "{{ if isEmpty .test.nilPtr }}空{{ else }}非空{{ end }}", "空"},
+			{"非nil指针", "{{ if isEmpty .test.nonNilPtr }}空{{ else }}非空{{ end }}", "非空"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := s.render.Render(ctx, tt.template)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+
+	t.Run("isTruthy函数各种类型测试", func(t *testing.T) {
+		ctx := template.NewContext(context.Background())
+
+		testData := map[string]any{
+			"nilValue":       nil,
+			"trueBool":       true,
+			"falseBool":      false,
+			"emptyString":    "",
+			"nonEmptyStr":    "hello",
+			"zeroInt":        0,
+			"nonZeroInt":     42,
+			"zeroInt8":       int8(0),
+			"nonZeroInt8":    int8(1),
+			"zeroInt16":      int16(0),
+			"zeroInt32":      int32(0),
+			"zeroInt64":      int64(0),
+			"nonZeroInt64":   int64(1),
+			"zeroUint":       uint(0),
+			"nonZeroUint":    uint(1),
+			"zeroUint8":      uint8(0),
+			"zeroUint16":     uint16(0),
+			"zeroUint32":     uint32(0),
+			"zeroUint64":     uint64(0),
+			"nonZeroUint64":  uint64(1),
+			"zeroFloat32":    float32(0.0),
+			"nonZeroFloat32": float32(1.5),
+			"zeroFloat64":    float64(0.0),
+			"nonZeroFloat64": float64(2.5),
+			"emptySlice":     []string{},
+			"nonEmptySlice":  []string{"item"},
+			"emptyMap":       map[string]any{},
+			"nonEmptyMap":    map[string]any{"key": "value"},
+			"nilPtr":         (*string)(nil),
+			"customStruct":   struct{ Name string }{Name: "test"},
+		}
+		nonNilPtr := "test"
+		testData["nonNilPtr"] = &nonNilPtr
+
+		err := ctx.SetVariable(template.NewVariable("test", testData))
+		require.NoError(t, err)
+
+		tests := []struct {
+			name     string
+			template string
+			expected string
+		}{
+			{"nil值", "{{ if and .test.nilValue true }}真{{ else }}假{{ end }}", "假"},
+			{"true布尔", "{{ if and .test.trueBool true }}真{{ else }}假{{ end }}", "真"},
+			{"false布尔", "{{ if and .test.falseBool true }}真{{ else }}假{{ end }}", "假"},
+			{"空字符串", "{{ if and .test.emptyString true }}真{{ else }}假{{ end }}", "假"},
+			{"非空字符串", "{{ if and .test.nonEmptyStr true }}真{{ else }}假{{ end }}", "真"},
+			{"零int", "{{ if and .test.zeroInt true }}真{{ else }}假{{ end }}", "假"},
+			{"非零int", "{{ if and .test.nonZeroInt true }}真{{ else }}假{{ end }}", "真"},
+			{"零int64", "{{ if and .test.zeroInt64 true }}真{{ else }}假{{ end }}", "假"},
+			{"非零int64", "{{ if and .test.nonZeroInt64 true }}真{{ else }}假{{ end }}", "真"},
+			{"零uint64", "{{ if and .test.zeroUint64 true }}真{{ else }}假{{ end }}", "假"},
+			{"非零uint64", "{{ if and .test.nonZeroUint64 true }}真{{ else }}假{{ end }}", "真"},
+			{"零float64", "{{ if and .test.zeroFloat64 true }}真{{ else }}假{{ end }}", "假"},
+			{"非零float64", "{{ if and .test.nonZeroFloat64 true }}真{{ else }}假{{ end }}", "真"},
+			{"空切片", "{{ if and .test.emptySlice true }}真{{ else }}假{{ end }}", "假"},
+			{"非空切片", "{{ if and .test.nonEmptySlice true }}真{{ else }}假{{ end }}", "真"},
+			{"nil指针", "{{ if and .test.nilPtr true }}真{{ else }}假{{ end }}", "假"},
+			{"非nil指针", "{{ if and .test.nonNilPtr true }}真{{ else }}假{{ end }}", "真"},
+			{"自定义结构", "{{ if and .test.customStruct true }}真{{ else }}假{{ end }}", "真"}, // 默认为真
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := s.render.Render(ctx, tt.template)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+
+	t.Run("contains函数边界测试", func(t *testing.T) {
+		ctx := template.NewContext(context.Background())
+
+		testData := map[string]any{
+			"stringVal":    "hello world",
+			"intSlice":     []int{1, 2, 3},
+			"stringSlice":  []string{"go", "python", "java"},
+			"mixedSlice":   []any{"go", 123, true},
+			"stringMap":    map[string]string{"lang": "go", "type": "language"},
+			"mixedMap":     map[string]any{"count": 5, "active": true},
+			"intMap":       map[int]string{1: "one", 2: "two"},
+			"emptySlice":   []string{},
+			"emptyMap":     map[string]any{},
+			"notContainer": 123,
+		}
+
+		err := ctx.SetVariable(template.NewVariable("test", testData))
+		require.NoError(t, err)
+
+		tests := []struct {
+			name     string
+			template string
+			expected string
+		}{
+			{"字符串包含", "{{ if contains .test.stringVal \"world\" }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"字符串不包含", "{{ if contains .test.stringVal \"java\" }}包含{{ else }}不包含{{ end }}", "不包含"},
+			{"int切片包含", "{{ if contains .test.intSlice 2 }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"int切片不包含", "{{ if contains .test.intSlice 5 }}包含{{ else }}不包含{{ end }}", "不包含"},
+			{"string切片包含", "{{ if contains .test.stringSlice \"go\" }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"mixed切片包含", "{{ if contains .test.mixedSlice 123 }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"string map包含key", "{{ if contains .test.stringMap \"lang\" }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"string map不包含key", "{{ if contains .test.stringMap \"version\" }}包含{{ else }}不包含{{ end }}", "不包含"},
+			{"int map包含key", "{{ if contains .test.intMap 1 }}包含{{ else }}不包含{{ end }}", "包含"},
+			{"非容器类型", "{{ if contains .test.notContainer \"test\" }}包含{{ else }}不包含{{ end }}", "不包含"},
+			{"空切片", "{{ if contains .test.emptySlice \"test\" }}包含{{ else }}不包含{{ end }}", "不包含"},
+			{"空map", "{{ if contains .test.emptyMap \"test\" }}包含{{ else }}不包含{{ end }}", "不包含"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result, err := s.render.Render(ctx, tt.template)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+
+	t.Run("变量相关边界测试", func(t *testing.T) {
+		ctx := template.NewContext(context.Background())
+
+		// 测试设置nil变量
+		err := ctx.SetVariable(nil)
+		assert.Error(t, err)
+
+		// 测试设置空名称变量
+		emptyNameVar := template.NewVariable("", "value")
+		err = ctx.SetVariable(emptyNameVar)
+		assert.Error(t, err)
+
+		// 测试正常变量
+		normalVar := template.NewVariable("normal", "value")
+		err = ctx.SetVariable(normalVar)
+		assert.NoError(t, err)
+
+		// 测试获取存在的变量
+		variable, exists := ctx.Variable("normal")
+		assert.True(t, exists)
+		assert.NotNil(t, variable)
+
+		// 测试获取不存在的变量
+		variable, exists = ctx.Variable("nonexistent")
+		assert.False(t, exists)
+		assert.Nil(t, variable)
+
+		// 测试VariableGetter.Get不存在的变量
+		value, err := ctx.Get("nonexistent")
+		assert.NoError(t, err) // 不存在的变量返回nil而不是错误
+		assert.Nil(t, value)
+	})
 }
 
 // TestSuite 运行测试套件

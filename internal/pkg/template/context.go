@@ -234,6 +234,9 @@ func (c *Context) registerBuiltinFunctions() {
 	// 逻辑函数
 	c.functions["and"] = c.logicalAnd
 	c.functions["or"] = c.logicalOr
+
+	// 工具函数
+	c.functions["isEmpty"] = c.isEmpty
 }
 
 // 内置函数实现
