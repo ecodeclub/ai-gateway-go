@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ioc
+package domain
 
-import (
-	"github.com/gotomicro/ego/core/econf"
-)
+type Provider struct {
+	ID     int64
+	Name   string
+	APIKey string
+	Models []Model
+	Ctime  int64
+	Utime  int64
+}
 
-func initSecretKey() string {
-	type SecretKeyConfig struct {
-		SecretKey string `json:"secret_key"`
-	}
-	var cfg SecretKeyConfig
-
-	err := econf.UnmarshalKey("secret", &cfg)
-	if err != nil {
-		panic(err)
-	}
-	return cfg.SecretKey
+type Model struct {
+	ID          int64
+	Provider    Provider
+	Name        string
+	InputPrice  int64
+	OutputPrice int64
+	PriceMode   string
+	Ctime       int64
+	Utime       int64
 }

@@ -15,19 +15,20 @@
 package admin
 
 import (
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ekit/slice"
 )
 
 type InvocationConfigVO struct {
-	ID          int64                    `json:"id"`
-	Name        string                   `json:"name"`
-	BizID       int64                    `json:"bizID"`
-	BizName     string                   `json:"bizName"`
-	Versions    []InvocationCfgVersionVO `json:"versions"`
-	Description string                   `json:"description"`
-	Ctime       int64                    `json:"ctime"`
-	Utime       int64                    `json:"utime"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	BizID       int64  `json:"bizID"`
+	BizName     string `json:"bizName,omitzero"`
+	Description string `json:"description"`
+	Ctime       int64  `json:"ctime"`
+	Utime       int64  `json:"utime"`
 }
 
 func (vo InvocationConfigVO) toDomain() domain.InvocationConfig {
@@ -38,13 +39,10 @@ func (vo InvocationConfigVO) toDomain() domain.InvocationConfig {
 			ID: vo.BizID,
 		},
 		Description: vo.Description,
-		Versions: slice.Map(vo.Versions, func(idx int, src InvocationCfgVersionVO) domain.InvocationCfgVersion {
-			return src.toDomain()
-		}),
 	}
 }
 
-type InvocationCfgVersionVO struct {
+type InvocationConfigVersionVO struct {
 	ID    int64 `json:"id"`
 	InvID int64 `json:"invID"`
 
@@ -53,78 +51,88 @@ type InvocationCfgVersionVO struct {
 	ModelProviderID   int64  `json:"modelProviderID"`
 	ModelProviderName string `json:"modelProviderName"`
 
-	Version      string  `json:"version"`
-	Prompt       string  `json:"prompt"`
-	SystemPrompt string  `json:"systemPrompt"`
-	Temperature  float32 `json:"temperature"`
-	TopP         float32 `json:"topP"`
-	MaxTokens    int     `json:"maxTokens"`
-	Status       string  `json:"status"`
-	Ctime        int64   `json:"ctime"`
-	Utime        int64   `json:"utime"`
+	Version      string         `json:"version"`
+	Prompt       string         `json:"prompt"`
+	SystemPrompt string         `json:"systemPrompt"`
+	JSONSchema   string         `json:"jsonSchema"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
+	Functions    []FunctionVO   `json:"functions,omitempty"`
+	Temperature  float32        `json:"temperature"`
+	TopP         float32        `json:"topP"`
+	MaxTokens    int            `json:"maxTokens"`
+	Status       string         `json:"status"`
+	Ctime        int64          `json:"ctime"`
+	Utime        int64          `json:"utime"`
 }
 
-func (vo InvocationCfgVersionVO) toDomain() domain.InvocationCfgVersion {
-	return domain.InvocationCfgVersion{
+type FunctionVO struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
+}
+
+func (vo InvocationConfigVersionVO) toDomain() domain.InvocationConfigVersion {
+	return domain.InvocationConfigVersion{
 		ID:           vo.ID,
-		InvID:        vo.InvID,
+		Config:       domain.InvocationConfig{ID: vo.InvID},
+		Model:        domain.Model{ID: vo.ModelID},
+		Version:      vo.Version,
 		Prompt:       vo.Prompt,
 		SystemPrompt: vo.SystemPrompt,
-		Version:      vo.Version,
-		Model:        domain.Model{ID: vo.ModelID},
-		Temperature:  vo.Temperature,
-		TopP:         vo.TopP,
-		MaxTokens:    vo.MaxTokens,
-		Status:       domain.InvocationCfgVersionStatus(vo.Status),
+		JSONSchema:   vo.JSONSchema,
+		Attributes:   vo.Attributes,
+		Functions: slice.Map(vo.Functions, func(_ int, src FunctionVO) domain.Function {
+			return domain.Function{
+				Name:       src.Name,
+				Definition: src.Definition,
+			}
+		}),
+		Temperature: vo.Temperature,
+		TopP:        vo.TopP,
+		MaxTokens:   vo.MaxTokens,
+		Status:      domain.InvocationConfigVersionStatus(vo.Status),
+		Ctime:       time.Time{},
+		Utime:       time.Time{},
 	}
 }
 
 func newInvocationVO(p domain.InvocationConfig) InvocationConfigVO {
 	return InvocationConfigVO{
-		ID:      p.ID,
-		BizID:   p.Biz.ID,
-		BizName: p.Biz.Name,
-		Name:    p.Name,
-		Versions: slice.Map(p.Versions, func(idx int, src domain.InvocationCfgVersion) InvocationCfgVersionVO {
-			return newInvocationCfgVersion(src)
-		}),
+		ID:          p.ID,
+		BizID:       p.Biz.ID,
+		BizName:     p.Biz.Name,
+		Name:        p.Name,
 		Description: p.Description,
 		Ctime:       p.Ctime.UnixMilli(),
 		Utime:       p.Utime.UnixMilli(),
 	}
 }
 
-func newInvocationCfgVersion(v domain.InvocationCfgVersion) InvocationCfgVersionVO {
-	return InvocationCfgVersionVO{
+func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigVersionVO {
+	return InvocationConfigVersionVO{
 		ID:                v.ID,
-		InvID:             v.InvID,
-		Prompt:            v.Prompt,
-		Version:           v.Version,
+		InvID:             v.Config.ID,
 		ModelID:           v.Model.ID,
 		ModelName:         v.Model.Name,
 		ModelProviderID:   v.Model.Provider.ID,
 		ModelProviderName: v.Model.Provider.Name,
+		Version:           v.Version,
+		Prompt:            v.Prompt,
 		SystemPrompt:      v.SystemPrompt,
-		Temperature:       v.Temperature,
-		TopP:              v.TopP,
-		MaxTokens:         v.MaxTokens,
-		Status:            v.Status.String(),
-		Ctime:             v.Ctime.UnixMilli(),
-		Utime:             v.Utime.UnixMilli(),
+		JSONSchema:        v.JSONSchema,
+		Attributes:        v.Attributes,
+		Functions: slice.Map(v.Functions, func(_ int, src domain.Function) FunctionVO {
+			return FunctionVO{
+				Name:       src.Name,
+				Definition: src.Definition,
+			}
+		}),
+		Temperature: v.Temperature,
+		TopP:        v.TopP,
+		MaxTokens:   v.MaxTokens,
+		Status:      v.Status.String(),
+		Ctime:       v.Ctime.UnixMilli(),
+		Utime:       v.Utime.UnixMilli(),
 	}
-}
-
-type SaveInvocationConfigReq struct {
-	Cfg InvocationConfigVO `json:"cfg"`
-}
-
-type ListInvocationConfigReq struct {
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
-}
-
-type SaveInvocationConfigVersionReq struct {
-	Version InvocationCfgVersionVO `json:"version"`
 }
 
 type ListInvocationConfigVersionsReq struct {

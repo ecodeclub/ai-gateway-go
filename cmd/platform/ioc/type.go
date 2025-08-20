@@ -55,7 +55,6 @@ var (
 		service.NewChatService,
 		igrpc.NewChatServer,
 	)
-
 	InvocationConfigSet = wire.NewSet(
 		dao.NewInvocationConfigDAO,
 		repository.NewInvocationConfigRepo,
@@ -69,6 +68,12 @@ var (
 		admin.NewBizConfigHandler,
 	)
 
+	ProviderSet = wire.NewSet(
+		dao.NewProviderDAO,
+		repository.NewProviderRepository,
+		InitProvider,
+		admin.NewProviderHandler,
+	)
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )
 

@@ -28,7 +28,6 @@ func main() {
 		// Invoker 在 Ego 里面，应该叫做初始化函数
 		Invoker().
 		Serve(
-			//egovernor.Load("server.governor").Build(),
 			app.GinServer,
 			app.GrpcSever).
 		Run()
