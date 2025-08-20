@@ -85,14 +85,6 @@ func (r *DefaultRender) Render(ctx *Context, templateStr string) (string, error)
 	return result, nil
 }
 
-// ClearCache 清除模板缓存
-func (r *DefaultRender) ClearCache() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.templates = make(map[string]*template.Template)
-}
-
 // getOrParseTemplate 获取或解析模板
 func (r *DefaultRender) getOrParseTemplate(templateStr string, funcMap template.FuncMap) (*template.Template, error) {
 	// 生成模板缓存键
@@ -126,7 +118,7 @@ func (r *DefaultRender) getOrParseTemplate(templateStr string, funcMap template.
 	// 解析模板
 	tmpl, err := tmpl.Parse(templateStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
+		return nil, fmt.Errorf("模板解析失败: %w", err)
 	}
 
 	// 缓存模板
@@ -151,10 +143,9 @@ func (r *DefaultRender) executeTemplate(ctx context.Context, tmpl *template.Temp
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				done <- fmt.Errorf("template execution panic: %v", r)
+				done <- fmt.Errorf("模版执行panic: %v", r)
 			}
 		}()
-
 		err := tmpl.Execute(&buf, data)
 		done <- err
 	}()
@@ -163,7 +154,7 @@ func (r *DefaultRender) executeTemplate(ctx context.Context, tmpl *template.Temp
 	select {
 	case err := <-done:
 		if err != nil {
-			return "", fmt.Errorf("template execution failed: %w", err)
+			return "", fmt.Errorf("模板执行失败: %w", err)
 		}
 		return buf.String(), nil
 	case <-ctx.Done():

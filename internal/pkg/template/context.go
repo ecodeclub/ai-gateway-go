@@ -163,23 +163,6 @@ func (c *Context) FuncMap() template.FuncMap {
 	return result
 }
 
-// ClearVariables 清除所有变量
-func (c *Context) ClearVariables() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.variables = make(map[string]Variable)
-}
-
-// ClearFunctions 清除自定义函数（保留内置函数）
-func (c *Context) ClearFunctions() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.functions = make(map[string]any)
-	c.registerBuiltinFunctions()
-}
-
 // Get 实现VariableGetter接口，用于动态变量访问其他变量
 func (c *Context) Get(name string) (any, error) {
 	c.mu.RLock()
@@ -202,7 +185,7 @@ func (c *Context) registerBuiltinFunctions() {
 	c.functions["join"] = c.joinStrings
 	c.functions["split"] = strings.Split
 	c.functions["title"] = c.titleCase
-	c.functions["replace"] = strings.ReplaceAll
+	c.functions["replace"] = c.replaceString
 
 	// 数学函数
 	c.functions["add"] = c.mathAdd
@@ -236,7 +219,7 @@ func (c *Context) registerBuiltinFunctions() {
 	c.functions["coalesce"] = c.coalesce
 
 	// 编码函数
-	c.functions["base64Encode"] = base64.StdEncoding.EncodeToString
+	c.functions["base64Encode"] = c.base64Encode
 	c.functions["base64Decode"] = c.base64Decode
 
 	// 类型转换
@@ -272,6 +255,10 @@ func (c *Context) joinStrings(sep string, elems []string) string {
 func (c *Context) titleCase(s string) string {
 	caser := cases.Title(language.English)
 	return caser.String(s)
+}
+
+func (c *Context) replaceString(old, new, s string) string {
+	return strings.ReplaceAll(s, old, new)
 }
 
 func (c *Context) mathAdd(a, b any) (float64, error) {
@@ -320,7 +307,7 @@ func (c *Context) mathDiv(a, b any) (float64, error) {
 		return 0, err
 	}
 	if bVal == 0 {
-		return 0, fmt.Errorf("division by zero")
+		return 0, fmt.Errorf("除零错误")
 	}
 	return aVal / bVal, nil
 }
@@ -335,7 +322,7 @@ func (c *Context) mathMod(a, b any) (float64, error) {
 		return 0, err
 	}
 	if bVal == 0 {
-		return 0, fmt.Errorf("modulo by zero")
+		return 0, fmt.Errorf("取模零错误")
 	}
 	return math.Mod(aVal, bVal), nil
 }
@@ -413,12 +400,12 @@ func (c *Context) formatDate(layout string, date any) (string, error) {
 				return t.Format(layout), nil
 			}
 		}
-		return "", fmt.Errorf("unable to parse date string: %s", v)
+		return "", fmt.Errorf("无法解析日期字符串: %s", v)
 	case int64:
 		t := time.Unix(v, 0)
 		return t.Format(layout), nil
 	default:
-		return "", fmt.Errorf("invalid date type: %T", date)
+		return "", fmt.Errorf("无效的日期类型: %T", date)
 	}
 }
 
@@ -456,6 +443,10 @@ func (c *Context) coalesce(values ...any) any {
 	return nil
 }
 
+func (c *Context) base64Encode(input string) string {
+	return base64.StdEncoding.EncodeToString([]byte(input))
+}
+
 func (c *Context) base64Decode(encoded string) (string, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
@@ -479,7 +470,7 @@ func (c *Context) toInt(v any) (int64, error) {
 	case string:
 		return strconv.ParseInt(val, 10, 64)
 	default:
-		return 0, fmt.Errorf("cannot convert %T to int", v)
+		return 0, fmt.Errorf("无法将 %T 转换为整数", v)
 	}
 }
 
@@ -529,7 +520,7 @@ func (c *Context) toFloat64(v any) (float64, error) {
 	case string:
 		return strconv.ParseFloat(val, 64)
 	default:
-		return 0, fmt.Errorf("cannot convert %T to float64", v)
+		return 0, fmt.Errorf("无法将 %T 转换为浮点数", v)
 	}
 }
 

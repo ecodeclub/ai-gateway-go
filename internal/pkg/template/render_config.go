@@ -26,9 +26,8 @@ type Config struct {
 	RenderTimeout   time.Duration // 渲染超时时间
 
 	// 函数限制
-	AllowedFunctions []string      // 允许的函数白名单，空表示允许所有
-	DisableHTTP      bool          // 是否禁用HTTP相关函数
-	FunctionTimeout  time.Duration // 单个函数执行超时
+	DisableHTTP     bool          // 是否禁用HTTP相关函数
+	FunctionTimeout time.Duration // 单个函数执行超时
 
 	// 上下文限制
 	MaxContextDepth int // 最大上下文嵌套深度
@@ -38,46 +37,27 @@ type Config struct {
 // DefaultConfig 返回默认配置
 func DefaultConfig() *Config {
 	return &Config{
-		MaxTemplateSize:  10 * 1024,       // 10KB
-		MaxOutputSize:    100 * 1024,      // 100KB
-		RenderTimeout:    time.Second * 5, // 5秒
-		AllowedFunctions: nil,             // 允许所有函数
-		DisableHTTP:      true,            // 默认禁用HTTP
-		FunctionTimeout:  time.Second,     // 函数1秒超时
-		MaxContextDepth:  10,              // 最大10层嵌套
-		MaxLoopCount:     1000,            // 最大1000次循环
+		MaxTemplateSize: 10 * 1024,       // 10KB
+		MaxOutputSize:   100 * 1024,      // 100KB
+		RenderTimeout:   time.Second * 5, // 5秒
+		DisableHTTP:     true,            // 默认禁用HTTP
+		FunctionTimeout: time.Second,     // 函数1秒超时
+		MaxContextDepth: 10,              // 最大10层嵌套
+		MaxLoopCount:    1000,            // 最大1000次循环
 	}
 }
 
 // StrictConfig 返回严格配置
 func StrictConfig() *Config {
 	return &Config{
-		MaxTemplateSize: 2 * 1024,        // 2KB
-		MaxOutputSize:   10 * 1024,       // 10KB
-		RenderTimeout:   time.Second * 2, // 2秒
-		AllowedFunctions: []string{ // 只允许基础函数
-			"upper", "lower", "trim", "truncate",
-			"default", "formatDate", "add", "sub",
-		},
+		MaxTemplateSize: 2 * 1024,               // 2KB
+		MaxOutputSize:   10 * 1024,              // 10KB
+		RenderTimeout:   time.Second * 2,        // 2秒
 		DisableHTTP:     true,                   // 禁用HTTP
 		FunctionTimeout: time.Millisecond * 500, // 函数500ms超时
 		MaxContextDepth: 5,                      // 最大5层嵌套
 		MaxLoopCount:    100,                    // 最大100次循环
 	}
-}
-
-// IsFunctionAllowed 检查函数是否被允许
-func (c *Config) IsFunctionAllowed(funcName string) bool {
-	if len(c.AllowedFunctions) == 0 {
-		return true // 空白名单表示允许所有
-	}
-
-	for _, allowed := range c.AllowedFunctions {
-		if allowed == funcName {
-			return true
-		}
-	}
-	return false
 }
 
 // ValidateTemplateSize 验证模板大小

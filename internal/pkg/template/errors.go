@@ -33,40 +33,16 @@ var (
 	ErrTemplateFunctionInvalid = errors.New("模板函数无效")
 )
 
-// Error 模板错误的包装
-type Error struct {
-	Op       string // 操作名称
-	Template string // 模板内容（可能被截断）
-	Err      error  // 原始错误
-}
-
-func (e *Error) Error() string {
-	if e.Template != "" {
-		return fmt.Sprintf("template %s error: %v (template: %s)", e.Op, e.Err, e.truncateTemplate())
-	}
-	return fmt.Sprintf("template %s error: %v", e.Op, e.Err)
-}
-
-func (e *Error) Unwrap() error {
-	return e.Err
-}
-
-// truncateTemplate 截断模板内容用于错误显示
-func (e *Error) truncateTemplate() string {
-	if len(e.Template) <= 50 {
-		return e.Template
-	}
-	return e.Template[:47] + "..."
-}
-
-// WrapError 包装错误为TemplateError
+// WrapError 包装错误并添加template包前缀和操作信息
 func WrapError(op, template string, err error) error {
-	if err == nil {
-		return nil
+	// 包含包名的错误信息
+	if template != "" {
+		// 截断模板内容用于错误显示
+		truncated := template
+		if len(template) > 50 {
+			truncated = template[:47] + "..."
+		}
+		return fmt.Errorf("template.%s: %w (模板: %s)", op, err, truncated)
 	}
-	return &Error{
-		Op:       op,
-		Template: template,
-		Err:      err,
-	}
+	return fmt.Errorf("template.%s: %w", op, err)
 }
