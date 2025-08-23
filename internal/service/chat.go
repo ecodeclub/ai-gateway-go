@@ -148,7 +148,7 @@ func (c *ChatService) Stream(
 func (c *ChatService) getModel(modelId int64) (domain.Model, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	return c.providerService.GetModel(ctx, modelId)
+	return c.providerService.ModelDetail(ctx, modelId)
 }
 
 func (c *ChatService) deduct(uid int64, key string, amount int64) {

@@ -52,22 +52,3 @@ grpc:
 	@buf format -w api/proto
 	@buf lint api/proto
 	@buf generate api/proto
-
-.PHONY: check-license
-check-license:
-	@echo "Ruining check-license"
-	@missing=$$(find . -type f -name "*.go" \
-	  -not -path "./vendor/*" \
-	  -not -path "./third_party/*" \
-	  -not -path "./.idea/*" \
-	  -not -name '*.pb.go' \
-	  -not -name '*_gen.go' \
-	  -not -name '*mock*.go' \
-	  | xargs grep -L "Licensed under the Apache License"); \
-	if [ -n "$$missing" ]; then \
-	  echo "The following files are missing the license header:"; \
-	  echo "$$missing"; \
-	  exit 1; \
-	else \
-	  echo "All Go files contain the license header."; \
-	fi
