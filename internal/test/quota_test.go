@@ -16,13 +16,14 @@ package test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 )
 
 type QuotaTestSuite struct {

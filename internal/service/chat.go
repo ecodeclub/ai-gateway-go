@@ -16,9 +16,10 @@ package service
 
 import (
 	"context"
-	"github.com/ecodeclub/ai-gateway-go/errs"
 	"math"
 	"time"
+
+	"github.com/ecodeclub/ai-gateway-go/errs"
 
 	"github.com/gotomicro/ego/core/elog"
 
