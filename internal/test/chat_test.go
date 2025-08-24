@@ -2,6 +2,9 @@ package test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
@@ -10,8 +13,6 @@ import (
 	"github.com/gotomicro/ego"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
-	"testing"
-	"time"
 )
 
 type ChatSuite struct {

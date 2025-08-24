@@ -22,6 +22,11 @@ message StreamRequest {
   Message msg = 2;
 }
 
+message ChatRequest {
+  string sn = 1;
+  Message msg = 2;
+}
+
 message StreamResponse {
   bool final = 1;
   string reasoning_content = 2;
@@ -39,7 +44,7 @@ service Service {
   // 这部分是真的发起会话
   // Stream 是采用流式接口发起一轮对话
   rpc Stream(StreamRequest) returns (stream StreamResponse);
-  rpc Chat(StreamRequest) returns (ChatResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
 }
 
 message SaveRequest {
