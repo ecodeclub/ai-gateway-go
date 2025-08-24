@@ -24,5 +24,8 @@ func InitTables(db *gorm.DB) error {
 		&Message{},
 		&Provider{},
 		&Model{},
+		&Quota{},
+		&TempQuota{},
+		&QuotaRecord{},
 	)
 }

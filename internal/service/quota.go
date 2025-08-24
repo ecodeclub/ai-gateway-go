@@ -16,17 +16,19 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 )
 
 type QuotaService struct {
-	repo *repository.QuotaRepo
+	repo    *repository.QuotaRepo
+	maxDebt int64
 }
 
-func NewQuotaService(repo *repository.QuotaRepo) *QuotaService {
-	return &QuotaService{repo: repo}
+func NewQuotaService(repo *repository.QuotaRepo, maxDebt int64) *QuotaService {
+	return &QuotaService{repo: repo, maxDebt: maxDebt}
 }
 
 func (q *QuotaService) AddQuota(ctx context.Context, quota domain.Quota) error {
@@ -47,4 +49,21 @@ func (q *QuotaService) GetQuota(ctx context.Context, uid int64) (domain.Quota, e
 
 func (q *QuotaService) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
 	return q.repo.Deduct(ctx, uid, amount, key)
+}
+
+func (q *QuotaService) HasEnoughQuota(ctx context.Context, uid int64) (bool, error) {
+	quota, err := q.repo.GetQuota(ctx, uid)
+	if err != nil {
+		return false, err
+	}
+	now := time.Now()
+	lastClearTime := time.Unix(quota.DebtStartTime, 0)
+
+	lapsed := now.Sub(lastClearTime)
+	threshold := 30 * 24 * time.Hour
+
+	if quota.Amount >= q.maxDebt && lapsed > threshold {
+		return false, nil
+	}
+	return true, nil
 }

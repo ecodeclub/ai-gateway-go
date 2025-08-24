@@ -16,7 +16,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: chat/v1/chat.proto
+// source: api/proto/chat/v1/chat.proto
 
 package chatv1
 
@@ -47,7 +47,7 @@ type ServiceClient interface {
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Detail(ctx context.Context, in *DetailRequest, opts ...grpc.CallOption) (*DetailResponse, error)
 	// 会更新传入过来的字段，没有传递的字段将会被忽略
-	// 如果没有对应的 ID，则会执行创建的语义
+	// 如果没有对应的 SN，则会执行创建的语义
 	Save(ctx context.Context, in *SaveRequest, opts ...grpc.CallOption) (*SaveResponse, error)
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
@@ -119,7 +119,7 @@ type ServiceServer interface {
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	Detail(context.Context, *DetailRequest) (*DetailResponse, error)
 	// 会更新传入过来的字段，没有传递的字段将会被忽略
-	// 如果没有对应的 ID，则会执行创建的语义
+	// 如果没有对应的 SN，则会执行创建的语义
 	Save(context.Context, *SaveRequest) (*SaveResponse, error)
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
@@ -259,5 +259,5 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "chat/v1/chat.proto",
+	Metadata: "api/proto/chat/v1/chat.proto",
 }

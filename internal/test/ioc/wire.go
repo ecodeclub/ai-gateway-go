@@ -35,6 +35,7 @@ func InitApp(to TestOnly) *TestApp {
 		ioc.InvocationConfigSet,
 		ioc.BizConfigSet,
 		ioc.ProviderSet,
+		ioc.QuotaSet,
 		wire.FieldsOf(new(TestOnly), "LLM"),
 		wire.Struct(new(TestApp), "*"),
 	)

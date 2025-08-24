@@ -31,7 +31,15 @@ var (
 		InitRedis, InitDB, InitSession,
 		InitGin,
 		InitGrpcServer)
-	LLMSet  = wire.NewSet(initLLMHandler)
+
+	LLMSet = wire.NewSet(initLLMHandler)
+
+	QuotaSet = wire.NewSet(
+		dao.NewQuotaDao,
+		repository.NewQuotaRepo,
+		InitQuota,
+	)
+
 	ChatSet = wire.NewSet(
 		dao.NewChatDAO,
 		cache.NewChatCache,
