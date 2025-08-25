@@ -20,4 +20,5 @@ import (
 
 var (
 	ErrInsufficientBalance = errors.New("余额不足")
+	ErrAccountOverdue      = errors.New("账户欠费")
 )

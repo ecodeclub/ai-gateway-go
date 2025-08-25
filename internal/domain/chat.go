@@ -28,6 +28,13 @@ type Chat struct {
 	Ctime    time.Time
 	Utime    time.Time
 }
+
+const (
+	USER   = "USER"
+	TOOL   = "TOOL"
+	SYSTEM = "SYSTEM"
+)
+
 type Message struct {
 	ID               int64
 	Role             string

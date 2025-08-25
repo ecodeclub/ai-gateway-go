@@ -22,4 +22,5 @@ import (
 
 type Handler interface {
 	StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error)
+	Chat(ctx context.Context, req []domain.Message) (domain.ChatResponse, error)
 }

@@ -16,6 +16,11 @@ package grpc
 
 import (
 	"context"
+	"errors"
+
+	"github.com/ecodeclub/ai-gateway-go/errs"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -64,10 +69,31 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 	return &ai.DetailResponse{Chat: c.toChat(chat)}, nil
 }
 
+func (c *ChatServer) Chat(ctx context.Context, request *ai.ChatRequest) (*ai.ChatResponse, error) {
+	chat, err := c.svc.Chat(ctx, request.GetSn(), c.toDomainMessage([]*ai.Message{request.GetMsg()}))
+	if err != nil {
+		return nil, err
+	}
+	return &ai.ChatResponse{
+		Response: &ai.Message{
+			Content: chat.Response.Content,
+		},
+	}, nil
+}
+
 func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
 	ctx := resp.Context()
-	ch, err := c.svc.Stream(ctx, request.GetSn(), c.toDomainMessage([]*ai.Message{request.GetMsg()}))
+	ch, err := c.svc.Stream(
+		ctx,
+		request.GetSn(),
+		request.GetUid(),
+		request.GetKey(),
+		request.GetInvocationConfigID(),
+		c.toDomainMessage([]*ai.Message{request.GetMsg()}))
 	if err != nil {
+		if errors.Is(err, errs.ErrAccountOverdue) {
+			return status.Error(codes.PermissionDenied, "账户欠费")
+		}
 		return err
 	}
 	return c.stream(ctx, ch, resp)

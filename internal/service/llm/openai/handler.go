@@ -1,3 +1,17 @@
+// Copyright 2025 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package openai
 
 import (
@@ -5,6 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/slice"
 	"github.com/gotomicro/ego/core/elog"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -33,6 +48,22 @@ func NewHandler(apikey string, baseURL string, model string) *Handler {
 		logger: elog.DefaultLogger,
 		model:  model,
 	}
+}
+
+func (h *Handler) Chat(ctx context.Context, messages []domain.Message) (domain.ChatResponse, error) {
+	params := openai.ChatCompletionNewParams{
+		Messages: h.toOpenAIMessage(messages),
+		Model:    h.model,
+	}
+	res, err := h.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return domain.ChatResponse{}, err
+	}
+	return domain.ChatResponse{
+		Response: domain.Message{
+			Content: res.Choices[0].Message.Content,
+		},
+	}, err
 }
 
 func (h *Handler) StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error) {
@@ -83,6 +114,21 @@ func (h *Handler) recv(eventCh chan domain.StreamEvent,
 		}
 	}
 	eventCh <- domain.StreamEvent{
-		Done: true,
+		Done:        true,
+		InputToken:  acc.Usage.PromptTokens,
+		OutputToken: acc.Usage.TotalTokens,
 	}
+}
+
+func (h *Handler) toOpenAIMessage(messages []domain.Message) []openai.ChatCompletionMessageParamUnion {
+	return slice.Map(messages, func(idx int, src domain.Message) openai.ChatCompletionMessageParamUnion {
+		switch src.Role {
+		case domain.USER:
+			return openai.UserMessage(src.Content)
+		case domain.SYSTEM:
+			return openai.SystemMessage(src.Content)
+		default:
+			return openai.ChatCompletionMessageParamUnion{}
+		}
+	})
 }
