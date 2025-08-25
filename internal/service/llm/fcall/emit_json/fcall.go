@@ -1,9 +1,6 @@
 package emit_json
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/pkg/errors"
 )
@@ -22,19 +19,10 @@ func (e EmitJsonFunctionCall) Name() string {
 // Call 这里的会将
 func (e EmitJsonFunctionCall) Call(fctx *fcall.Context, req fcall.Request) (fcall.Response, error) {
 	// 第一步从req的data中获取原始数据
-	dataMap := make(map[string]any)
-	err := json.Unmarshal(req.Args, &dataMap)
+	val,err := req.GetVal(jsonDataName)
 	if err != nil {
-		return fcall.Response{}, fcall.NewFcallErr(e, fmt.Errorf("反序列化失败 %w", err))
+		return fcall.Response{},err
 	}
-	jsonData, ok := dataMap[jsonDataName]
-	if !ok {
-		return fcall.Response{}, fcall.NewFcallErr(e, ErrJsonNotFound)
-	}
-	// 将用户输入的内容放进ctx里
-	fctx.JSONData, ok = jsonData.(string)
-	if !ok {
-		return fcall.Response{}, fcall.NewFcallErr(e, errors.New("jsonData的数据类型不正确"))
-	}
+	fctx.JSONData = val
 	return fcall.Response{}, err
 }
