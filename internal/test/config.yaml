@@ -6,6 +6,7 @@ grpc:
 provider:
   encrypt:
     key: "6ebp4qunN13NznqCbtLspAnZrQ9JBhnY"
-
+quota:
+  maxDebt: 20
 admin:
   port: 9080

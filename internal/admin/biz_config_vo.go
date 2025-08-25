@@ -16,37 +16,24 @@ package admin
 
 import "github.com/ecodeclub/ai-gateway-go/internal/domain"
 
-type CreateBizConfigReq struct {
-	ID        int64  `json:"id"`
-	OwnerId   int64  `json:"owner_id"`
-	OwnerType string `json:"owner_type"`
-	Config    string `json:"config"`
-}
-
 type BizConfig struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
-	OwnerId   int64  `json:"ownerID"`
+	OwnerID   int64  `json:"ownerID"`
 	OwnerType string `json:"ownerType"`
 	Config    string `json:"config"`
-}
-
-type ListReq struct {
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
-}
-
-type BizConfigList struct {
-	Cfgs  []BizConfig `json:"cfgs"`
-	Total int
+	Ctime     int64  `json:"ctime"`
+	Utime     int64  `json:"utime"`
 }
 
 func newBizConfig(cfg domain.BizConfig) BizConfig {
 	return BizConfig{
 		ID:        cfg.ID,
 		Name:      cfg.Name,
-		OwnerId:   cfg.OwnerID,
+		OwnerID:   cfg.OwnerID,
 		OwnerType: cfg.OwnerType,
 		Config:    cfg.Config,
+		Ctime:     cfg.Ctime.UnixMilli(),
+		Utime:     cfg.Utime.UnixMilli(),
 	}
 }

@@ -20,6 +20,9 @@ option go_package = "v1/chat;chatv1";
 message StreamRequest {
   string sn = 1;
   Message msg = 2;
+  int64  invocationConfigID = 3;
+  int64 uid = 4;
+  string key = 5;
 }
 
 message ChatRequest {

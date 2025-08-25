@@ -34,36 +34,48 @@ type InvocationConfig struct {
 	Name        string
 	Biz         BizConfig
 	Description string
-	// 配置的所有的版本信息
-	Versions []InvocationCfgVersion
-	Ctime    time.Time
-	Utime    time.Time
+	Ctime       time.Time
+	Utime       time.Time
 }
 
-type InvocationCfgVersionStatus string
+type InvocationConfigVersionStatus string
 
 const (
-	InvocationCfgVersionStatusDraft  InvocationCfgVersionStatus = "draft"
-	InvocationCfgVersionStatusActive InvocationCfgVersionStatus = "active"
+	InvocationCfgVersionStatusDraft  InvocationConfigVersionStatus = "draft"
+	InvocationCfgVersionStatusActive InvocationConfigVersionStatus = "active"
 )
 
-func (s InvocationCfgVersionStatus) String() string {
+func (s InvocationConfigVersionStatus) String() string {
 	return string(s)
 }
 
-type InvocationCfgVersion struct {
-	ID int64
-	// InvocationConfig 的 ID
-	InvID int64
-	Model Model
-	// 版本号
+func (s InvocationConfigVersionStatus) IsValid() bool {
+	switch s {
+	case InvocationCfgVersionStatusDraft, InvocationCfgVersionStatusActive:
+		return true
+	}
+	return false
+}
+
+type InvocationConfigVersion struct {
+	ID           int64
+	Config       InvocationConfig
+	Model        Model
 	Version      string
 	Prompt       string
 	SystemPrompt string
+	JSONSchema   string
+	Attributes   map[string]any
+	Functions    []Function
 	Temperature  float32
 	TopP         float32
 	MaxTokens    int
-	Status       InvocationCfgVersionStatus
+	Status       InvocationConfigVersionStatus
 	Ctime        time.Time
 	Utime        time.Time
+}
+
+type Function struct {
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
 }

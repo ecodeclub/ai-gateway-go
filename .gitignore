@@ -30,3 +30,4 @@ logs
 .log
 .sys
 **/local.yaml
+.tool-versions

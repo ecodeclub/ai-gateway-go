@@ -20,7 +20,7 @@ import (
 	"github.com/gotomicro/ego/core/econf"
 )
 
-func InitProvider(repo *repository.ProviderRepo) *service.ProviderService {
+func InitProvider(repo *repository.ProviderRepository) *service.ProviderService {
 	type Config struct {
 		Encrypt struct {
 			Key string

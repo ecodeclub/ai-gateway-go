@@ -26,7 +26,7 @@ import (
 
 type TempQuota struct {
 	ID        int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	UID       int64  `gorm:"column:uid"`
+	UID       int64  `gorm:"column:uid;uniqueIndex:idx_uid"`
 	Key       string `gorm:"column:key;uniqueIndex;type:varchar(256)"`
 	Amount    int64  `gorm:"column:amount"`
 	StartTime int64  `gorm:"column:start_time"`
@@ -41,7 +41,7 @@ func (TempQuota) TableName() string {
 
 type QuotaRecord struct {
 	ID     int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Uid    int64  `gorm:"column:uid;index"`
+	UID    int64  `gorm:"column:uid"`
 	Key    string `gorm:"column:key;uniqueIndex;type:varchar(256)"`
 	Amount int64  `gorm:"column:amount"`
 	Ctime  int64  `gorm:"column:ctime"`
@@ -53,13 +53,12 @@ func (QuotaRecord) TableName() string {
 }
 
 type Quota struct {
-	ID            int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	UID           int64  `gorm:"column:uid"`
-	Key           string `gorm:"column:key;uniqueIndex;type:varchar(256)"`
-	Amount        int64  `gorm:"column:amount"`
-	LastClearTime int64  `gorm:"column:last_clear_time"`
-	Ctime         int64  `gorm:"column:ctime"`
-	Utime         int64  `gorm:"column:utime"`
+	ID            int64 `gorm:"primaryKey;autoIncrement;column:id"`
+	UID           int64 `gorm:"column:uid;uniqueIndex:idx_uid"`
+	Amount        int64 `gorm:"column:amount"`
+	DebtStartTime int64 `gorm:"column:debt_start_time"`
+	Ctime         int64 `gorm:"column:ctime"`
+	Utime         int64 `gorm:"column:utime"`
 }
 
 func (Quota) TableName() string {
@@ -81,15 +80,15 @@ func (dao *QuotaDao) CreateTempQuota(ctx context.Context, quota TempQuota) error
 	return dao.db.WithContext(ctx).Create(&quota).Error
 }
 
-func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
+func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) error {
 	now := time.Now().Unix()
 	quota.Utime = now
 
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().Unix()
 		record := QuotaRecord{
-			Key:    quota.Key,
-			Uid:    quota.UID,
+			Key:    key,
+			UID:    quota.UID,
 			Amount: quota.Amount,
 			Ctime:  now,
 			Utime:  now,
@@ -99,19 +98,26 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, quota Quota) error {
 			return err
 		}
 
-		return tx.Clauses(clause.OnConflict{
+		err = tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "uid"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"amount": gorm.Expr("amount + ?", quota.Amount),
 				"utime":  now,
 			}),
 		}).Create(&quota).Error
+		if err != nil {
+			return err
+		}
+		return tx.Model(&Quota{}).
+			Where("uid = ? AND amount > 0", quota.UID).
+			Update("debt_start_time", now).Error
 	})
 }
 
 func (dao *QuotaDao) GetQuotaByUid(ctx context.Context, uid int64) (Quota, error) {
 	var quota Quota
 	err := dao.db.WithContext(ctx).
-		Where("uid = ? and end_time >= ?", uid).
+		Where("uid = ?", uid).
 		First(&quota).Error
 	if err != nil {
 		return Quota{}, err
@@ -137,7 +143,7 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key st
 		now := time.Now().Unix()
 		record := QuotaRecord{
 			Key:    key,
-			Uid:    uid,
+			UID:    uid,
 			Amount: amount,
 			Ctime:  now,
 			Utime:  now,
@@ -180,13 +186,27 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 			return nil
 		}
 	}
-	// 从主额度扣
-	result := tx.Model(&Quota{}).
-		Where("uid = ?", uid).
-		Updates(map[string]any{
-			"amount": gorm.Expr("amount - ?", deductAmount),
-			"utime":  now,
-		})
+	quota := Quota{
+		UID:           uid,
+		Amount:        -amount,
+		Utime:         now,
+		DebtStartTime: now,
+	}
+	// 如果存在对应的用户, 那么直接扣,
+	// 如果不存在那么初始化为负数
+	result := tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "uid"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"amount": gorm.Expr("amount - ?", amount),
+			"debt_start_time": gorm.Expr(
+				"CASE WHEN quotas.amount < ? THEN ? ELSE quotas.debt_start_time END",
+				amount,
+				now,
+			),
+			"utime": now,
+		}),
+	}).Create(&quota)
+
 	if result.Error != nil {
 		return result.Error
 	}
@@ -194,8 +214,4 @@ func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) err
 		return errs.ErrInsufficientBalance
 	}
 	return nil
-}
-
-func InitQuotaTable(db *gorm.DB) error {
-	return db.AutoMigrate(&Quota{}, &TempQuota{}, &QuotaRecord{})
 }

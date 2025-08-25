@@ -25,7 +25,7 @@ import (
 
 type BizConfig struct {
 	ID        int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Name      string `gorm:"type:varchar(256)"`
+	Name      string `gorm:"type:varchar(255)"`
 	OwnerID   int64  `gorm:"column:owner_id;type:bigint;not null"`
 	OwnerType string `gorm:"column:owner_type;type:varchar(20);not null"`
 	Config    string `gorm:"column:config;type:text"`
@@ -50,16 +50,14 @@ func (d *BizConfigDAO) Save(ctx context.Context, bc BizConfig) (int64, error) {
 	bc.Ctime = now
 	bc.Utime = now
 	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.AssignmentColumns([]string{"config", "name", "utime"}),
+		DoUpdates: clause.AssignmentColumns([]string{
+			"name",
+			"owner_id",
+			"owner_type",
+			"config",
+			"utime"}),
 	}).Create(&bc).Error
 	return bc.ID, err
-}
-
-// GetByID 根据ID查询
-func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (BizConfig, error) {
-	var bc BizConfig
-	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bc).Error
-	return bc, err
 }
 
 func (d *BizConfigDAO) List(ctx context.Context, offset, limit int) ([]BizConfig, error) {
@@ -69,8 +67,14 @@ func (d *BizConfigDAO) List(ctx context.Context, offset, limit int) ([]BizConfig
 	return bc, err
 }
 
-func (d *BizConfigDAO) Count(ctx context.Context) (int, error) {
-	var total int
-	err := d.db.WithContext(ctx).Model(&BizConfig{}).Select("COUNT(id)").First(&total).Error
+func (d *BizConfigDAO) Count(ctx context.Context) (int64, error) {
+	var total int64
+	err := d.db.WithContext(ctx).Model(&BizConfig{}).Count(&total).Error
 	return total, err
+}
+
+func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (BizConfig, error) {
+	var bc BizConfig
+	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bc).Error
+	return bc, err
 }

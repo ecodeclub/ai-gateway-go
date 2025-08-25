@@ -15,18 +15,19 @@
 package ioc
 
 import (
+	"github.com/ecodeclub/ai-gateway-go/internal/repository"
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/gotomicro/ego/core/econf"
 )
 
-func initSecretKey() string {
-	type SecretKeyConfig struct {
-		SecretKey string `json:"secret_key"`
+func InitQuota(repo *repository.QuotaRepo) *service.QuotaService {
+	type QuotaConfig struct {
+		MaxDebt int64 `yaml:"maxDebt"`
 	}
-	var cfg SecretKeyConfig
-
-	err := econf.UnmarshalKey("secret", &cfg)
+	var cfg QuotaConfig
+	err := econf.UnmarshalKey("quota", &cfg)
 	if err != nil {
 		panic(err)
 	}
-	return cfg.SecretKey
+	return service.NewQuotaService(repo, cfg.MaxDebt)
 }
