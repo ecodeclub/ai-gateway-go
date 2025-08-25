@@ -22,6 +22,7 @@ package chatv1
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -37,6 +38,7 @@ const (
 	Service_Detail_FullMethodName = "/chat.v1.Service/Detail"
 	Service_Save_FullMethodName   = "/chat.v1.Service/Save"
 	Service_Stream_FullMethodName = "/chat.v1.Service/Stream"
+	Service_Chat_FullMethodName   = "/chat.v1.Service/Chat"
 )
 
 // ServiceClient is the client API for Service service.
@@ -52,6 +54,7 @@ type ServiceClient interface {
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
 	Stream(ctx context.Context, in *StreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamResponse], error)
+	Chat(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (*ChatResponse, error)
 }
 
 type serviceClient struct {
@@ -111,6 +114,16 @@ func (c *serviceClient) Stream(ctx context.Context, in *StreamRequest, opts ...g
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Service_StreamClient = grpc.ServerStreamingClient[StreamResponse]
 
+func (c *serviceClient) Chat(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (*ChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatResponse)
+	err := c.cc.Invoke(ctx, Service_Chat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServiceServer is the server API for Service service.
 // All implementations must embed UnimplementedServiceServer
 // for forward compatibility.
@@ -124,6 +137,7 @@ type ServiceServer interface {
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
 	Stream(*StreamRequest, grpc.ServerStreamingServer[StreamResponse]) error
+	Chat(context.Context, *ChatRequest) (*ChatResponse, error)
 	mustEmbedUnimplementedServiceServer()
 }
 
@@ -145,6 +159,9 @@ func (UnimplementedServiceServer) Save(context.Context, *SaveRequest) (*SaveResp
 }
 func (UnimplementedServiceServer) Stream(*StreamRequest, grpc.ServerStreamingServer[StreamResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
+}
+func (UnimplementedServiceServer) Chat(context.Context, *ChatRequest) (*ChatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Chat not implemented")
 }
 func (UnimplementedServiceServer) mustEmbedUnimplementedServiceServer() {}
 func (UnimplementedServiceServer) testEmbeddedByValue()                 {}
@@ -232,6 +249,24 @@ func _Service_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Service_StreamServer = grpc.ServerStreamingServer[StreamResponse]
 
+func _Service_Chat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServiceServer).Chat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Service_Chat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServiceServer).Chat(ctx, req.(*ChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Service_ServiceDesc is the grpc.ServiceDesc for Service service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +285,10 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Save",
 			Handler:    _Service_Save_Handler,
+		},
+		{
+			MethodName: "Chat",
+			Handler:    _Service_Chat_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

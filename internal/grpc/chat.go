@@ -69,6 +69,18 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 	return &ai.DetailResponse{Chat: c.toChat(chat)}, nil
 }
 
+func (c *ChatServer) Chat(ctx context.Context, request *ai.ChatRequest) (*ai.ChatResponse, error) {
+	chat, err := c.svc.Chat(ctx, request.GetSn(), c.toDomainMessage([]*ai.Message{request.GetMsg()}))
+	if err != nil {
+		return nil, err
+	}
+	return &ai.ChatResponse{
+		Response: &ai.Message{
+			Content: chat.Response.Content,
+		},
+	}, nil
+}
+
 func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
 	ctx := resp.Context()
 	ch, err := c.svc.Stream(
