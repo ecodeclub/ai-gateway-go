@@ -1,6 +1,7 @@
 package emit_json
 
 import (
+	"encoding/json"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/pkg/errors"
 )
@@ -19,10 +20,12 @@ func (e EmitJsonFunctionCall) Name() string {
 // Call 这里的会将
 func (e EmitJsonFunctionCall) Call(fctx *fcall.Context, req fcall.Request) (fcall.Response, error) {
 	// 第一步从req的data中获取原始数据
-	val,err := req.GetVal(jsonDataName)
+	val, err := req.GetVal(jsonDataName)
 	if err != nil {
-		return fcall.Response{},err
+		return fcall.Response{}, err
 	}
-	fctx.JSONData = val
+	jsonData := make(map[string]any)
+	err = json.Unmarshal([]byte(val), &jsonData)
+	fctx.JSONData = jsonData
 	return fcall.Response{}, err
 }

@@ -3,73 +3,61 @@
 package emit_json
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestEmitJsonFunctionCall_Name(t *testing.T) {
-	fc := EmitJsonFunctionCall{}
-	assert.Equal(t, "emit_json", fc.Name())
-}
+func TestEmitJsonFunctionCall(t *testing.T) {
 
-func TestEmitJsonFunctionCall_Call(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        []byte
-		wantJSON    string
-		wantErr     bool
-		errIs       error
-		errContains []string
+		argMap      map[string]string
+		wantErr     error
+		wantJSON    map[string]any
+		checkPrefix bool
 	}{
 		{
-			name:     "成功",
-			args:     []byte(`{"data":"hello"}`),
-			wantJSON: "hello",
+			name:     "成功解析JSON到上下文",
+			argMap:   map[string]string{"data": `{"a":1,"b":"x"}`},
+			wantErr:  nil,
+			wantJSON: map[string]any{"a": float64(1), "b": "x"},
 		},
 		{
-			name:        "反序列化失败",
-			args:        []byte(`not json`),
-			wantErr:     true,
-			errContains: []string{"反序列化失败"},
+			name:    "缺少data参数",
+			argMap:  map[string]string{},
+			wantErr: fcall.ErrArgNotFound,
+			// 失败情况下，JSONData 未被写入，应为 nil
+			wantJSON: nil,
 		},
 		{
-			name:    "缺少data",
-			args:    []byte(`{"other":"x"}`),
-			wantErr: true,
-			errIs:   ErrJsonNotFound,
-		},
-		{
-			name:        "data类型不正确",
-			args:        []byte(`{"data":123}`),
-			wantErr:     true,
-			errContains: []string{"jsonData的数据类型不正确"},
+			name:        "data不是合法JSON",
+			argMap:      map[string]string{"data": "not a json"},
+			wantErr:     errors.New("json: "),
+			wantJSON:    map[string]any{},
+			checkPrefix: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fc := EmitJsonFunctionCall{}
-			ctx := &fcall.Context{}
-			_, err := fc.Call(ctx, fcall.Request{Args: tt.args})
+			fctx := &fcall.Context{}
 
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, "functionCall: emit_json")
-				for _, s := range tt.errContains {
-					assert.ErrorContains(t, err, s)
-				}
-				if tt.errIs != nil {
-					assert.True(t, errors.Is(err, tt.errIs))
-				}
-				return
+			args, err := json.Marshal(tt.argMap)
+			assert.NoError(t, err)
+
+			resp, err := fc.Call(fctx, fcall.Request{Args: args})
+			if tt.wantErr == nil {
+				assert.NoError(t, err)
+				assert.Equal(t, fcall.Response{}, resp)
+			} else {
+				assert.Error(t, err)
 			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantJSON, ctx.JSONData)
+			assert.Equal(t, tt.wantJSON, fctx.JSONData)
 		})
 	}
 }

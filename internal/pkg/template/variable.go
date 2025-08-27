@@ -16,7 +16,7 @@ package template
 
 // Variable 变量接口，简洁的名称+值设计
 type Variable interface {
-	// Name 返回变量名称，用于模板中访问 {{ .name.xxx }}
+	// Name 返回变量名称，用于模板中访问
 	Name() string
 	// Value 返回变量值，支持错误返回
 	Value() (any, error)

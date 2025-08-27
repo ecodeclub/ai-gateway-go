@@ -19,8 +19,8 @@ type FunctionCall interface {
 type Context struct {
 	context.Context
 	// 这里的是用户输入的数据
-	JSONData string
-	// Attachments 是每个functionCall的产物，每个functioncall如果想要，其他人共享都可以放在这个字段里，健是functionCall的name。
+	JSONData map[string]any
+	// Attachments 是每个functionCall的产物，每个functioncall如果想要，其他人共享都可以放在这个字段里
 	Attachments map[string]string
 }
 
@@ -30,11 +30,15 @@ type Request struct {
 	Args []byte
 }
 
+
 // GetArgs 获取序列化好的Args
 func (r Request) GetArgs() (map[string]string, error) {
 	args := make(map[string]string)
 	err := json.Unmarshal(r.Args, &args)
-	return args, fmt.Errorf("序列化失败 %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("序列化失败 %w", err)
+	}
+	return args, nil
 }
 
 // GetVal 获取具体的值
