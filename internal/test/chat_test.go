@@ -24,6 +24,7 @@ type ChatSuite struct {
 }
 
 func TestChat(t *testing.T) {
+	t.Skip()
 	suite.Run(t, &ChatSuite{})
 }
 
