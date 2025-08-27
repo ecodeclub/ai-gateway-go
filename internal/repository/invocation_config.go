@@ -18,8 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"golang.org/x/sync/errgroup"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ecodeclub/ekit/slice"
 

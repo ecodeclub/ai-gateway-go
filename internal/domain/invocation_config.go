@@ -16,8 +16,9 @@ package domain
 
 import (
 	"encoding/json"
-	"github.com/tidwall/gjson"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 type OwnerType string

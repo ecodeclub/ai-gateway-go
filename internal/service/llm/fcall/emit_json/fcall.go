@@ -2,6 +2,7 @@ package emit_json
 
 import (
 	"encoding/json"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/pkg/errors"
 )

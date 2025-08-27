@@ -30,7 +30,6 @@ type Request struct {
 	Args []byte
 }
 
-
 // GetArgs 获取序列化好的Args
 func (r Request) GetArgs() (map[string]string, error) {
 	args := make(map[string]string)

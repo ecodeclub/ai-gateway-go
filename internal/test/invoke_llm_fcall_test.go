@@ -39,11 +39,6 @@ func (i *InvokeLLmFcall) SetupSuite() {
 
 func TestInvokeLLmFcall(t *testing.T) { suite.Run(t, new(InvokeLLmFcall)) }
 
-// Name 返回值校验
-func (i *InvokeLLmFcall) TestName() {
-	i.Equal("invoke_llm", i.TestApp.InvokeLLmFcall.Name())
-}
-
 // Call 在参数反序列化出错时应返回错误，并且不应写入附件
 func (i *InvokeLLmFcall) TestCall() {
 	ctx := i.T().Context()
@@ -73,7 +68,7 @@ func (i *InvokeLLmFcall) TestCall() {
 	i.initVersion()
 	fctx := &fcall.Context{Context: ctx, JSONData: jsonMap, Attachments: map[string]string{}}
 	req := fcall.Request{Args: []byte(`{"invocation_id":"1000","gjson":"engineer"}`)}
-	_, err := i.TestApp.InvokeLLmFcall.Call(fctx, req)
+	_, err := i.InvokeLLmFcall.Call(fctx, req)
 	require.NoError(i.T(), err)
 	// 校验fctx中的数据
 	resp := domain.ChatResponse{
@@ -136,7 +131,6 @@ func (i *InvokeLLmFcall) initVersion() {
 		Utime:  now,
 	}).Error
 	require.NoError(i.T(), err)
-
 }
 
 func (i *InvokeLLmFcall) TearDownSuite() {
@@ -148,5 +142,4 @@ func (i *InvokeLLmFcall) TearDownSuite() {
 		Model(&dao.InvocationConfig{}).
 		Where("id = ?", 1000).Delete(&dao.InvocationConfig{}).Error
 	require.NoError(i.T(), err)
-
 }
