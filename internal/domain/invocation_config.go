@@ -15,7 +15,10 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 type OwnerType string
@@ -65,7 +68,7 @@ type InvocationConfigVersion struct {
 	Prompt       string
 	SystemPrompt string
 	JSONSchema   string
-	Attributes   map[string]any
+	Attributes   Attributes
 	Functions    []Function
 	Temperature  float32
 	TopP         float32
@@ -73,6 +76,24 @@ type InvocationConfigVersion struct {
 	Status       InvocationConfigVersionStatus
 	Ctime        time.Time
 	Utime        time.Time
+}
+
+type Attributes map[string]any
+
+func (a Attributes) GetAttribute(expr string) map[string]any {
+	if expr == "" {
+		return a
+	}
+	attrJson := a.toJson()
+	res := gjson.Get(attrJson, expr)
+	attr := make(map[string]any)
+	_ = json.Unmarshal([]byte(res.Raw), &attr)
+	return attr
+}
+
+func (a Attributes) toJson() string {
+	aByte, _ := json.Marshal(a)
+	return string(aByte)
 }
 
 type Function struct {

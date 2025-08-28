@@ -154,3 +154,13 @@ func (p *InvocationConfigDAO) ActivateVersion(ctx context.Context, id int64) err
 		}).Error
 	})
 }
+
+func (p *InvocationConfigDAO) ActiveVersion(ctx context.Context, id int64) (InvocationConfigVersion, error) {
+	var version InvocationConfigVersion
+	db := p.db
+	err := db.WithContext(ctx).
+		Where("inv_id = ? and status = ? ", id, domain.InvocationCfgVersionStatusActive.String()).
+		Order("utime desc").
+		First(&version).Error
+	return version, err
+}

@@ -17,10 +17,12 @@ package ioc
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/admin"
 	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	"github.com/ecodeclub/ai-gateway-go/internal/pkg/template"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall/invoke_llm"
 	"github.com/google/wire"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
@@ -59,15 +61,23 @@ var (
 		service.NewBizConfigService,
 		admin.NewBizConfigHandler,
 	)
-
 	ProviderSet = wire.NewSet(
 		dao.NewProviderDAO,
 		repository.NewProviderRepository,
 		InitProvider,
 		admin.NewProviderHandler,
 	)
+	InvokeLLmSet = wire.NewSet(
+		InitRender,
+		invoke_llm.NewFcall,
+	)
+
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )
+
+func InitRender() *template.DefaultRender {
+	return template.NewDefaultRender(template.DefaultConfig())
+}
 
 type App struct {
 	GrpcSever *egrpc.Component

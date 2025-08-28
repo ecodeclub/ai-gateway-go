@@ -51,18 +51,18 @@ type InvocationConfigVersionVO struct {
 	ModelProviderID   int64  `json:"modelProviderID"`
 	ModelProviderName string `json:"modelProviderName"`
 
-	Version      string         `json:"version"`
-	Prompt       string         `json:"prompt"`
-	SystemPrompt string         `json:"systemPrompt"`
-	JSONSchema   string         `json:"jsonSchema"`
-	Attributes   map[string]any `json:"attributes,omitempty"`
-	Functions    []FunctionVO   `json:"functions,omitempty"`
-	Temperature  float32        `json:"temperature"`
-	TopP         float32        `json:"topP"`
-	MaxTokens    int            `json:"maxTokens"`
-	Status       string         `json:"status"`
-	Ctime        int64          `json:"ctime"`
-	Utime        int64          `json:"utime"`
+	Version      string            `json:"version"`
+	Prompt       string            `json:"prompt"`
+	SystemPrompt string            `json:"systemPrompt"`
+	JSONSchema   string            `json:"jsonSchema"`
+	Attributes   domain.Attributes `json:"attributes,omitempty"`
+	Functions    []FunctionVO      `json:"functions,omitempty"`
+	Temperature  float32           `json:"temperature"`
+	TopP         float32           `json:"topP"`
+	MaxTokens    int               `json:"maxTokens"`
+	Status       string            `json:"status"`
+	Ctime        int64             `json:"ctime"`
+	Utime        int64             `json:"utime"`
 }
 
 type FunctionVO struct {

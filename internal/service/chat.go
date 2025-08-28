@@ -101,50 +101,58 @@ func (c *ChatService) Stream(
 	if err != nil {
 		return ch, err
 	}
-
-	go func() {
-		content := ""
-		reasoningContent := ""
-		var (
-			inputToken  int64
-			outputToken int64
-		)
-		defer func() {
-			saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-			err1 := c.repo.AddMessages(saveCtx, sn, []domain.Message{{
-				Content:          content,
-				ReasoningContent: reasoningContent,
-			}})
-			if err1 != nil {
-				c.logger.Error("写入数据库失败", elog.FieldErr(err))
-			}
-			amount := int64(
-				float64(model.InputPrice)*float64(inputToken)/1000 +
-					float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
-			)
-			c.deduct(uid, key, amount)
-		}()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case value, ok := <-event:
-				if !ok || value.Done {
-					inputToken += value.InputToken
-					outputToken += value.OutputToken
-					ch <- domain.StreamEvent{Done: true}
-					return
-				}
-				reasoningContent += value.ReasoningContent
-				content += value.Content
-				ch <- value
-			}
-		}
-	}()
+	go c.chatLoop(ctx, model, uid, key, sn, ch, event)
 	return ch, err
 }
 
+func (c *ChatService) chatLoop(
+	ctx context.Context,
+	model domain.Model,
+	uid int64,
+	key string,
+	sn string,
+	ch chan domain.StreamEvent,
+	event chan domain.StreamEvent,
+) {
+	content := ""
+	reasoningContent := ""
+	var (
+		inputToken  int64
+		outputToken int64
+	)
+	defer func() {
+		saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		err1 := c.repo.AddMessages(saveCtx, sn, []domain.Message{{
+			Content:          content,
+			ReasoningContent: reasoningContent,
+		}})
+		if err1 != nil {
+			c.logger.Error("写入数据库失败", elog.FieldErr(err1))
+		}
+		amount := int64(
+			float64(model.InputPrice)*float64(inputToken)/1000 +
+				float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
+		)
+		c.deduct(uid, key, amount)
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case value, ok := <-event:
+			if !ok || value.Done {
+				inputToken += value.InputToken
+				outputToken += value.OutputToken
+				ch <- domain.StreamEvent{Done: true}
+				return
+			}
+			reasoningContent += value.ReasoningContent
+			content += value.Content
+			ch <- value
+		}
+	}
+}
 func (c *ChatService) getModel(modelId int64) (domain.Model, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

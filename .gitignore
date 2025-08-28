@@ -31,3 +31,4 @@ logs
 .sys
 **/local.yaml
 .tool-versions
+.DS_Store

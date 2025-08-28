@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ecodeclub/ekit/slice"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -172,4 +174,32 @@ func (p *InvocationConfigRepo) GetVersionByID(ctx context.Context, id int64) (do
 
 func (p *InvocationConfigRepo) ActivateVersion(ctx context.Context, id int64) error {
 	return p.dao.ActivateVersion(ctx, id)
+}
+
+// GetActiveVersionByID 获取
+func (p *InvocationConfigRepo) GetActiveVersionByID(ctx context.Context, id int64) (domain.InvocationConfigVersion, error) {
+	var (
+		eg            errgroup.Group
+		config        dao.InvocationConfig
+		configVersion dao.InvocationConfigVersion
+	)
+
+	eg.Go(func() error {
+		var err error
+		config, err = p.dao.GetByID(ctx, id)
+		return err
+	})
+
+	eg.Go(func() error {
+		var err error
+		configVersion, err = p.dao.ActiveVersion(ctx, id)
+		return err
+	})
+	if err := eg.Wait(); err != nil {
+		return domain.InvocationConfigVersion{}, err
+	}
+	domainCfg := p.toDomain(config)
+	versionCfg := p.toDomainVersion(configVersion)
+	versionCfg.Config = domainCfg
+	return versionCfg, nil
 }
