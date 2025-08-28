@@ -15,7 +15,7 @@
 package ioc
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall/invoke_llm"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
 	"github.com/redis/go-redis/v9"
@@ -23,9 +23,9 @@ import (
 )
 
 type TestApp struct {
-	GrpcSever      *egrpc.Component
-	GinServer      *egin.Component
-	DB             *gorm.DB
-	Rdb            redis.Cmdable
-	InvokeLLmFcall *invoke_llm.FCall
+	GrpcSever         *egrpc.Component
+	GinServer         *egin.Component
+	DB                *gorm.DB
+	Rdb               redis.Cmdable
+	InvokeLLMFuncCall *fcall.InvokeLLMFuncCall
 }

@@ -8,28 +8,28 @@ import (
 
 var ErrFunctionCallNotFound = errors.New("function call not found")
 
-type FunctionCallRegistry struct {
-	fcalls *syncx.Map[string, FunctionCall]
+type Registry struct {
+	calls *syncx.Map[string, FunctionCall]
 }
 
-func NewFunctionCallRegistry() *FunctionCallRegistry {
-	return &FunctionCallRegistry{
-		fcalls: &syncx.Map[string, FunctionCall]{},
+func NewFunctionCallRegistry() *Registry {
+	return &Registry{
+		calls: &syncx.Map[string, FunctionCall]{},
 	}
 }
 
-// Lookup 按名索引对应的fcall
-func (f *FunctionCallRegistry) Lookup(name string) (FunctionCall, error) {
-	val, ok := f.fcalls.Load(name)
+// Register 注册对应的funcCall
+func (f *Registry) Register(fc FunctionCall) error {
+	name := fc.Name()
+	f.calls.Store(name, fc)
+	return nil
+}
+
+// Lookup 按名索引对应的funcCall
+func (f *Registry) Lookup(name string) (FunctionCall, error) {
+	val, ok := f.calls.Load(name)
 	if !ok {
 		return nil, ErrFunctionCallNotFound
 	}
 	return val, nil
-}
-
-// Register 注册对应的fcall
-func (f *FunctionCallRegistry) Register(fc FunctionCall) error {
-	name := fc.Name()
-	f.fcalls.Store(name, fc)
-	return nil
 }

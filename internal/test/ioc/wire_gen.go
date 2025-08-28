@@ -14,7 +14,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall/invoke_llm"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 )
 
 // Injectors from wire.go:
@@ -50,13 +50,13 @@ func InitApp(to TestOnly) *TestApp {
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
 	defaultRender := ioc.InitRender()
-	fCall := invoke_llm.NewFcall(chatService, defaultRender, invocationConfigRepo)
+	fCall := fcall.NewInvokeLLMFuncCall(chatService, defaultRender, invocationConfigRepo)
 	testApp := &TestApp{
-		GrpcSever:      component,
-		GinServer:      eginComponent,
-		DB:             db,
-		Rdb:            cmdable,
-		InvokeLLmFcall: fCall,
+		GrpcSever:         component,
+		GinServer:         eginComponent,
+		DB:                db,
+		Rdb:               cmdable,
+		InvokeLLMFuncCall: fCall,
 	}
 	return testApp
 }

@@ -16,6 +16,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -80,20 +81,21 @@ type InvocationConfigVersion struct {
 
 type Attributes map[string]any
 
-func (a Attributes) GetAttribute(expr string) map[string]any {
+func (a Attributes) Get(expr string) (map[string]any, error) {
 	if expr == "" {
-		return a
+		return nil, errors.New("domain: 表达式不能为空")
 	}
-	attrJson := a.toJson()
-	res := gjson.Get(attrJson, expr)
+	byt, err := json.Marshal(a)
+	if err != nil {
+		return nil, err
+	}
+	res := gjson.Get(string(byt), expr)
 	attr := make(map[string]any)
-	_ = json.Unmarshal([]byte(res.Raw), &attr)
-	return attr
-}
-
-func (a Attributes) toJson() string {
-	aByte, _ := json.Marshal(a)
-	return string(aByte)
+	err = json.Unmarshal([]byte(res.Raw), &attr)
+	if err != nil {
+		return nil, err
+	}
+	return attr, nil
 }
 
 type Function struct {

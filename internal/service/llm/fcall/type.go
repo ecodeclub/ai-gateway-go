@@ -11,17 +11,26 @@ var (
 	ErrArgNotFound = errors.New("参数没有找到")
 )
 
+//go:generate mockgen -source=./type.go -package=mocks -destination=./mocks/fcall.mock.go -typed FunctionCall
 type FunctionCall interface {
 	Name() string
-	Call(fctx *Context, req Request) (Response, error)
+	Call(ctx *Context, req Request) (Response, error)
 }
 
 type Context struct {
 	context.Context
-	// 这里的是用户输入的数据
+	// 根据发起LLM调用时传入的JSON Schema和用户输入的业务数据，经由LLM提取的结构化JSON数据
+	// 由LLM 发起的 emit_json 函数调用设置
 	JSONData map[string]any
-	// Attachments 是每个functionCall的产物，每个functioncall如果想要，其他人共享都可以放在这个字段里
+	// Attachments 是每个functionCall的产物，每个functionCall如果想要，其他人共享都可以放在这个字段里
 	Attachments map[string]string
+}
+
+func (c *Context) SetAttachment(key, val string) {
+	if c.Attachments == nil {
+		c.Attachments = map[string]string{}
+	}
+	c.Attachments[key] = val
 }
 
 type Request struct {
@@ -40,8 +49,8 @@ func (r Request) GetArgs() (map[string]string, error) {
 	return args, nil
 }
 
-// GetVal 获取具体的值
-func (r Request) GetVal(key string) (string, error) {
+// GetArg 获取具体参数的值
+func (r Request) GetArg(key string) (string, error) {
 	argMap, err := r.GetArgs()
 	if err != nil {
 		return "", err
@@ -53,10 +62,10 @@ func (r Request) GetVal(key string) (string, error) {
 	return val, nil
 }
 
-// 需要什么字段也不确定，按需要添加
+// Response 需要什么字段也不确定，按需要添加
 type Response struct {
 }
 
-func NewFcallErr(fcall FunctionCall, err error) error {
-	return fmt.Errorf("functionCall: %s 发送错误 %w", fcall.Name(), err)
+func newCallErr(funcCall FunctionCall, err error) error {
+	return fmt.Errorf("fcall: %s 发送错误 %w", funcCall.Name(), err)
 }
