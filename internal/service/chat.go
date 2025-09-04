@@ -29,7 +29,8 @@ import (
 
 type ChatService struct {
 	repo            *repository.ChatRepo
-	handle          llm.Handler
+	configRepo      *repository.InvocationConfigRepo
+	llmHandler      llm.Handler
 	logger          *elog.Component
 	quotaService    *QuotaService
 	providerService *ProviderService
@@ -37,16 +38,18 @@ type ChatService struct {
 
 func NewChatService(
 	repo *repository.ChatRepo,
+	configRepo *repository.InvocationConfigRepo,
 	handler llm.Handler,
 	quotaService *QuotaService,
 	provider *ProviderService,
 ) *ChatService {
 	return &ChatService{
 		repo:            repo,
-		handle:          handler,
+		configRepo:      configRepo,
+		llmHandler:      handler,
 		quotaService:    quotaService,
 		providerService: provider,
-		logger:          elog.DefaultLogger.With(elog.String("component", "ChatService")),
+		logger:          elog.DefaultLogger.With(elog.FieldComponent("service.ChatService")),
 	}
 }
 
@@ -62,58 +65,44 @@ func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error
 	return c.repo.Detail(ctx, sn)
 }
 
-func (c *ChatService) Stream(
-	ctx context.Context,
-	sn string,
-	uid int64,
-	key string,
-	modelId int64,
-	messages []domain.Message,
-) (chan domain.StreamEvent, error) {
-	h, err := c.quotaService.HasEnoughQuota(ctx, uid)
+func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) (chan domain.StreamEvent, error) {
+	ok, err := c.quotaService.HasEnoughQuota(ctx, req.Uid)
 	if err != nil {
 		return nil, err
 	}
-	if !h {
+	if !ok {
 		return nil, errs.ErrAccountOverdue
 	}
 
-	model, err := c.getModel(modelId)
+	configVersion, err := c.configRepo.GetActiveVersionByID(ctx, req.InvocationConfigID)
 	if err != nil {
 		return nil, err
 	}
 
-	ch := make(chan domain.StreamEvent, 10)
-
-	cs, err := c.repo.GetHistoryMessageList(ctx, sn)
+	model, err := c.providerService.ModelDetail(ctx, configVersion.Model.ID)
 	if err != nil {
-		return ch, err
+		return nil, err
+	}
+	configVersion.Model = model
+
+	err = c.repo.AddMessages(ctx, req.Sn, req.Messages)
+	if err != nil {
+		return nil, err
 	}
 
-	err = c.repo.AddMessages(ctx, sn, messages)
+	llmEvents, err := c.llmHandler.Stream(ctx, domain.StreamRequest{
+		Messages:      req.Messages,
+		ConfigVersion: configVersion,
+	})
 	if err != nil {
-		return ch, err
+		return nil, err
 	}
-
-	cs = append(cs, messages...)
-
-	event, err := c.handle.StreamHandle(ctx, cs)
-	if err != nil {
-		return ch, err
-	}
-	go c.chatLoop(ctx, model, uid, key, sn, ch, event)
-	return ch, err
+	events := make(chan domain.StreamEvent, 10)
+	go c.forward(ctx, model, req, llmEvents, events)
+	return events, nil
 }
 
-func (c *ChatService) chatLoop(
-	ctx context.Context,
-	model domain.Model,
-	uid int64,
-	key string,
-	sn string,
-	ch chan domain.StreamEvent,
-	event chan domain.StreamEvent,
-) {
+func (c *ChatService) forward(ctx context.Context, model domain.Model, req domain.ChatStreamRequest, in, out chan domain.StreamEvent) {
 	content := ""
 	reasoningContent := ""
 	var (
@@ -123,7 +112,7 @@ func (c *ChatService) chatLoop(
 	defer func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		err1 := c.repo.AddMessages(saveCtx, sn, []domain.Message{{
+		err1 := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{{
 			Content:          content,
 			ReasoningContent: reasoningContent,
 		}})
@@ -134,37 +123,30 @@ func (c *ChatService) chatLoop(
 			float64(model.InputPrice)*float64(inputToken)/1000 +
 				float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
 		)
-		c.deduct(uid, key, amount)
+		c.deduct(req.Uid, req.Key, amount)
 	}()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case value, ok := <-event:
-			if !ok || value.Done {
-				inputToken += value.InputToken
-				outputToken += value.OutputToken
-				ch <- domain.StreamEvent{Done: true}
+		case evt, ok := <-in:
+			if !ok || evt.Done {
+				inputToken += evt.InputToken
+				outputToken += evt.OutputToken
+				out <- domain.StreamEvent{Done: true}
 				return
 			}
-			reasoningContent += value.ReasoningContent
-			content += value.Content
-			ch <- value
+			reasoningContent += evt.ReasoningContent
+			content += evt.Content
+			out <- evt
 		}
 	}
-}
-func (c *ChatService) getModel(modelId int64) (domain.Model, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	return c.providerService.ModelDetail(ctx, modelId)
 }
 
 func (c *ChatService) deduct(uid int64, key string, amount int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-
 	maxRetry := 3
-
 	for i := 0; i < maxRetry; i++ {
 		err := c.quotaService.Deduct(ctx, uid, amount, key)
 		if err != nil {
@@ -177,30 +159,4 @@ func (c *ChatService) deduct(uid int64, key string, amount int64) {
 		}
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
 	}
-}
-
-func (c *ChatService) Chat(ctx context.Context, sn string, messages []domain.Message) (domain.ChatResponse, error) {
-	err := c.repo.AddMessages(ctx, sn, messages)
-	if err != nil {
-		return domain.ChatResponse{}, err
-	}
-
-	chat, err := c.handle.Chat(ctx, messages)
-	if err != nil {
-		return domain.ChatResponse{}, err
-	}
-
-	newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	err1 := c.repo.AddMessages(newCtx, sn, []domain.Message{
-		{Content: chat.Response.Content},
-	})
-	if err1 != nil {
-		c.logger.Error("写入数据库失败",
-			elog.FieldErr(err),
-			elog.String("sn", sn),
-			elog.String("content", chat.Response.Content),
-		)
-	}
-	return chat, err
 }

@@ -33,7 +33,7 @@ func TestEmitJsonFunctionCall(t *testing.T) {
 			name:        "data不是合法JSON",
 			argMap:      map[string]string{"data": "not a json"},
 			wantErr:     errors.New("json: "),
-			wantJSON:    map[string]any{},
+			wantJSON:    (map[string]any)(nil),
 			checkPrefix: true,
 		},
 	}

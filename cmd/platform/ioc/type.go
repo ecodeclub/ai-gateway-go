@@ -34,7 +34,7 @@ var (
 		InitGin,
 		InitGrpcServer)
 
-	LLMSet = wire.NewSet(initLLMHandler)
+	LLMSet = wire.NewSet(InitLLMHandler)
 
 	QuotaSet = wire.NewSet(
 		dao.NewQuotaDao,
@@ -67,9 +67,12 @@ var (
 		InitProvider,
 		admin.NewProviderHandler,
 	)
-	InvokeLLMSet = wire.NewSet(
+	FuncCallSet = wire.NewSet(
 		InitRender,
 		fcall.NewInvokeLLMFuncCall,
+		fcall.NewEmitJsonFunctionCall,
+		fcall.NewAskUserFunctionCall,
+		InitFunctionCallRegistry,
 	)
 
 	MockSet = wire.NewSet(admin.NewMockHandler)

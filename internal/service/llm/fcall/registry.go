@@ -6,7 +6,7 @@ import (
 	"github.com/ecodeclub/ekit/syncx"
 )
 
-var ErrFunctionCallNotFound = errors.New("function call not found")
+var ErrFunctionCallNotFound = errors.New("函数调用未找到")
 
 type Registry struct {
 	calls *syncx.Map[string, FunctionCall]

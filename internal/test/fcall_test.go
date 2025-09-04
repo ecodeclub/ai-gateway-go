@@ -107,30 +107,8 @@ func (s *TestLLMFuncCallSuite) TestInvokeLLM_Call() {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockHandler := mocks.NewMockHandler(ctrl)
-
-	mockHandler.EXPECT().Chat(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, messages []domain.Message) (domain.ChatResponse, error) {
-		assert.Equal(t, []domain.Message{
-			{
-				Role: domain.USER,
-				Content: `这是我的评判标准，你需要对用户的简历信息进行一个评判，而后输出
-1. 如果简历信息达到要求，则执行下一个 llm_invoke
-2. 否则，执行ask_user，要求用户补充更多
-评判标准
-需要有高并发高可用的工作经历
-`,
-			},
-		}, messages)
-		return domain.ChatResponse{
-			Response: domain.Message{
-				Role:    domain.USER,
-				Content: "ans",
-			},
-		}, nil
-	}).Times(1)
-
 	// 初始化APP
-	app := testioc.InitApp(testioc.TestOnly{LLM: mockHandler})
+	app := testioc.InitApp(testioc.TestOnly{LLM: mocks.NewMockHandler(ctrl)})
 
 	ctx := &fcall.Context{
 		Context: t.Context(),
@@ -146,11 +124,14 @@ func (s *TestLLMFuncCallSuite) TestInvokeLLM_Call() {
 	assert.Equal(t,
 		ctx.Attachments,
 		func() map[string]string {
-			respByte, err1 := json.Marshal(domain.ChatResponse{
-				Response: domain.Message{
-					Role:    domain.USER,
-					Content: "ans",
-				},
+			respByte, err1 := json.Marshal(&domain.Message{
+				Role: domain.USER,
+				Content: `这是我的评判标准，你需要对用户的简历信息进行一个评判，而后输出
+1. 如果简历信息达到要求，则执行下一个 llm_invoke
+2. 否则，执行ask_user，要求用户补充更多
+评判标准
+需要有高并发高可用的工作经历
+`,
 			})
 			require.NoError(t, err1)
 			return map[string]string{

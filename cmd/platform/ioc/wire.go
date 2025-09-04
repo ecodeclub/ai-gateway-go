@@ -30,6 +30,7 @@ func InitApp() *App {
 		ChatSet,
 		InvocationConfigSet,
 		BizConfigSet,
+		FuncCallSet,
 		wire.Struct(new(App), "*"),
 	)
 	return new(App)

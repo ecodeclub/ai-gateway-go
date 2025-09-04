@@ -5,12 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/mocks"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
-	"github.com/gotomicro/ego"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 )
@@ -51,27 +49,4 @@ func (c *ChatSuite) TearDownTest() {
 	}
 
 	c.TestApp.Rdb.FlushDB(ctx)
-}
-
-func (c *ChatSuite) TestChat() {
-	t := c.T()
-	testcases := []struct {
-		name   string
-		before func(handler *mocks.MockHandler)
-	}{
-		{
-			name: "chat 接口调用",
-			before: func(handler *mocks.MockHandler) {
-				resp := domain.ChatResponse{Response: domain.Message{Content: "event1"}}
-				handler.EXPECT().Chat(gomock.Any(), gomock.Any()).Return(resp, nil)
-			},
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.before(c.handler)
-			egoApp := ego.New()
-			egoApp.Invoker().Serve(c.GrpcSever)
-		})
-	}
 }

@@ -36,8 +36,7 @@ type ChatServer struct {
 }
 
 func NewChatServer(svc *service.ChatService) *ChatServer {
-	chatSvc := &ChatServer{svc: svc}
-	return chatSvc
+	return &ChatServer{svc: svc}
 }
 
 func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.SaveResponse, error) {
@@ -58,7 +57,25 @@ func (c *ChatServer) List(ctx context.Context, req *ai.ListRequest) (*ai.ListRes
 	if err != nil {
 		return &ai.ListResponse{}, err
 	}
-	return &ai.ListResponse{Chats: c.toChats(chat)}, nil
+	return &ai.ListResponse{Chats: slice.Map(chat, func(idx int, src domain.Chat) *ai.Chat {
+		return c.toChat(src)
+	})}, nil
+}
+
+func (c *ChatServer) toChat(chat domain.Chat) *ai.Chat {
+	return &ai.Chat{
+		Sn:    chat.Sn,
+		Title: chat.Title,
+		Uid:   chat.Uid,
+		Msgs: slice.Map(chat.Messages, func(idx int, src domain.Message) *ai.Message {
+			return &ai.Message{
+				Role:             src.Role,
+				Content:          src.Content,
+				ReasoningContent: src.ReasoningContent,
+			}
+		}),
+		Ctime: chat.Ctime.UnixMilli(),
+	}
 }
 
 func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai.DetailResponse, error) {
@@ -69,90 +86,54 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 	return &ai.DetailResponse{Chat: c.toChat(chat)}, nil
 }
 
-func (c *ChatServer) Chat(ctx context.Context, request *ai.ChatRequest) (*ai.ChatResponse, error) {
-	chat, err := c.svc.Chat(ctx, request.GetSn(), c.toDomainMessage([]*ai.Message{request.GetMsg()}))
-	if err != nil {
-		return nil, err
-	}
-	return &ai.ChatResponse{
-		Response: &ai.Message{
-			Content: chat.Response.Content,
-		},
-	}, nil
-}
-
 func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
 	ctx := resp.Context()
-	ch, err := c.svc.Stream(
-		ctx,
-		request.GetSn(),
-		request.GetUid(),
-		request.GetKey(),
-		request.GetInvocationConfigID(),
-		c.toDomainMessage([]*ai.Message{request.GetMsg()}))
+	req := domain.ChatStreamRequest{
+		Sn: request.GetSn(),
+		Messages: slice.Map([]*ai.Message{request.GetMsg()}, func(idx int, src *ai.Message) domain.Message {
+			return domain.Message{
+				Role:    src.Role,
+				Content: src.Content,
+			}
+		}),
+		InvocationConfigID: request.GetInvocationConfigId(),
+		Uid:                request.GetUid(),
+		Key:                request.GetKey(),
+		PreviousResponseID: request.GetPreviousResponseId(),
+	}
+	events, err := c.svc.Stream(ctx, req)
 	if err != nil {
 		if errors.Is(err, errs.ErrAccountOverdue) {
 			return status.Error(codes.PermissionDenied, "账户欠费")
 		}
 		return err
 	}
-	return c.stream(ctx, ch, resp)
+	return c.stream(ctx, events, resp)
 }
 
-func (c *ChatServer) stream(ctx context.Context, ch chan domain.StreamEvent, resp ai.Service_StreamServer) error {
+func (c *ChatServer) stream(ctx context.Context, events chan domain.StreamEvent, resp ai.Service_StreamServer) error {
 	var err error
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case e, ok := <-ch:
-			if !ok || e.Done {
+		case evt, ok := <-events:
+			if !ok || evt.Done {
 				err = resp.Send(&ai.StreamResponse{Final: true})
 				return err
 			}
-			if e.Error != nil {
-				err = resp.Send(&ai.StreamResponse{Err: e.Error.Error()})
+			if evt.Error != nil {
+				err = resp.Send(&ai.StreamResponse{Err: evt.Error.Error()})
 				return err
 			}
-			err = resp.Send(&ai.StreamResponse{Final: false, Content: e.Content, ReasoningContent: e.ReasoningContent})
+			err = resp.Send(&ai.StreamResponse{
+				ReasoningContent: evt.ReasoningContent,
+				Content:          evt.Content,
+				Id:               "",
+			})
 			if err != nil {
 				return err
 			}
 		}
 	}
-}
-
-func (c *ChatServer) toChats(conversations []domain.Chat) []*ai.Chat {
-	return slice.Map(conversations, func(idx int, src domain.Chat) *ai.Chat {
-		return c.toChat(src)
-	})
-}
-
-func (c *ChatServer) toChat(chat domain.Chat) *ai.Chat {
-	return &ai.Chat{
-		Sn:    chat.Sn,
-		Title: chat.Title,
-		Uid:   chat.Uid,
-		Msgs:  c.toMessage(chat.Messages),
-		Ctime: chat.Ctime.UnixMilli(),
-	}
-}
-
-func (c *ChatServer) toDomainMessage(messages []*ai.Message) []domain.Message {
-	return slice.Map(messages, func(idx int, src *ai.Message) domain.Message {
-		return domain.Message{
-			Role:    src.Role,
-			Content: src.Content,
-		}
-	})
-}
-
-func (c *ChatServer) toMessage(messages []domain.Message) []*ai.Message {
-	return slice.Map(messages, func(idx int, src domain.Message) *ai.Message {
-		return &ai.Message{
-			Role:             src.Role,
-			Content:          src.Content,
-			ReasoningContent: src.ReasoningContent,
-		}
-	})
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 
+//go:generate mockgen -source=./llm.go -destination=../mocks/llm.mock.go -package=mocks -typed Handler
 type Handler interface {
-	StreamHandle(ctx context.Context, req []domain.Message) (chan domain.StreamEvent, error)
-	Chat(ctx context.Context, req []domain.Message) (domain.ChatResponse, error)
+	Stream(ctx context.Context, req domain.StreamRequest) (chan domain.StreamEvent, error)
 }

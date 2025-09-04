@@ -1,0 +1,19 @@
+{
+  "type": "function",
+  "name": "emit_json",
+  "description": "根据先前指定的JSON Schema，输出提取或生成的结构化JSON数据。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "type": "string",
+        "description": "一个包含JSON格式数据的字符串。例如：'{\"name\":\"张三\",\"age\":25}'。"
+      }
+    },
+    "required": [
+      "data"
+    ],
+    "additionalProperties": false
+  }
+}

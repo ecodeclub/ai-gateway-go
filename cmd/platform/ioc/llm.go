@@ -16,11 +16,14 @@ package ioc
 
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/openai"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
+	openaihdl "github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/openai"
 	"github.com/gotomicro/ego/core/econf"
+	"github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
 )
 
-func initLLMHandler() llm.Handler {
+func InitLLMHandler(registry *fcall.Registry) llm.Handler {
 	type AliyunConfig struct {
 		APIKey  string `json:"apiKey"`
 		BaseURL string `json:"baseURL"`
@@ -32,6 +35,24 @@ func initLLMHandler() llm.Handler {
 	if err != nil {
 		panic(err)
 	}
-	handler := openai.NewHandler(cfg.APIKey, cfg.BaseURL, cfg.Model)
-	return handler
+	return openaihdl.NewHandler(openai.NewClient(
+		option.WithAPIKey(cfg.APIKey),
+		option.WithBaseURL(cfg.BaseURL),
+	), registry)
+}
+
+func InitFunctionCallRegistry(
+	askUser *fcall.AskUserFunctionCall,
+	emitJSON *fcall.EmitJsonFunctionCall,
+	invokeLLM *fcall.InvokeLLMFuncCall,
+) *fcall.Registry {
+	registry := fcall.NewFunctionCallRegistry()
+	fcs := []fcall.FunctionCall{askUser, emitJSON, invokeLLM}
+	for i := range fcs {
+		err := registry.Register(fcs[i])
+		if err != nil {
+			panic(err)
+		}
+	}
+	return registry
 }

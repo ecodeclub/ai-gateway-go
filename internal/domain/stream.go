@@ -14,7 +14,17 @@
 
 package domain
 
+type StreamRequest struct {
+	ConversationID     string
+	PreviousResponseID string
+	CallID             string
+	Messages           []Message
+	ConfigVersion      InvocationConfigVersion
+}
+
 type StreamEvent struct {
+	ResponseID       string
+	CallID           string // 函数调用的ID
 	ReasoningContent string
 	Content          string
 	Done             bool

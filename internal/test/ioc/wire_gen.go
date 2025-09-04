@@ -27,6 +27,8 @@ func InitApp(to TestOnly) *TestApp {
 	cmdable := InitRedis()
 	chatCache := cache.NewChatCache(cmdable)
 	chatRepo := repository.NewChatRepo(chatDAO, chatCache)
+	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
+	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
 	handler := to.LLM
 	quotaDao := dao.NewQuotaDao(db)
 	quotaRepo := repository.NewQuotaRepo(quotaDao)
@@ -34,13 +36,11 @@ func InitApp(to TestOnly) *TestApp {
 	providerDAO := dao.NewProviderDAO(db)
 	providerRepository := repository.NewProviderRepository(providerDAO)
 	providerService := ioc.InitProvider(providerRepository)
-	chatService := service.NewChatService(chatRepo, handler, quotaService, providerService)
+	chatService := service.NewChatService(chatRepo, invocationConfigRepo, handler, quotaService, providerService)
 	chatServer := grpc.NewChatServer(chatService)
 	component := ioc.InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
-	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
-	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizConfigRepository := repository.NewBizConfigRepository(bizConfigDAO)
 	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, providerRepository)
@@ -50,13 +50,18 @@ func InitApp(to TestOnly) *TestApp {
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
 	defaultRender := ioc.InitRender()
-	fCall := fcall.NewInvokeLLMFuncCall(chatService, defaultRender, invocationConfigRepo)
+	invokeLLMFuncCall := fcall.NewInvokeLLMFuncCall(invocationConfigRepo, defaultRender)
+	askUserFunctionCall := fcall.NewAskUserFunctionCall()
+	emitJsonFunctionCall := fcall.NewEmitJsonFunctionCall()
+	registry := ioc.InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall)
 	testApp := &TestApp{
 		GrpcSever:         component,
 		GinServer:         eginComponent,
 		DB:                db,
 		Rdb:               cmdable,
-		InvokeLLMFuncCall: fCall,
+		InvokeLLMFuncCall: invokeLLMFuncCall,
+		funcCallRegistry:  registry,
+		LLM:               handler,
 	}
 	return testApp
 }

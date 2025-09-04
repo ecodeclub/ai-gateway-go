@@ -15,6 +15,7 @@
 package ioc
 
 import (
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
@@ -28,4 +29,6 @@ type TestApp struct {
 	DB                *gorm.DB
 	Rdb               redis.Cmdable
 	InvokeLLMFuncCall *fcall.InvokeLLMFuncCall
+	funcCallRegistry  *fcall.Registry
+	LLM               llm.Handler
 }

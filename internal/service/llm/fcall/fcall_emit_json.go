@@ -9,11 +9,15 @@ const jsonDataName = "data"
 type EmitJsonFunctionCall struct {
 }
 
-func (e EmitJsonFunctionCall) Name() string {
-	return "emit_json"
+func NewEmitJsonFunctionCall() *EmitJsonFunctionCall {
+	return &EmitJsonFunctionCall{}
 }
 
-func (e EmitJsonFunctionCall) Call(ctx *Context, req Request) (Response, error) {
+func (e *EmitJsonFunctionCall) Name() string {
+	return NameEmitJSON
+}
+
+func (e *EmitJsonFunctionCall) Call(ctx *Context, req Request) (Response, error) {
 	val, err := req.GetArg(jsonDataName)
 	if err != nil {
 		return Response{}, err
@@ -24,5 +28,8 @@ func (e EmitJsonFunctionCall) Call(ctx *Context, req Request) (Response, error) 
 		return Response{}, err
 	}
 	ctx.JSONData = jsonData
-	return Response{}, nil
+	return Response{
+		Output: "success",
+		Status: "completed",
+	}, nil
 }

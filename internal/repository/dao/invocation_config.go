@@ -124,7 +124,7 @@ func (p *InvocationConfigDAO) CountVersions(ctx context.Context, invID int64) (i
 	return int(res), err
 }
 
-func (p *InvocationConfigDAO) GetVersionByD(ctx context.Context, id int64) (InvocationConfigVersion, error) {
+func (p *InvocationConfigDAO) GetVersionByID(ctx context.Context, id int64) (InvocationConfigVersion, error) {
 	var res InvocationConfigVersion
 	err := p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", id).First(&res).Error
 	return res, err

@@ -11,6 +11,12 @@ var (
 	ErrArgNotFound = errors.New("参数没有找到")
 )
 
+const (
+	NameAskUser   = "ask_user"
+	NameEmitJSON  = "emit_json"
+	NameInvokeLLM = "invoke_llm"
+)
+
 //go:generate mockgen -source=./type.go -package=mocks -destination=./mocks/fcall.mock.go -typed FunctionCall
 type FunctionCall interface {
 	Name() string
@@ -31,6 +37,13 @@ func (c *Context) SetAttachment(key, val string) {
 		c.Attachments = map[string]string{}
 	}
 	c.Attachments[key] = val
+}
+
+func (c *Context) GetAttachment(key string) string {
+	if c.Attachments == nil {
+		return ""
+	}
+	return c.Attachments[key]
 }
 
 type Request struct {
@@ -64,6 +77,8 @@ func (r Request) GetArg(key string) (string, error) {
 
 // Response 需要什么字段也不确定，按需要添加
 type Response struct {
+	Output string
+	Status string // "in_progress", "completed", "incomplete"
 }
 
 func newCallErr(funcCall FunctionCall, err error) error {

@@ -9,10 +9,9 @@ require (
 	github.com/ego-component/egorm v1.1.4
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
-	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/gotomicro/ego v1.2.3
-	github.com/openai/openai-go v1.8.1
+	github.com/openai/openai-go/v2 v2.2.2
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.14.4
@@ -66,6 +65,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.11.3 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gotomicro/logrotate v0.0.0-20211108034117-46d53eedc960 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/go-version v1.4.0 // indirect
