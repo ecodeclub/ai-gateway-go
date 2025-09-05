@@ -76,10 +76,7 @@ func (r Request) GetArg(key string) (string, error) {
 }
 
 // Response 需要什么字段也不确定，按需要添加
-type Response struct {
-	Output string
-	Status string // "in_progress", "completed", "incomplete"
-}
+type Response struct{}
 
 func newCallErr(funcCall FunctionCall, err error) error {
 	return fmt.Errorf("fcall: %s 发送错误 %w", funcCall.Name(), err)

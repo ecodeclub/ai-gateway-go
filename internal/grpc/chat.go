@@ -129,7 +129,6 @@ func (c *ChatServer) stream(ctx context.Context, events chan domain.StreamEvent,
 			err = resp.Send(&ai.StreamResponse{
 				ReasoningContent: evt.ReasoningContent,
 				Content:          evt.Content,
-				Id:               "",
 			})
 			if err != nil {
 				return err

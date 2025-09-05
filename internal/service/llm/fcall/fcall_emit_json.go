@@ -28,8 +28,5 @@ func (e *EmitJsonFunctionCall) Call(ctx *Context, req Request) (Response, error)
 		return Response{}, err
 	}
 	ctx.JSONData = jsonData
-	return Response{
-		Output: "success",
-		Status: "completed",
-	}, nil
+	return Response{}, nil
 }

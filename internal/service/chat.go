@@ -66,7 +66,7 @@ func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error
 }
 
 func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) (chan domain.StreamEvent, error) {
-	// 有bug，暂时注释掉
+	// 有bug，测试中无论如何设置配额都无法通过这个检查。暂时注释掉
 	// ok, err := c.quotaService.HasEnoughQuota(ctx, req.Uid)
 	// if err != nil {
 	// 	return nil, err
@@ -96,8 +96,6 @@ func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) 
 	}
 
 	llmEvents, err := c.llmHandler.Stream(ctx, domain.StreamRequest{
-		// PreviousResponseID: req.PreviousResponseID,
-		CallID:        req.CallID,
 		Messages:      msgs,
 		ConfigVersion: configVersion,
 	})
@@ -109,7 +107,7 @@ func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) 
 	return events, nil
 }
 
-func (c *ChatService) forward(ctx context.Context, model domain.Model, req domain.ChatStreamRequest, llmEvents, respEvents chan domain.StreamEvent) {
+func (c *ChatService) forward(ctx context.Context, _ domain.Model, req domain.ChatStreamRequest, llmEvents, respEvents chan domain.StreamEvent) {
 	var (
 		reasoningContent string
 		content          string
@@ -118,18 +116,20 @@ func (c *ChatService) forward(ctx context.Context, model domain.Model, req domai
 		outputToken int64
 	)
 	defer func() {
-		saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		message := domain.Message{
-			Role:             domain.SYSTEM,
-			ReasoningContent: reasoningContent,
-			Content:          content,
+		if reasoningContent != "" || content != "" {
+			message := domain.Message{
+				Role:             domain.SYSTEM,
+				ReasoningContent: reasoningContent,
+				Content:          content,
+			}
+			saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			err := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{message})
+			cancel()
+			if err != nil {
+				c.logger.Error("将LLM返回的消息流聚合后，写入数据库失败", elog.FieldErr(err))
+			}
+			log.Printf("saved llm response message: %#v\n", message)
 		}
-		err := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{message})
-		if err != nil {
-			c.logger.Error("将LLM返回的消息流聚合后，写入数据库失败", elog.FieldErr(err))
-		}
-		log.Printf("saved llm response message: %#v\n", message)
 
 		// 有bug，暂时注释掉，下方代码
 		// amount := int64(
@@ -137,6 +137,7 @@ func (c *ChatService) forward(ctx context.Context, model domain.Model, req domai
 		// 		float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
 		// )
 		// c.deduct(req.Uid, req.Key, amount)
+
 		respEvents <- domain.StreamEvent{Done: true}
 	}()
 	for {
@@ -152,23 +153,7 @@ func (c *ChatService) forward(ctx context.Context, model domain.Model, req domai
 
 			reasoningContent += evt.ReasoningContent
 			content += evt.Content
-
-			// message := domain.Message{
-			// 	Role:             domain.SYSTEM,
-			// 	ReasoningContent: evt.ReasoningContent,
-			// 	Content:          evt.Content,
-			// }
-			// messages = append(messages, message)
-
-			// err := c.repo.AddMessages(ctx, req.Sn, []domain.Message{message})
-			// if err != nil {
-			// 	c.logger.Error("将LLM返回的消息写入数据库失败",
-			// 		elog.FieldErr(err),
-			// 		elog.Any("message", message))
-			// }
-
 			respEvents <- evt
-
 		}
 	}
 }

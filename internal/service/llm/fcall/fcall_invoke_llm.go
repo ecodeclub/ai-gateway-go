@@ -38,14 +38,14 @@ func (c *InvokeLLMFuncCall) Call(ctx *Context, req Request) (Response, error) {
 	if err != nil {
 		return Response{}, newCallErr(c, err)
 	}
-	gjsonExpr, err := req.GetArg(gjsonKey)
-	if err != nil {
-		return Response{}, newCallErr(c, err)
-	}
-	prompt, err := c.getRenderedPrompt(ctx, gjsonExpr, invocationConfig)
-	if err != nil {
-		return Response{}, newCallErr(c, err)
-	}
+	// gjsonExpr, err := req.GetArg(gjsonKey)
+	// if err != nil {
+	// 	return Response{}, newCallErr(c, err)
+	// }
+	// prompt, err := c.getRenderedPrompt(ctx, gjsonExpr, invocationConfig)
+	// if err != nil {
+	// 	return Response{}, newCallErr(c, err)
+	// }
 	// 调用llm接口
 	// resp, err := c.svc.Stream(ctx, domain.ChatStreamRequest{
 	// 	Sn: uuid.New().String(),
@@ -64,17 +64,14 @@ func (c *InvokeLLMFuncCall) Call(ctx *Context, req Request) (Response, error) {
 	// 	return Response{}, newCallErr(c, err)
 	// }
 	msgBytes, err := json.Marshal(&domain.Message{
-		Role:    domain.USER,
-		Content: prompt,
+		Role:    domain.SYSTEM,
+		Content: invocationConfig.SystemPrompt,
 	})
 	if err != nil {
 		return Response{}, newCallErr(c, err)
 	}
 	ctx.SetAttachment(c.Name(), string(msgBytes))
-	return Response{
-		Output: "success",
-		Status: "completed",
-	}, nil
+	return Response{}, nil
 }
 
 func (c *InvokeLLMFuncCall) getInvocationConfig(ctx *Context, req Request) (domain.InvocationConfigVersion, error) {

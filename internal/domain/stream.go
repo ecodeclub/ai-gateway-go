@@ -22,8 +22,8 @@ type StreamRequest struct {
 }
 
 type StreamEvent struct {
-	ResponseID       string
-	CallID           string // 函数调用的ID
+	// ResponseID       string
+	// CallID           string // 函数调用的ID
 	ReasoningContent string
 	Content          string
 	Done             bool

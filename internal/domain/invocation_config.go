@@ -16,7 +16,6 @@ package domain
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -83,7 +82,7 @@ type Attributes map[string]any
 
 func (a Attributes) Get(expr string) (map[string]any, error) {
 	if expr == "" {
-		return nil, errors.New("domain: 表达式不能为空")
+		return nil, nil
 	}
 	byt, err := json.Marshal(a)
 	if err != nil {
