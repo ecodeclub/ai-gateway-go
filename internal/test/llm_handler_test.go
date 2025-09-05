@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/conversations"
 	"github.com/openai/openai-go/v2/option"
 	"github.com/openai/openai-go/v2/responses"
 	"github.com/stretchr/testify/assert"
@@ -92,6 +94,12 @@ func (s *TestLLMHandlerSuite) TearDownTest() {
 	err := s.DB.WithContext(ctx).Exec("TRUNCATE TABLE chats").Error
 	s.NoError(err)
 	err = s.DB.WithContext(ctx).Exec("TRUNCATE TABLE messages").Error
+	s.NoError(err)
+	err = s.DB.WithContext(ctx).Exec("TRUNCATE TABLE temp_quotas").Error
+	s.NoError(err)
+	err = s.DB.WithContext(ctx).Exec("TRUNCATE TABLE quotas").Error
+	s.NoError(err)
+	err = s.DB.WithContext(ctx).Exec("TRUNCATE TABLE quota_records").Error
 	s.NoError(err)
 	s.TestApp.Rdb.FlushDB(ctx)
 }
@@ -332,9 +340,80 @@ func (s *TestLLMHandlerSuite) TestResponseID() {
 	*/
 }
 
+func (s *TestLLMHandlerSuite) TestConversationAPI() {
+	t := s.T()
+	t.Skip()
+	cvs, err := s.client.Conversations.New(t.Context(), conversations.ConversationNewParams{})
+	require.NoError(t, err)
+
+	params := responses.ResponseNewParams{
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: slice.Map([]domain.Message{
+				{
+					Role:    domain.USER,
+					Content: "给我讲个笑话",
+				},
+			}, func(idx int, src domain.Message) responses.ResponseInputItemUnionParam {
+				contentList := responses.ResponseInputMessageContentListParam{
+					{
+						OfInputText: &responses.ResponseInputTextParam{Text: src.Content},
+					},
+				}
+				switch src.Role {
+				case domain.USER:
+					return responses.ResponseInputItemUnionParam{
+						OfInputMessage: &responses.ResponseInputItemMessageParam{
+							Content: contentList,
+							Role:    "user",
+						},
+					}
+				case domain.SYSTEM:
+					return responses.ResponseInputItemUnionParam{
+						OfInputMessage: &responses.ResponseInputItemMessageParam{
+							Content: contentList,
+							Role:    "system",
+						},
+					}
+				default:
+					return responses.ResponseInputItemUnionParam{}
+				}
+			}),
+		},
+		Model: "gpt-4o-mini",
+		Conversation: responses.ResponseNewParamsConversationUnion{
+			OfConversationObject: &responses.ResponseConversationParam{
+				ID: cvs.ID,
+			},
+		},
+	}
+
+	resp, err := s.client.Responses.New(t.Context(), params)
+	require.NoError(t, err)
+
+	t.Logf("输出：%s", resp.OutputText())
+
+	params.PreviousResponseID = openai.String(resp.ID)
+	params.Input = responses.ResponseNewParamsInputUnion{}
+	params.Input.OfInputItemList = append(params.Input.OfInputItemList, responses.ResponseInputItemUnionParam{
+		OfInputMessage: &responses.ResponseInputItemMessageParam{
+			Role: "user",
+			Content: []responses.ResponseInputContentUnionParam{{
+				OfInputText: &responses.ResponseInputTextParam{
+					Text: "解释一下这个笑话为什么好笑？",
+				},
+			}},
+		},
+	})
+
+	resp, err = s.client.Responses.New(t.Context(), params)
+	require.NoError(t, err)
+
+	t.Logf("输出：%s", resp.OutputText())
+}
+
 func (s *TestLLMHandlerSuite) TestHandler_Stream() {
 	t := s.T()
-	// t.Skip()
+	t.Skip()
 
 	_, err := s.providerRepo.SaveProvider(t.Context(), domain.Provider{
 		ID:     1,
@@ -402,73 +481,73 @@ func (s *TestLLMHandlerSuite) TestHandler_Stream() {
 			},
 		},
 
-		{
-			name: "ask_user_讲笑话2",
-			reqFunc: func(t *testing.T) domain.StreamRequest {
-				t.Helper()
-				config := domain.InvocationConfig{
-					Name:        "讲笑话",
-					Biz:         domain.BizConfig{ID: 1},
-					Description: "",
-				}
-				id, err := s.configRepo.Save(t.Context(), config)
-				require.NoError(t, err)
-				config.ID = id
-				version := domain.InvocationConfigVersion{
-					Config:       config,
-					Model:        domain.Model{ID: 1},
-					Version:      "v0.1",
-					Prompt:       "",
-					SystemPrompt: "你是一个笑话大王，可以针对不同性别、年龄的用户讲针对性的笑话。询问用户的年龄和性别等可以使用ask_user函数调用。你必须在一次函数调用中问清楚所有问题。",
-					Functions: []domain.Function{
-						{
-							Name:       fcall.NameAskUser,
-							Definition: askUserJSON,
-						},
-					},
-					Temperature: 0,
-					TopP:        0,
-					MaxTokens:   2500,
-					Status:      domain.InvocationCfgVersionStatusActive,
-				}
-				vid, err := s.configRepo.SaveVersion(t.Context(), version)
-				require.NoError(t, err)
-				model, err := s.providerRepo.GetModel(t.Context(), 1)
-				require.NoError(t, err)
-				version.ID = vid
-				version.Model = model
-				return domain.StreamRequest{
-					ConfigVersion: version,
-					Messages: []domain.Message{
-						{
-							Role:    domain.USER,
-							Content: "请给我讲一个笑话。",
-						},
-						{
-							Role:    domain.SYSTEM,
-							Content: "讲完笑话后，你还有说明一下这个笑话为什么好笑。",
-						},
-					},
-				}
-			},
-			handleEvents: func(t *testing.T, req domain.StreamRequest, events chan domain.StreamEvent) {
-				t.Helper()
-				previousResponseID, callID := s.logEvents(t, events)
-				events, err := s.handler.Stream(t.Context(), domain.StreamRequest{
-					CallID:             callID,
-					PreviousResponseID: previousResponseID,
-					ConfigVersion:      req.ConfigVersion,
-					Messages: []domain.Message{
-						{
-							Role:    domain.USER,
-							Content: "男，25岁",
-						},
-					},
-				})
-				require.NoError(t, err)
-				s.logEvents(t, events)
-			},
-		},
+		// {
+		// 	name: "ask_user_讲笑话2",
+		// 	reqFunc: func(t *testing.T) domain.StreamRequest {
+		// 		t.Helper()
+		// 		config := domain.InvocationConfig{
+		// 			Name:        "讲笑话",
+		// 			Biz:         domain.BizConfig{ID: 1},
+		// 			Description: "",
+		// 		}
+		// 		id, err := s.configRepo.Save(t.Context(), config)
+		// 		require.NoError(t, err)
+		// 		config.ID = id
+		// 		version := domain.InvocationConfigVersion{
+		// 			Config:       config,
+		// 			Model:        domain.Model{ID: 1},
+		// 			Version:      "v0.1",
+		// 			Prompt:       "",
+		// 			SystemPrompt: "你是一个笑话大王，可以针对不同性别、年龄的用户讲针对性的笑话。询问用户的年龄和性别等可以使用ask_user函数调用。你必须在一次函数调用中问清楚所有问题。",
+		// 			Functions: []domain.Function{
+		// 				{
+		// 					Name:       fcall.NameAskUser,
+		// 					Definition: askUserJSON,
+		// 				},
+		// 			},
+		// 			Temperature: 0,
+		// 			TopP:        0,
+		// 			MaxTokens:   2500,
+		// 			Status:      domain.InvocationCfgVersionStatusActive,
+		// 		}
+		// 		vid, err := s.configRepo.SaveVersion(t.Context(), version)
+		// 		require.NoError(t, err)
+		// 		model, err := s.providerRepo.GetModel(t.Context(), 1)
+		// 		require.NoError(t, err)
+		// 		version.ID = vid
+		// 		version.Model = model
+		// 		return domain.StreamRequest{
+		// 			ConfigVersion: version,
+		// 			Messages: []domain.Message{
+		// 				{
+		// 					Role:    domain.USER,
+		// 					Content: "请给我讲一个笑话。",
+		// 				},
+		// 				{
+		// 					Role:    domain.SYSTEM,
+		// 					Content: "讲完笑话后，你还有说明一下这个笑话为什么好笑。",
+		// 				},
+		// 			},
+		// 		}
+		// 	},
+		// 	handleEvents: func(t *testing.T, req domain.StreamRequest, events chan domain.StreamEvent) {
+		// 		t.Helper()
+		// 		previousResponseID, callID := s.logEvents(t, events)
+		// 		events, err := s.handler.Stream(t.Context(), domain.StreamRequest{
+		// 			CallID:             callID,
+		// 			PreviousResponseID: previousResponseID,
+		// 			ConfigVersion:      req.ConfigVersion,
+		// 			Messages: []domain.Message{
+		// 				{
+		// 					Role:    domain.USER,
+		// 					Content: "男，25岁",
+		// 				},
+		// 			},
+		// 		})
+		// 		require.NoError(t, err)
+		// 		s.logEvents(t, events)
+		// 	},
+		// },
 
 		// {
 		// 	name: "ask_user_简历信息提取",
@@ -569,4 +648,299 @@ func (s *TestLLMHandlerSuite) logEvents(t *testing.T, events chan domain.StreamE
 		// t.Logf("Error: %s\n", event.Error)
 	}
 	return
+}
+
+func (s *TestLLMHandlerSuite) TestChatService_Stream() {
+	t := s.T()
+
+	uid := int64(1890521)
+	userKey := fmt.Sprintf("key-%d", uid)
+	err := s.QuotaService.AddQuota(t.Context(), domain.Quota{
+		Amount: 10000,
+		Key:    userKey,
+		Uid:    uid,
+	})
+	require.NoError(t, err)
+
+	providerID := int64(2)
+	modelID := int64(2)
+	_, err = s.providerRepo.SaveProvider(t.Context(), domain.Provider{
+		ID:     providerID,
+		Name:   "openai",
+		APIKey: "fake-key",
+	})
+	require.NoError(t, err)
+
+	_, err = s.providerRepo.SaveModel(t.Context(), domain.Model{
+		ID:          modelID,
+		Provider:    domain.Provider{ID: providerID},
+		Name:        "gpt-4o",
+		InputPrice:  10,
+		OutputPrice: 100,
+		PriceMode:   "fake-price-mode",
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		err = s.DB.Model(&dao.Provider{}).Where("id = ?", providerID).Error
+		require.NoError(t, err)
+		err = s.DB.Model(&dao.Model{}).Where("id = ?", modelID).Error
+		require.NoError(t, err)
+	})
+
+	testCases := []struct {
+		name         string
+		reqFunc      func(t *testing.T) domain.ChatStreamRequest
+		handleEvents func(t *testing.T, req domain.ChatStreamRequest, events chan domain.StreamEvent)
+	}{
+		{
+			name: "ask_user_讲笑话",
+			reqFunc: func(t *testing.T) domain.ChatStreamRequest {
+				t.Helper()
+				sn, err1 := s.ChatService.Save(t.Context(), domain.Chat{
+					Uid:   uid,
+					Title: "讲笑话",
+				})
+				require.NoError(t, err1)
+
+				config := domain.InvocationConfig{
+					Name:        "",
+					Biz:         domain.BizConfig{ID: 1},
+					Description: "",
+				}
+				id, err1 := s.configRepo.Save(t.Context(), config)
+				require.NoError(t, err1)
+
+				config.ID = id
+				version := domain.InvocationConfigVersion{
+					Config:     config,
+					Model:      domain.Model{ID: modelID},
+					Version:    "v0.1",
+					Attributes: nil,
+					Functions: []domain.Function{
+						{
+							Name:       fcall.NameAskUser,
+							Definition: askUserJSON,
+						},
+					},
+					Temperature: 0,
+					TopP:        0,
+					MaxTokens:   2500,
+					Status:      domain.InvocationCfgVersionStatusActive,
+				}
+				vid, err1 := s.configRepo.SaveVersion(t.Context(), version)
+				require.NoError(t, err1)
+				model, err1 := s.providerRepo.GetModel(t.Context(), 1)
+				require.NoError(t, err1)
+				version.ID = vid
+				version.Model = model
+				return domain.ChatStreamRequest{
+					Sn: sn,
+					Messages: []domain.Message{
+						{
+							Role:    domain.SYSTEM,
+							Content: "你是一个笑话大王，可以针对不同性别、年龄的用户讲针对性的笑话。询问用户的年龄和性别等可以使用ask_user函数调用。你必须在一次函数调用中问清楚所有问题。",
+						},
+						{
+							Role:    domain.USER,
+							Content: "请给我讲一个笑话。",
+						},
+					},
+					InvocationConfigID: config.ID,
+					Uid:                uid,
+					Key:                userKey,
+				}
+			},
+			handleEvents: func(t *testing.T, req domain.ChatStreamRequest, events chan domain.StreamEvent) {
+				t.Helper()
+				previousResponseID, callID := s.logEvents(t, events)
+				events, err := s.ChatService.Stream(t.Context(), domain.ChatStreamRequest{
+					Sn:                 req.Sn,
+					CallID:             callID,
+					PreviousResponseID: previousResponseID,
+					InvocationConfigID: req.InvocationConfigID,
+					Messages: []domain.Message{
+						{
+							Role:    domain.USER,
+							Content: "男，25岁",
+						},
+					},
+				})
+				require.NoError(t, err)
+				s.logEvents(t, events)
+
+				chat, err := s.ChatService.Detail(t.Context(), req.Sn)
+				require.NoError(t, err)
+				for i := range chat.Messages {
+					t.Logf("detail.Message[%d]: %#v\n", i, chat.Messages[i])
+				}
+			},
+		},
+		{
+			name: "ask_user_使用systemPrompt讲笑话",
+			reqFunc: func(t *testing.T) domain.ChatStreamRequest {
+				t.Helper()
+				sn, err1 := s.ChatService.Save(t.Context(), domain.Chat{
+					Uid:   uid,
+					Title: "使用systemPrompt讲笑话",
+				})
+				require.NoError(t, err1)
+
+				config := domain.InvocationConfig{
+					Name:        "使用systemPrompt讲笑话",
+					Biz:         domain.BizConfig{ID: 1},
+					Description: "",
+				}
+				id, err1 := s.configRepo.Save(t.Context(), config)
+				require.NoError(t, err1)
+
+				config.ID = id
+				version := domain.InvocationConfigVersion{
+					Config:       config,
+					Model:        domain.Model{ID: modelID},
+					Version:      "v0.1",
+					Prompt:       "",
+					SystemPrompt: "你是一个笑话大王，可以针对不同性别、年龄的用户讲针对性的笑话。询问用户的年龄和性别等可以使用ask_user函数调用。你必须在一次函数调用中问清楚所有问题。",
+					Attributes:   nil,
+					Functions: []domain.Function{
+						{
+							Name:       fcall.NameAskUser,
+							Definition: askUserJSON,
+						},
+					},
+					Temperature: 0,
+					TopP:        0,
+					MaxTokens:   2500,
+					Status:      domain.InvocationCfgVersionStatusActive,
+				}
+				vid, err1 := s.configRepo.SaveVersion(t.Context(), version)
+				require.NoError(t, err1)
+				model, err1 := s.providerRepo.GetModel(t.Context(), 1)
+				require.NoError(t, err1)
+				version.ID = vid
+				version.Model = model
+				return domain.ChatStreamRequest{
+					Sn: sn,
+					Messages: []domain.Message{
+						{
+							Role:    domain.USER,
+							Content: "请给我讲一个笑话。",
+						},
+					},
+					InvocationConfigID: config.ID,
+					Uid:                uid,
+					Key:                userKey,
+				}
+			},
+			handleEvents: func(t *testing.T, req domain.ChatStreamRequest, events chan domain.StreamEvent) {
+				t.Helper()
+				previousResponseID, callID := s.logEvents(t, events)
+				events, err := s.ChatService.Stream(t.Context(), domain.ChatStreamRequest{
+					Sn:                 req.Sn,
+					CallID:             callID,
+					PreviousResponseID: previousResponseID,
+					InvocationConfigID: req.InvocationConfigID,
+					Messages: []domain.Message{
+						{
+							Role:    domain.USER,
+							Content: "男，25岁",
+						},
+					},
+				})
+				require.NoError(t, err)
+				s.logEvents(t, events)
+
+				chat, err := s.ChatService.Detail(t.Context(), req.Sn)
+				require.NoError(t, err)
+				for i := range chat.Messages {
+					t.Logf("detail.Message[%d]: %#v\n", i, chat.Messages[i])
+				}
+			},
+		},
+		{
+			name: "ask_user_emit_json_提取简历信息",
+			reqFunc: func(t *testing.T) domain.ChatStreamRequest {
+				t.Helper()
+				sn, err1 := s.ChatService.Save(t.Context(), domain.Chat{
+					Uid:   uid,
+					Title: "提取简历信息",
+				})
+				require.NoError(t, err1)
+
+				config := domain.InvocationConfig{
+					Name:        "提取简历信息",
+					Biz:         domain.BizConfig{ID: 1},
+					Description: "",
+				}
+				id, err1 := s.configRepo.Save(t.Context(), config)
+				require.NoError(t, err1)
+
+				config.ID = id
+				version := domain.InvocationConfigVersion{
+					Config:       config,
+					Model:        domain.Model{ID: modelID},
+					Version:      "v0.1",
+					Prompt:       "",
+					SystemPrompt: resumeExtractionAssistantSystemPrompt,
+					JSONSchema:   resumeJSONSchema,
+					Attributes:   nil,
+					Functions: []domain.Function{
+						{
+							Name:       fcall.NameAskUser,
+							Definition: askUserJSON,
+						},
+						{
+							Name:       fcall.NameEmitJSON,
+							Definition: emitJSON,
+						},
+					},
+					Temperature: 0,
+					TopP:        0,
+					MaxTokens:   2500,
+					Status:      domain.InvocationCfgVersionStatusActive,
+				}
+				vid, err1 := s.configRepo.SaveVersion(t.Context(), version)
+				require.NoError(t, err1)
+				model, err1 := s.providerRepo.GetModel(t.Context(), 1)
+				require.NoError(t, err1)
+				version.ID = vid
+				version.Model = model
+				return domain.ChatStreamRequest{
+					Sn: sn,
+					Messages: []domain.Message{
+						{
+							Role:    domain.USER,
+							Content: resumeXiaoMing,
+						},
+					},
+					InvocationConfigID: config.ID,
+					Uid:                uid,
+					Key:                userKey,
+				}
+			},
+			handleEvents: func(t *testing.T, req domain.ChatStreamRequest, events chan domain.StreamEvent) {
+				t.Helper()
+				s.logEvents(t, events)
+				chat, err := s.ChatService.Detail(t.Context(), req.Sn)
+				require.NoError(t, err)
+				for i := range chat.Messages {
+					t.Logf("detail.Message[%d]: %#v\n", i, chat.Messages[i])
+				}
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.reqFunc(t)
+			t.Cleanup(func() {
+				err = s.DB.Model(&dao.InvocationConfig{}).Where("id = ?", req.InvocationConfigID).Error
+				require.NoError(t, err)
+				err = s.DB.Model(&dao.InvocationConfigVersion{}).Where("inv_id = ?", req.InvocationConfigID).Error
+				require.NoError(t, err)
+			})
+			events, err1 := s.ChatService.Stream(t.Context(), req)
+			require.NoError(t, err1)
+			tc.handleEvents(t, req, events)
+		})
+	}
 }

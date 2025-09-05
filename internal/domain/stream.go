@@ -15,7 +15,6 @@
 package domain
 
 type StreamRequest struct {
-	ConversationID     string
 	PreviousResponseID string
 	CallID             string
 	Messages           []Message

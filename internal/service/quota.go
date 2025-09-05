@@ -16,6 +16,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -61,7 +62,8 @@ func (q *QuotaService) HasEnoughQuota(ctx context.Context, uid int64) (bool, err
 
 	lapsed := now.Sub(lastClearTime)
 	threshold := 30 * 24 * time.Hour
-
+	log.Printf("quota.Amout: %d, q.maxDebt = %d, %v\n", quota.Amount, q.maxDebt, quota.Amount >= q.maxDebt)
+	log.Printf("lapsed: %d, threshold: %d , %v \n", lapsed, threshold, lapsed > threshold)
 	if quota.Amount >= q.maxDebt && lapsed > threshold {
 		return false, nil
 	}

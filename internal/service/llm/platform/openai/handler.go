@@ -48,14 +48,6 @@ func NewHandler(
 }
 
 func (h *Handler) Stream(ctx context.Context, req domain.StreamRequest) (chan domain.StreamEvent, error) {
-	// if req.ConversationID == "" {
-	// 	res, err := h.client.Conversations.New(ctx, conversations.ConversationNewParams{})
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	req.ConversationID = res.ID
-	//
-	// }
 	log.Printf("stream request: %#v\n", req)
 	events := make(chan domain.StreamEvent, 10)
 	go func() {
@@ -69,35 +61,45 @@ func (h *Handler) stream(ctx context.Context, req domain.StreamRequest) (stream 
 }
 
 func (h *Handler) newParams(req domain.StreamRequest) responses.ResponseNewParams {
-	messages := h.getMessages(req)
-	log.Printf("messages: %#v\n", messages)
+	// messages := h.getMessages(req)
+	// for i := range messages {
+	// 	log.Printf("newParams messages[%d]: %#v\n", i, messages[i])
+	// }
+	for i := range req.Messages {
+		log.Printf("req messages[%d]: %#v\n", i, req.Messages[i])
+	}
+
 	params := responses.ResponseNewParams{
-		Input: h.toInput(messages),
+		// Input: h.toInput(messages),
+		Input: h.toInput(req.Messages),
 		Model: req.ConfigVersion.Model.Name,
 		Tools: slice.Map(req.ConfigVersion.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
 			var p responses.FunctionToolParam
 			_ = json.Unmarshal([]byte(src.Definition), &p)
 			return responses.ToolUnionParam{OfFunction: &p}
 		}),
-		Temperature:        openai.Float(float64(req.ConfigVersion.Temperature)),
-		TopP:               openai.Float(float64(req.ConfigVersion.TopP)),
-		MaxOutputTokens:    openai.Int(int64(req.ConfigVersion.MaxTokens)),
-		PreviousResponseID: openai.String(req.PreviousResponseID),
-		Store:              openai.Bool(true),
+		Temperature:     openai.Float(float64(req.ConfigVersion.Temperature)),
+		TopP:            openai.Float(float64(req.ConfigVersion.TopP)),
+		MaxOutputTokens: openai.Int(int64(req.ConfigVersion.MaxTokens)),
+		// PreviousResponseID: openai.String(req.PreviousResponseID),
+		// Store:              openai.Bool(true),
 		// Conversation: responses.ResponseNewParamsConversationUnion{
 		// 	OfConversationObject: &responses.ResponseConversationParam{
 		// 		ID: req.ConversationID,
 		// 	},
 		// },
 	}
-	if req.CallID != "" {
-		params.Input.OfInputItemList = append(params.Input.OfInputItemList, responses.ResponseInputItemUnionParam{
-			OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
-				CallID: req.CallID,
-				Output: "success",
-				Status: "completed",
-			},
-		})
+	// if req.CallID != "" {
+	// 	params.Input.OfInputItemList = append(params.Input.OfInputItemList, responses.ResponseInputItemUnionParam{
+	// 		OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
+	// 			CallID: req.CallID,
+	// 			Output: "success",
+	// 			Status: "completed",
+	// 		},
+	// 	})
+	// }
+	if req.ConfigVersion.SystemPrompt != "" {
+		params.Instructions = openai.String(req.ConfigVersion.SystemPrompt)
 	}
 	return params
 }
@@ -188,6 +190,24 @@ func (h *Handler) forward(req domain.StreamRequest, stream *ssestream.Stream[res
 			responseID = event.Response.ID
 			log.Printf("forward: response created ID = %s\n", responseID)
 		case "response.completed":
+			// if len(funcCallOutputs) > 0 {
+			// 	log.Printf("有函数调用需要发送响应，暂不返回\n")
+			// 	req.Messages = nil
+			// 	req.PreviousResponseID = responseID
+			// 	params := h.newParams(req)
+			// 	params.Input.OfInputItemList = funcCallOutputs
+			// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			// 	h.client.Responses.NewStreaming(ctx, params)
+			// 	cancel()
+			// } else {
+			// 	evt := domain.StreamEvent{
+			// 		ResponseID: responseID,
+			// 		Done:       true,
+			// 	}
+			// 	events <- evt
+			// 	log.Printf("没有函数调用需要发送响应，直接返回: event=%#v\n", evt)
+			// }
+
 			noFuncCalls := len(funcCallOutputs) == 0
 			if noFuncCalls {
 				evt := domain.StreamEvent{
@@ -199,6 +219,7 @@ func (h *Handler) forward(req domain.StreamRequest, stream *ssestream.Stream[res
 			} else {
 				log.Printf("有函数调用需要发送响应，暂不返回\n")
 			}
+
 		case "response.output_text.delta":
 			text := event.AsResponseOutputTextDelta()
 			events <- domain.StreamEvent{

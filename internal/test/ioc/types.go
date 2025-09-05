@@ -15,6 +15,7 @@
 package ioc
 
 import (
+	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/gotomicro/ego/server/egin"
@@ -31,4 +32,6 @@ type TestApp struct {
 	InvokeLLMFuncCall *fcall.InvokeLLMFuncCall
 	funcCallRegistry  *fcall.Registry
 	LLM               llm.Handler
+	ChatService       *service.ChatService
+	QuotaService      *service.QuotaService
 }

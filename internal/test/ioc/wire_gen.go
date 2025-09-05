@@ -62,6 +62,8 @@ func InitApp(to TestOnly) *TestApp {
 		InvokeLLMFuncCall: invokeLLMFuncCall,
 		funcCallRegistry:  registry,
 		LLM:               handler,
+		ChatService:       chatService,
+		QuotaService:      quotaService,
 	}
 	return testApp
 }

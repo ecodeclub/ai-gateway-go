@@ -16,10 +16,10 @@ package service
 
 import (
 	"context"
+	"log"
 	"math"
 	"time"
 
-	"github.com/ecodeclub/ai-gateway-go/errs"
 	"github.com/gotomicro/ego/core/elog"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -66,19 +66,19 @@ func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error
 }
 
 func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) (chan domain.StreamEvent, error) {
-	ok, err := c.quotaService.HasEnoughQuota(ctx, req.Uid)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, errs.ErrAccountOverdue
-	}
+	// 有bug，暂时注释掉
+	// ok, err := c.quotaService.HasEnoughQuota(ctx, req.Uid)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if !ok {
+	// 	return nil, errs.ErrAccountOverdue
+	// }
 
 	configVersion, err := c.configRepo.GetActiveVersionByID(ctx, req.InvocationConfigID)
 	if err != nil {
 		return nil, err
 	}
-
 	model, err := c.providerService.ModelDetail(ctx, configVersion.Model.ID)
 	if err != nil {
 		return nil, err
@@ -90,8 +90,15 @@ func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) 
 		return nil, err
 	}
 
+	msgs, err := c.repo.GetHistoryMessageList(ctx, req.Sn)
+	if err != nil {
+		return nil, err
+	}
+
 	llmEvents, err := c.llmHandler.Stream(ctx, domain.StreamRequest{
-		Messages:      req.Messages,
+		// PreviousResponseID: req.PreviousResponseID,
+		CallID:        req.CallID,
+		Messages:      msgs,
 		ConfigVersion: configVersion,
 	})
 	if err != nil {
@@ -102,43 +109,66 @@ func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) 
 	return events, nil
 }
 
-func (c *ChatService) forward(ctx context.Context, model domain.Model, req domain.ChatStreamRequest, in, out chan domain.StreamEvent) {
-	content := ""
-	reasoningContent := ""
+func (c *ChatService) forward(ctx context.Context, model domain.Model, req domain.ChatStreamRequest, llmEvents, respEvents chan domain.StreamEvent) {
 	var (
+		reasoningContent string
+		content          string
+
 		inputToken  int64
 		outputToken int64
 	)
 	defer func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		err1 := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{{
-			Content:          content,
+		message := domain.Message{
+			Role:             domain.SYSTEM,
 			ReasoningContent: reasoningContent,
-		}})
-		if err1 != nil {
-			c.logger.Error("写入数据库失败", elog.FieldErr(err1))
+			Content:          content,
 		}
-		amount := int64(
-			float64(model.InputPrice)*float64(inputToken)/1000 +
-				float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
-		)
-		c.deduct(req.Uid, req.Key, amount)
+		err := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{message})
+		if err != nil {
+			c.logger.Error("将LLM返回的消息流聚合后，写入数据库失败", elog.FieldErr(err))
+		}
+		log.Printf("saved llm response message: %#v\n", message)
+
+		// 有bug，暂时注释掉，下方代码
+		// amount := int64(
+		// 	float64(model.InputPrice)*float64(inputToken)/1000 +
+		// 		float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
+		// )
+		// c.deduct(req.Uid, req.Key, amount)
+		respEvents <- domain.StreamEvent{Done: true}
 	}()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case evt, ok := <-in:
+		case evt, ok := <-llmEvents:
 			if !ok || evt.Done {
 				inputToken += evt.InputToken
 				outputToken += evt.OutputToken
-				out <- domain.StreamEvent{Done: true}
 				return
 			}
+
 			reasoningContent += evt.ReasoningContent
 			content += evt.Content
-			out <- evt
+
+			// message := domain.Message{
+			// 	Role:             domain.SYSTEM,
+			// 	ReasoningContent: evt.ReasoningContent,
+			// 	Content:          evt.Content,
+			// }
+			// messages = append(messages, message)
+
+			// err := c.repo.AddMessages(ctx, req.Sn, []domain.Message{message})
+			// if err != nil {
+			// 	c.logger.Error("将LLM返回的消息写入数据库失败",
+			// 		elog.FieldErr(err),
+			// 		elog.Any("message", message))
+			// }
+
+			respEvents <- evt
+
 		}
 	}
 }

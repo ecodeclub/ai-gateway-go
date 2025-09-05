@@ -27,6 +27,7 @@ type ChatStreamRequest struct {
 	Uid                int64
 	Key                string
 	PreviousResponseID string
+	CallID             string
 }
 
 type Chat struct {
