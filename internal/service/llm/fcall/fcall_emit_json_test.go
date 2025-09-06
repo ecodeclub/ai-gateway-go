@@ -1,18 +1,14 @@
-//go:build unit
-
-package emit_json
+package fcall
 
 import (
 	"encoding/json"
 	"errors"
 	"testing"
 
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEmitJsonFunctionCall(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		argMap      map[string]string
@@ -29,7 +25,7 @@ func TestEmitJsonFunctionCall(t *testing.T) {
 		{
 			name:    "缺少data参数",
 			argMap:  map[string]string{},
-			wantErr: fcall.ErrArgNotFound,
+			wantErr: ErrArgNotFound,
 			// 失败情况下，JSONData 未被写入，应为 nil
 			wantJSON: nil,
 		},
@@ -37,7 +33,7 @@ func TestEmitJsonFunctionCall(t *testing.T) {
 			name:        "data不是合法JSON",
 			argMap:      map[string]string{"data": "not a json"},
 			wantErr:     errors.New("json: "),
-			wantJSON:    map[string]any{},
+			wantJSON:    (map[string]any)(nil),
 			checkPrefix: true,
 		},
 	}
@@ -45,15 +41,16 @@ func TestEmitJsonFunctionCall(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fc := EmitJsonFunctionCall{}
-			fctx := &fcall.Context{}
+			fctx := &Context{
+				Context: t.Context()}
 
 			args, err := json.Marshal(tt.argMap)
 			assert.NoError(t, err)
 
-			resp, err := fc.Call(fctx, fcall.Request{Args: args})
+			resp, err := fc.Call(fctx, Request{Args: args})
 			if tt.wantErr == nil {
 				assert.NoError(t, err)
-				assert.Equal(t, fcall.Response{}, resp)
+				assert.Equal(t, Response{}, resp)
 			} else {
 				assert.Error(t, err)
 			}

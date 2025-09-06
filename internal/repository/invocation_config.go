@@ -165,7 +165,7 @@ func (p *InvocationConfigRepo) CountVersions(ctx context.Context, invID int64) (
 }
 
 func (p *InvocationConfigRepo) GetVersionByID(ctx context.Context, id int64) (domain.InvocationConfigVersion, error) {
-	res, err := p.dao.GetVersionByD(ctx, id)
+	res, err := p.dao.GetVersionByID(ctx, id)
 	if err != nil {
 		return domain.InvocationConfigVersion{}, err
 	}

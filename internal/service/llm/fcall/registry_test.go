@@ -1,5 +1,3 @@
-//go:build unit
-
 package fcall
 
 import (
@@ -18,7 +16,7 @@ func (m *MockFunctionCall) Name() string {
 	return m.name
 }
 
-func (m *MockFunctionCall) Call(ctx *Context, req Request) (Response, error) {
+func (m *MockFunctionCall) Call(_ *Context, _ Request) (Response, error) {
 	return Response{}, nil
 }
 
@@ -26,7 +24,7 @@ func TestFunctionCallRegistry(t *testing.T) {
 	t.Run("New", func(t *testing.T) {
 		registry := NewFunctionCallRegistry()
 		assert.NotNil(t, registry)
-		assert.NotNil(t, registry.fcalls)
+		assert.NotNil(t, registry.calls)
 	})
 
 	t.Run("Register", func(t *testing.T) {

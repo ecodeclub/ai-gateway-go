@@ -124,7 +124,7 @@ func (p *InvocationConfigDAO) CountVersions(ctx context.Context, invID int64) (i
 	return int(res), err
 }
 
-func (p *InvocationConfigDAO) GetVersionByD(ctx context.Context, id int64) (InvocationConfigVersion, error) {
+func (p *InvocationConfigDAO) GetVersionByID(ctx context.Context, id int64) (InvocationConfigVersion, error) {
 	var res InvocationConfigVersion
 	err := p.db.WithContext(ctx).Model(&InvocationConfigVersion{}).Where("id = ?", id).First(&res).Error
 	return res, err
@@ -157,8 +157,7 @@ func (p *InvocationConfigDAO) ActivateVersion(ctx context.Context, id int64) err
 
 func (p *InvocationConfigDAO) ActiveVersion(ctx context.Context, id int64) (InvocationConfigVersion, error) {
 	var version InvocationConfigVersion
-	db := p.db
-	err := db.WithContext(ctx).
+	err := p.db.WithContext(ctx).
 		Where("inv_id = ? and status = ? ", id, domain.InvocationCfgVersionStatusActive.String()).
 		Order("utime desc").
 		First(&version).Error

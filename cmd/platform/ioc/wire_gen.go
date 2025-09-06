@@ -13,6 +13,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 )
 
 // Injectors from wire.go:
@@ -23,20 +24,25 @@ func InitApp() *App {
 	cmdable := InitRedis()
 	chatCache := cache.NewChatCache(cmdable)
 	chatRepo := repository.NewChatRepo(chatDAO, chatCache)
-	handler := initLLMHandler()
+	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
+	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
+	askUserFunctionCall := fcall.NewAskUserFunctionCall()
+	emitJsonFunctionCall := fcall.NewEmitJsonFunctionCall()
+	defaultRender := InitRender()
+	invokeLLMFuncCall := fcall.NewInvokeLLMFuncCall(invocationConfigRepo, defaultRender)
+	registry := InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall)
+	handler := InitLLMHandler(registry)
 	quotaDao := dao.NewQuotaDao(db)
 	quotaRepo := repository.NewQuotaRepo(quotaDao)
 	quotaService := InitQuota(quotaRepo)
 	providerDAO := dao.NewProviderDAO(db)
 	providerRepository := repository.NewProviderRepository(providerDAO)
 	providerService := InitProvider(providerRepository)
-	chatService := service.NewChatService(chatRepo, handler, quotaService, providerService)
+	chatService := service.NewChatService(chatRepo, invocationConfigRepo, handler, quotaService, providerService)
 	chatServer := grpc.NewChatServer(chatService)
 	component := InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
-	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
-	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizConfigRepository := repository.NewBizConfigRepository(bizConfigDAO)
 	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, providerRepository)

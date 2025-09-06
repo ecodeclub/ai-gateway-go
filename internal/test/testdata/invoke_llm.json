@@ -1,0 +1,24 @@
+{
+  "type": "function",
+  "name": "invoke_llm",
+  "description": "作为执行计划的一部分，调用另一个LLM来完成特定任务。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "invocation_id": {
+        "type": "string",
+        "description": "下一步调用的执行计划或调用计划的唯一标识符。"
+      },
+      "gjson_expr": {
+        "type": "string",
+        "description": "一个GJSON表达式，用于从上下文的JSON数据中提取特定值以渲染模板。"
+      }
+    },
+    "required": [
+      "invocation_id",
+      "gjson_expr"
+    ],
+    "additionalProperties": false
+  }
+}

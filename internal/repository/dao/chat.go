@@ -61,7 +61,7 @@ func (dao *ChatDAO) GetBySN(ctx context.Context, sn string) (Chat, error) {
 
 func (dao *ChatDAO) GetMessages(ctx context.Context, sn string) ([]Message, error) {
 	var messages []Message
-	err := dao.db.WithContext(ctx).Where("sn = ?", sn).
+	err := dao.db.WithContext(ctx).Where("chat_sn = ?", sn).
 		Order("id DESC").
 		Find(&messages).Error
 	if err != nil {

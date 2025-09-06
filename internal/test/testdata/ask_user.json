@@ -1,0 +1,19 @@
+{
+  "type": "function",
+  "name": "ask_user",
+  "description": "向用户提出一个或多个问题，并等待用户的回答。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "questions": {
+        "type": "string",
+        "description": "需要向用户提出的问题集合，一个JSON格式问题数组的字符串。"
+      }
+    },
+    "required": [
+      "questions"
+    ],
+    "additionalProperties": false
+  }
+}

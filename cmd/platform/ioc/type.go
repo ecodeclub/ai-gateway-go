@@ -22,7 +22,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall/invoke_llm"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/google/wire"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
@@ -34,7 +34,7 @@ var (
 		InitGin,
 		InitGrpcServer)
 
-	LLMSet = wire.NewSet(initLLMHandler)
+	LLMSet = wire.NewSet(InitLLMHandler)
 
 	QuotaSet = wire.NewSet(
 		dao.NewQuotaDao,
@@ -67,9 +67,12 @@ var (
 		InitProvider,
 		admin.NewProviderHandler,
 	)
-	InvokeLLmSet = wire.NewSet(
+	FuncCallSet = wire.NewSet(
 		InitRender,
-		invoke_llm.NewFcall,
+		fcall.NewInvokeLLMFuncCall,
+		fcall.NewEmitJsonFunctionCall,
+		fcall.NewAskUserFunctionCall,
+		InitFunctionCallRegistry,
 	)
 
 	MockSet = wire.NewSet(admin.NewMockHandler)

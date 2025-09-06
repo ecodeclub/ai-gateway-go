@@ -20,6 +20,16 @@ import (
 	"github.com/ecodeclub/ekit"
 )
 
+type ChatStreamRequest struct {
+	Sn                 string
+	Messages           []Message
+	InvocationConfigID int64
+	Uid                int64
+	Key                string
+	PreviousResponseID string
+	CallID             string
+}
+
 type Chat struct {
 	Sn       string
 	Uid      int64
@@ -36,10 +46,10 @@ const (
 )
 
 type Message struct {
-	ID               int64
-	Role             string
-	Content          string
-	ReasoningContent string
+	ID               int64  `json:"id"`
+	Role             string `json:"role"`
+	Content          string `json:"content"`
+	ReasoningContent string `json:"reasoningContent"`
 	Ctime            time.Time
 	Utime            time.Time
 }
