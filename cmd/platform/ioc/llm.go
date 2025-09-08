@@ -45,9 +45,10 @@ func InitFunctionCallRegistry(
 	askUser *fcall.AskUserFunctionCall,
 	emitJSON *fcall.EmitJsonFunctionCall,
 	invokeLLM *fcall.InvokeLLMFuncCall,
+	genDocs *fcall.GenDocFunctionCall,
 ) *fcall.Registry {
 	registry := fcall.NewFunctionCallRegistry()
-	fcs := []fcall.FunctionCall{askUser, emitJSON, invokeLLM}
+	fcs := []fcall.FunctionCall{askUser, emitJSON, invokeLLM, genDocs}
 	for i := range fcs {
 		err := registry.Register(fcs[i])
 		if err != nil {

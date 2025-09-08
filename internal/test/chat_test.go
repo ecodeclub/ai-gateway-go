@@ -34,6 +34,8 @@ var (
 	emitJSON string
 	//go:embed testdata/invoke_llm.json
 	invokeLLMJSON string
+	//go:embed testdata/gen_doc.json
+	genDocJSON string
 	//go:embed testdata/resume_json_schema.json
 	resumeJSONSchema string
 	//go:embed testdata/resume_xiaoming.md
@@ -83,6 +85,7 @@ func (s *ChatTestSuite) SetupSuite() {
 		fcall.NewAskUserFunctionCall(),
 		fcall.NewEmitJsonFunctionCall(),
 		invokeLLMCall,
+		fcall.NewGenDocFunctionCall(),
 	)
 
 	s.client = openai.NewClient(
@@ -178,7 +181,7 @@ func (s *ChatTestSuite) TestUnmarshalFunctionToolParam() {
 	t := s.T()
 	t.Skip("测试定义的Function Definition是否能够被正确反序列化")
 	var p responses.FunctionToolParam
-	for _, str := range []string{askUserJSON, emitJSON, invokeLLMJSON} {
+	for _, str := range []string{askUserJSON, emitJSON, invokeLLMJSON, genDocJSON} {
 		// t.Logf("json_str: %s\n", str)
 		err := json.Unmarshal([]byte(str), &p)
 		require.NoError(t, err)
@@ -703,6 +706,10 @@ func (s *ChatTestSuite) TestChatService_Stream() {
 						{
 							Name:       fcall.NameInvokeLLM,
 							Definition: invokeLLMJSON,
+						},
+						{
+							Name:       fcall.NameGenDoc,
+							Definition: genDocJSON,
 						},
 					},
 					Temperature: 0,

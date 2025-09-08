@@ -15,6 +15,7 @@ const (
 	NameAskUser   = "ask_user"
 	NameEmitJSON  = "emit_json"
 	NameInvokeLLM = "invoke_llm"
+	NameGenDoc    = "gen_doc"
 )
 
 //go:generate mockgen -source=./type.go -package=mocks -destination=./mocks/fcall.mock.go -typed FunctionCall

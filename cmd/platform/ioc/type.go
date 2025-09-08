@@ -72,6 +72,7 @@ var (
 		fcall.NewInvokeLLMFuncCall,
 		fcall.NewEmitJsonFunctionCall,
 		fcall.NewAskUserFunctionCall,
+		fcall.NewGenDocFunctionCall,
 		InitFunctionCallRegistry,
 	)
 
