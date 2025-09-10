@@ -1,0 +1,28 @@
+{
+  "type": "function",
+  "name": "gen_doc",
+  "description": "根据输入的内容生成对应的格式化文档",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "doc": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "文档类型 比如markdown"
+          },
+          "content": {
+            "type": "string",
+            "description": "文档的具体内容"
+          }
+        },
+        "required": ["type", "content"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["doc"],
+    "additionalProperties": false
+  }
+}

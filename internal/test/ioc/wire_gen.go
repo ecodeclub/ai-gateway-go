@@ -53,7 +53,8 @@ func InitApp(to TestOnly) *TestApp {
 	invokeLLMFuncCall := fcall.NewInvokeLLMFuncCall(invocationConfigRepo, defaultRender)
 	askUserFunctionCall := fcall.NewAskUserFunctionCall()
 	emitJsonFunctionCall := fcall.NewEmitJsonFunctionCall()
-	registry := ioc.InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall)
+	genDocFunctionCall := fcall.NewGenDocFunctionCall()
+	registry := ioc.InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall, genDocFunctionCall)
 	testApp := &TestApp{
 		GrpcSever:         component,
 		GinServer:         eginComponent,
