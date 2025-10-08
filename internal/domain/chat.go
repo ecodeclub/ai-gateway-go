@@ -39,12 +39,6 @@ type Chat struct {
 	Utime    time.Time
 }
 
-const (
-	USER   = "USER"
-	TOOL   = "TOOL"
-	SYSTEM = "SYSTEM"
-)
-
 type Message struct {
 	ID               int64  `json:"id"`
 	Role             string `json:"role"`

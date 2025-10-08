@@ -23,10 +23,10 @@ import (
 )
 
 type QuotaRepo struct {
-	dao *dao.QuotaDao
+	dao *dao.QuotaDAO
 }
 
-func NewQuotaRepo(dao *dao.QuotaDao) *QuotaRepo {
+func NewQuotaRepo(dao *dao.QuotaDAO) *QuotaRepo {
 	return &QuotaRepo{dao: dao}
 }
 
@@ -39,7 +39,7 @@ func (q *QuotaRepo) CreateTempQuota(ctx context.Context, quota domain.TempQuota)
 }
 
 func (q *QuotaRepo) GetQuota(ctx context.Context, uid int64) (domain.Quota, error) {
-	quota, err := q.dao.GetQuotaByUid(ctx, uid)
+	quota, err := q.dao.GetOrInitQuotaByUid(ctx, uid)
 	if err != nil {
 		return domain.Quota{}, err
 	}

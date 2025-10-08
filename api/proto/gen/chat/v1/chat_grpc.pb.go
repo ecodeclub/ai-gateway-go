@@ -33,10 +33,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Service_List_FullMethodName   = "/chat.v1.Service/List"
-	Service_Detail_FullMethodName = "/chat.v1.Service/Detail"
-	Service_Save_FullMethodName   = "/chat.v1.Service/Save"
-	Service_Stream_FullMethodName = "/chat.v1.Service/Stream"
+	Service_List_FullMethodName     = "/chat.v1.Service/List"
+	Service_Detail_FullMethodName   = "/chat.v1.Service/Detail"
+	Service_Save_FullMethodName     = "/chat.v1.Service/Save"
+	Service_Stream_FullMethodName   = "/chat.v1.Service/Stream"
+	Service_StreamV1_FullMethodName = "/chat.v1.Service/StreamV1"
 )
 
 // ServiceClient is the client API for Service service.
@@ -52,6 +53,7 @@ type ServiceClient interface {
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
 	Stream(ctx context.Context, in *StreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamResponse], error)
+	StreamV1(ctx context.Context, in *StreamV1Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamV1Response], error)
 }
 
 type serviceClient struct {
@@ -111,6 +113,25 @@ func (c *serviceClient) Stream(ctx context.Context, in *StreamRequest, opts ...g
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Service_StreamClient = grpc.ServerStreamingClient[StreamResponse]
 
+func (c *serviceClient) StreamV1(ctx context.Context, in *StreamV1Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamV1Response], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Service_ServiceDesc.Streams[1], Service_StreamV1_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamV1Request, StreamV1Response]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Service_StreamV1Client = grpc.ServerStreamingClient[StreamV1Response]
+
 // ServiceServer is the server API for Service service.
 // All implementations must embed UnimplementedServiceServer
 // for forward compatibility.
@@ -124,6 +145,7 @@ type ServiceServer interface {
 	// 这部分是真的发起会话
 	// Stream 是采用流式接口发起一轮对话
 	Stream(*StreamRequest, grpc.ServerStreamingServer[StreamResponse]) error
+	StreamV1(*StreamV1Request, grpc.ServerStreamingServer[StreamV1Response]) error
 	mustEmbedUnimplementedServiceServer()
 }
 
@@ -145,6 +167,9 @@ func (UnimplementedServiceServer) Save(context.Context, *SaveRequest) (*SaveResp
 }
 func (UnimplementedServiceServer) Stream(*StreamRequest, grpc.ServerStreamingServer[StreamResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
+}
+func (UnimplementedServiceServer) StreamV1(*StreamV1Request, grpc.ServerStreamingServer[StreamV1Response]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamV1 not implemented")
 }
 func (UnimplementedServiceServer) mustEmbedUnimplementedServiceServer() {}
 func (UnimplementedServiceServer) testEmbeddedByValue()                 {}
@@ -232,6 +257,17 @@ func _Service_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Service_StreamServer = grpc.ServerStreamingServer[StreamResponse]
 
+func _Service_StreamV1_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamV1Request)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ServiceServer).StreamV1(m, &grpc.GenericServerStream[StreamV1Request, StreamV1Response]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Service_StreamV1Server = grpc.ServerStreamingServer[StreamV1Response]
+
 // Service_ServiceDesc is the grpc.ServiceDesc for Service service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -256,6 +292,11 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Stream",
 			Handler:       _Service_Stream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamV1",
+			Handler:       _Service_StreamV1_Handler,
 			ServerStreams: true,
 		},
 	},

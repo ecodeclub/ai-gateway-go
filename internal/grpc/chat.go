@@ -16,16 +16,13 @@ package grpc
 
 import (
 	"context"
-	"errors"
-
-	"github.com/ecodeclub/ai-gateway-go/errs"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
 	"github.com/ecodeclub/ekit/slice"
+	"github.com/gotomicro/ego/core/elog"
 )
 
 var _ ai.ServiceServer = &ChatServer{}
@@ -33,15 +30,19 @@ var _ ai.ServiceServer = &ChatServer{}
 type ChatServer struct {
 	svc *service.ChatService
 	ai.UnimplementedServiceServer
+	logger    *elog.Component
+	streamHdl stream.Handler
 }
 
-func NewChatServer(svc *service.ChatService) *ChatServer {
-	return &ChatServer{svc: svc}
+func NewChatServer(svc *service.ChatService, hdl stream.Handler) *ChatServer {
+	return &ChatServer{svc: svc,
+		streamHdl: hdl,
+		logger:    elog.DefaultLogger.With(elog.FieldComponent("grpc.ChatServer"))}
 }
 
 func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.SaveResponse, error) {
 	chat := request.GetChat()
-	sn, err := c.svc.Save(ctx, domain.Chat{
+	sn, err := c.svc.Save(ctx, domain.ChatV1{
 		Title: chat.Title,
 		Uid:   chat.Uid,
 		Sn:    chat.Sn,
@@ -57,21 +58,20 @@ func (c *ChatServer) List(ctx context.Context, req *ai.ListRequest) (*ai.ListRes
 	if err != nil {
 		return &ai.ListResponse{}, err
 	}
-	return &ai.ListResponse{Chats: slice.Map(chat, func(idx int, src domain.Chat) *ai.Chat {
-		return c.toChat(src)
+	return &ai.ListResponse{Chats: slice.Map(chat, func(idx int, src domain.ChatV1) *ai.Chat {
+		return c.toChatV1(src)
 	})}, nil
 }
 
-func (c *ChatServer) toChat(chat domain.Chat) *ai.Chat {
+func (c *ChatServer) toChatV1(chat domain.ChatV1) *ai.Chat {
 	return &ai.Chat{
 		Sn:    chat.Sn,
 		Title: chat.Title,
 		Uid:   chat.Uid,
-		Msgs: slice.Map(chat.Messages, func(idx int, src domain.Message) *ai.Message {
+		Msgs: slice.Map(chat.HistoryAsMsg(), func(idx int, src domain.HistoryRecord) *ai.Message {
 			return &ai.Message{
-				Role:             src.Role,
-				Content:          src.Content,
-				ReasoningContent: src.ReasoningContent,
+				Role:    src.Role,
+				Content: src.Content,
 			}
 		}),
 		Ctime: chat.Ctime.UnixMilli(),
@@ -83,56 +83,25 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 	if err != nil {
 		return nil, err
 	}
-	return &ai.DetailResponse{Chat: c.toChat(chat)}, nil
+	return &ai.DetailResponse{Chat: c.toChatV1(chat)}, nil
+}
+
+func (c *ChatServer) StreamV1(request *ai.StreamV1Request, resp ai.Service_StreamV1Server) error {
+	ctx := &domain.StreamContext{
+		Ctx:   resp.Context(),
+		CfgID: request.InvocationConfigId,
+		Input: request.GetInput(),
+		Sender: &StreamEventGRPCSender{
+			server: resp,
+			logger: c.logger.With(elog.FieldComponentName("grpc.StreamEventGRPCSender")),
+		},
+		Chat: domain.ChatV1{
+			Sn: request.ChatSn,
+		},
+	}
+	return c.streamHdl.Stream(ctx)
 }
 
 func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
-	ctx := resp.Context()
-	req := domain.ChatStreamRequest{
-		Sn: request.GetSn(),
-		Messages: slice.Map([]*ai.Message{request.GetMsg()}, func(idx int, src *ai.Message) domain.Message {
-			return domain.Message{
-				Role:    src.Role,
-				Content: src.Content,
-			}
-		}),
-		InvocationConfigID: request.GetInvocationConfigId(),
-		Uid:                request.GetUid(),
-		Key:                request.GetKey(),
-		PreviousResponseID: request.GetPreviousResponseId(),
-	}
-	events, err := c.svc.Stream(ctx, req)
-	if err != nil {
-		if errors.Is(err, errs.ErrAccountOverdue) {
-			return status.Error(codes.PermissionDenied, "账户欠费")
-		}
-		return err
-	}
-	return c.stream(ctx, events, resp)
-}
-
-func (c *ChatServer) stream(ctx context.Context, events chan domain.StreamEvent, resp ai.Service_StreamServer) error {
-	var err error
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case evt, ok := <-events:
-			if !ok || evt.Done {
-				err = resp.Send(&ai.StreamResponse{Final: true})
-				return err
-			}
-			if evt.Error != nil {
-				err = resp.Send(&ai.StreamResponse{Err: evt.Error.Error()})
-				return err
-			}
-			err = resp.Send(&ai.StreamResponse{
-				ReasoningContent: evt.ReasoningContent,
-				Content:          evt.Content,
-			})
-			if err != nil {
-				return err
-			}
-		}
-	}
+	panic("implement me")
 }

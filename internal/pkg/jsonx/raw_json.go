@@ -12,13 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package jsonx
 
 import (
-	"errors"
+	"bytes"
+	"encoding/json"
+
+	"github.com/ecodeclub/ekit"
 )
 
-var (
-	ErrInsufficientBalance = errors.New("余额不足")
-	ErrAccountOverdue      = errors.New("账户欠费")
-)
+// RawJSON 一个代表 JSON 数据的类型
+// 它可以是一个 JSON 数组，也可以是 JSON 对象
+type RawJSON []byte
+
+// Get 返回 key 对应的 value
+func (c RawJSON) Get(name string) ekit.AnyValue {
+	decoder := json.NewDecoder(bytes.NewReader(c))
+	decoder.UseNumber()
+	var res map[string]any
+	err := decoder.Decode(&res)
+	return ekit.AnyValue{Val: res[name], Err: err}
+}

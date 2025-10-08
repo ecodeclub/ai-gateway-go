@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package errs
+package admin
 
 var (
 	SystemError              = ErrorCode{Code: 501001, Msg: "系统错误"}

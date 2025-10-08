@@ -17,12 +17,17 @@ package ioc
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/admin"
 	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
-	"github.com/ecodeclub/ai-gateway-go/internal/pkg/template"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
+	fcall "github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/rebuildctx"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 	"github.com/google/wire"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
@@ -34,7 +39,15 @@ var (
 		InitGin,
 		InitGrpcServer)
 
-	LLMSet = wire.NewSet(InitLLMHandler)
+	LLMSet = wire.NewSet(
+		InitOpenAIClient,
+		rebuildctx.NewRebuildContextHandler,
+		render.NewHandler,
+		store.NewHandler,
+		openai.NewHandler,
+		// 最终组装链条的地方
+		InitStreamHandler,
+	)
 
 	QuotaSet = wire.NewSet(
 		dao.NewQuotaDao,
@@ -68,21 +81,26 @@ var (
 		admin.NewProviderHandler,
 	)
 	FuncCallSet = wire.NewSet(
-		InitRender,
-		fcall.NewInvokeLLMFuncCall,
-		fcall.NewEmitJsonFunctionCall,
-		fcall.NewAskUserFunctionCall,
-		InitFunctionCallRegistry,
+		fcall.NewFunctionCallRegistry,
+		fcall.NewBaseFCall,
+		analyzer.NewAnalysisDialogFCall,
+		savedoc.NewFCall,
+		InitKBaseRAG,
+		InitFuncCall,
 	)
-
 	MockSet = wire.NewSet(admin.NewMockHandler)
 )
-
-func InitRender() *template.DefaultRender {
-	return template.NewDefaultRender(template.DefaultConfig())
-}
 
 type App struct {
 	GrpcSever *egrpc.Component
 	GinServer *egin.Component
+	// 受制于 wire 的特性，只能写成这种样子
+	Registry *fcall.Registry
+	FCalls   []fcall.FunctionCall
+}
+
+func (a *App) AfterCreated() {
+	for _, call := range a.FCalls {
+		a.Registry.Register(call)
+	}
 }

@@ -78,7 +78,6 @@ func (vo InvocationConfigVersionVO) toDomain() domain.InvocationConfigVersion {
 		Version:      vo.Version,
 		Prompt:       vo.Prompt,
 		SystemPrompt: vo.SystemPrompt,
-		JSONSchema:   vo.JSONSchema,
 		Attributes:   vo.Attributes,
 		Functions: slice.Map(vo.Functions, func(_ int, src FunctionVO) domain.Function {
 			return domain.Function{
@@ -118,7 +117,6 @@ func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigV
 		Version:           v.Version,
 		Prompt:            v.Prompt,
 		SystemPrompt:      v.SystemPrompt,
-		JSONSchema:        v.JSONSchema,
 		Attributes:        v.Attributes,
 		Functions: slice.Map(v.Functions, func(_ int, src domain.Function) FunctionVO {
 			return FunctionVO{

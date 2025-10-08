@@ -19,7 +19,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ecodeclub/ai-gateway-go/errs"
+	"github.com/ecodeclub/ai-gateway-go/internal/errs"
+	"github.com/gotomicro/ego/core/elog"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -65,22 +66,23 @@ func (Quota) TableName() string {
 	return "quotas"
 }
 
-type QuotaDao struct {
-	db *gorm.DB
+type QuotaDAO struct {
+	db     *gorm.DB
+	logger *elog.Component
 }
 
-func NewQuotaDao(db *gorm.DB) *QuotaDao {
-	return &QuotaDao{db: db}
+func NewQuotaDao(db *gorm.DB) *QuotaDAO {
+	return &QuotaDAO{db: db, logger: elog.DefaultLogger.With(elog.String("dao", "QuotaDAO"))}
 }
 
-func (dao *QuotaDao) CreateTempQuota(ctx context.Context, quota TempQuota) error {
+func (dao *QuotaDAO) CreateTempQuota(ctx context.Context, quota TempQuota) error {
 	now := time.Now().Unix()
 	quota.Ctime = now
 	quota.Utime = now
 	return dao.db.WithContext(ctx).Create(&quota).Error
 }
 
-func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) error {
+func (dao *QuotaDAO) AddQuota(ctx context.Context, key string, quota Quota) error {
 	now := time.Now().Unix()
 	quota.Utime = now
 
@@ -114,18 +116,35 @@ func (dao *QuotaDao) AddQuota(ctx context.Context, key string, quota Quota) erro
 	})
 }
 
-func (dao *QuotaDao) GetQuotaByUid(ctx context.Context, uid int64) (Quota, error) {
+// GetOrInitQuotaByUid 如果没有找到会执行初始化
+func (dao *QuotaDAO) GetOrInitQuotaByUid(ctx context.Context, uid int64) (Quota, error) {
 	var quota Quota
 	err := dao.db.WithContext(ctx).
 		Where("uid = ?", uid).
 		First(&quota).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		now := time.Now().Unix()
+		quota = Quota{
+			ID:            uid,
+			Amount:        0,
+			DebtStartTime: now,
+			Ctime:         now,
+			Utime:         now,
+		}
+		err1 := dao.db.WithContext(ctx).Create(&quota).Error
+		// 理论上来说，这里存在并发的问题，但是正常用户是不可能触发这个情况的
+		if err1 != nil {
+			dao.logger.Error("初始化 quota 失败", elog.Int64("uid", uid), elog.FieldErr(err1))
+		}
+		return quota, nil
+	}
 	if err != nil {
 		return Quota{}, err
 	}
 	return quota, nil
 }
 
-func (dao *QuotaDao) GetTempQuotaByUidAndTime(ctx context.Context, uid int64) ([]TempQuota, error) {
+func (dao *QuotaDAO) GetTempQuotaByUidAndTime(ctx context.Context, uid int64) ([]TempQuota, error) {
 	now := time.Now().Unix()
 	var quota []TempQuota
 	err := dao.db.WithContext(ctx).
@@ -138,7 +157,7 @@ func (dao *QuotaDao) GetTempQuotaByUidAndTime(ctx context.Context, uid int64) ([
 	return quota, nil
 }
 
-func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
+func (dao *QuotaDAO) Deduct(ctx context.Context, uid int64, amount int64, key string) error {
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().Unix()
 		record := QuotaRecord{
@@ -156,7 +175,7 @@ func (dao *QuotaDao) Deduct(ctx context.Context, uid int64, amount int64, key st
 	})
 }
 
-func (dao *QuotaDao) deduct(tx *gorm.DB, uid int64, amount int64, now int64) error {
+func (dao *QuotaDAO) deduct(tx *gorm.DB, uid int64, amount int64, now int64) error {
 	deductAmount := amount
 	for {
 		var quota TempQuota

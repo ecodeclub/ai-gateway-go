@@ -3,8 +3,9 @@ package fcall
 import (
 	"testing"
 
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // MockFunctionCall 用于测试的模拟实现
@@ -16,7 +17,7 @@ func (m *MockFunctionCall) Name() string {
 	return m.name
 }
 
-func (m *MockFunctionCall) Call(_ *Context, _ Request) (Response, error) {
+func (m *MockFunctionCall) Call(ctx *domain.StreamContext, req Request) (Response, error) {
 	return Response{}, nil
 }
 
@@ -49,12 +50,7 @@ func TestFunctionCallRegistry(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				err := registry.Register(tt.fc)
-				if tt.wantErr {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
+				registry.Register(tt.fc)
 			})
 		}
 	})
@@ -67,12 +63,9 @@ func TestFunctionCallRegistry(t *testing.T) {
 		testFC2 := &MockFunctionCall{name: "function2"}
 		testFC3 := &MockFunctionCall{name: "function3"}
 
-		err := registry.Register(testFC1)
-		require.NoError(t, err)
-		err = registry.Register(testFC2)
-		require.NoError(t, err)
-		err = registry.Register(testFC3)
-		require.NoError(t, err)
+		registry.Register(testFC1)
+		registry.Register(testFC2)
+		registry.Register(testFC3)
 
 		tests := []struct {
 			name     string

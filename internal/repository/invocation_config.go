@@ -29,11 +29,12 @@ import (
 )
 
 type InvocationConfigRepo struct {
-	dao *dao.InvocationConfigDAO
+	dao     *dao.InvocationConfigDAO
+	priRepo *ProviderRepository
 }
 
-func NewInvocationConfigRepo(dao *dao.InvocationConfigDAO) *InvocationConfigRepo {
-	return &InvocationConfigRepo{dao: dao}
+func NewInvocationConfigRepo(dao *dao.InvocationConfigDAO, priRepo *ProviderRepository) *InvocationConfigRepo {
+	return &InvocationConfigRepo{dao: dao, priRepo: priRepo}
 }
 
 func (p *InvocationConfigRepo) Save(ctx context.Context, cfg domain.InvocationConfig) (int64, error) {
@@ -109,7 +110,6 @@ func (p *InvocationConfigRepo) toVersionEntity(src domain.InvocationConfigVersio
 		Version:      src.Version,
 		Prompt:       src.Prompt,
 		SystemPrompt: src.SystemPrompt,
-		JSONSchema:   sql.Null[string]{V: src.JSONSchema, Valid: src.JSONSchema != ""},
 		Attributes:   attributes,
 		Functions:    functions,
 		Temperature:  src.Temperature,
@@ -129,10 +129,6 @@ func (p *InvocationConfigRepo) ListVersions(ctx context.Context, invID int64, of
 }
 
 func (p *InvocationConfigRepo) toDomainVersion(v dao.InvocationConfigVersion) domain.InvocationConfigVersion {
-	var jsonSchema string
-	if v.JSONSchema.Valid {
-		jsonSchema = v.JSONSchema.V
-	}
 	var attributes map[string]any
 	if v.Attributes.Valid {
 		_ = json.Unmarshal([]byte(v.Attributes.V), &attributes)
@@ -148,7 +144,6 @@ func (p *InvocationConfigRepo) toDomainVersion(v dao.InvocationConfigVersion) do
 		Version:      v.Version,
 		Prompt:       v.Prompt,
 		SystemPrompt: v.SystemPrompt,
-		JSONSchema:   jsonSchema,
 		Attributes:   attributes,
 		Functions:    functions,
 		Temperature:  v.Temperature,
@@ -182,6 +177,7 @@ func (p *InvocationConfigRepo) GetActiveVersionByID(ctx context.Context, id int6
 		eg            errgroup.Group
 		config        dao.InvocationConfig
 		configVersion dao.InvocationConfigVersion
+		model         domain.Model
 	)
 
 	eg.Go(func() error {
@@ -193,13 +189,20 @@ func (p *InvocationConfigRepo) GetActiveVersionByID(ctx context.Context, id int6
 	eg.Go(func() error {
 		var err error
 		configVersion, err = p.dao.ActiveVersion(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		model, err = p.priRepo.GetModel(ctx, configVersion.ModelID)
 		return err
 	})
 	if err := eg.Wait(); err != nil {
 		return domain.InvocationConfigVersion{}, err
 	}
+
 	domainCfg := p.toDomain(config)
 	versionCfg := p.toDomainVersion(configVersion)
 	versionCfg.Config = domainCfg
+	versionCfg.Model = model
 	return versionCfg, nil
 }

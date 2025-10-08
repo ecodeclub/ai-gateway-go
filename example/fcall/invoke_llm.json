@@ -1,0 +1,17 @@
+{
+  "type": "function",
+  "function": {
+    "name": "invoke_llm",
+    "description": "调用一个预设的 LLM 配置。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cfgID": {
+          "type": "integer",
+          "description": "配置 ID（int64 类型）。"
+        }
+      },
+      "required": ["cfgID"]
+    }
+  }
+}

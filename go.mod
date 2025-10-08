@@ -3,7 +3,6 @@ module github.com/ecodeclub/ai-gateway-go
 go 1.24.2
 
 require (
-	github.com/cohesion-org/deepseek-go v1.2.7
 	github.com/ecodeclub/ekit v0.0.10
 	github.com/ecodeclub/ginx v0.0.3-0.20250724125208-2ec06fc61450
 	github.com/ego-component/egorm v1.1.4
@@ -11,10 +10,12 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/wire v0.6.0
 	github.com/gotomicro/ego v1.2.3
+	github.com/nats-io/nats-server/v2 v2.1.2
 	github.com/openai/openai-go/v2 v2.2.2
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.14.4
+	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.42.0
@@ -79,7 +80,6 @@ require (
 	github.com/jackc/pgx/v4 v4.16.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -110,7 +110,6 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.45.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect

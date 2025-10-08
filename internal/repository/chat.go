@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ecodeclub/ekit/sqlx"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/sn"
 	"golang.org/x/sync/errgroup"
 
@@ -43,19 +45,35 @@ func NewChatRepo(d *dao.ChatDAO, c *cache.ChatCache) *ChatRepo {
 	}
 }
 
-func (repo *ChatRepo) Save(ctx context.Context, chat domain.Chat) (string, error) {
+func (repo *ChatRepo) Save(ctx context.Context, chat domain.ChatV1) (string, error) {
 	if chat.Sn == "" {
 		chat.Sn = repo.snGen.Generate(chat.Uid)
-	}
-	if chat.Title == "" {
-		chat.Title = fmt.Sprintf("Chat-%s", chat.Sn)
 	}
 	err := repo.dao.Save(ctx, dao.Chat{
 		Sn:    chat.Sn,
 		Title: chat.Title,
-		Uid:   chat.Uid,
+		Vars: sqlx.JsonColumn[map[string]any]{
+			Val:   chat.Vars,
+			Valid: chat.Vars != nil,
+		},
+		Uid: chat.Uid,
 	})
 	return chat.Sn, err
+}
+
+func (repo *ChatRepo) SaveTurn(ctx context.Context, sn string, turn *domain.Turn) (int64, error) {
+	return repo.dao.SaveTurn(ctx, dao.Turn{
+		ID:     turn.ID,
+		ChatSN: sn,
+		UserRun: sqlx.JsonColumn[*domain.UserRun]{
+			Val:   turn.UserRun,
+			Valid: turn.UserRun != nil,
+		},
+		AssistantRun: sqlx.JsonColumn[*domain.AssistantRun]{
+			Val:   turn.AssistantRun,
+			Valid: turn.AssistantRun != nil,
+		},
+	})
 }
 
 func (repo *ChatRepo) AddMessages(ctx context.Context, chatSN string, messages []domain.Message) error {
@@ -71,10 +89,10 @@ func (repo *ChatRepo) AddMessages(ctx context.Context, chatSN string, messages [
 }
 
 // GetByUid 根据 uid 获取对话列表
-func (repo *ChatRepo) GetByUid(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.Chat, error) {
+func (repo *ChatRepo) GetByUid(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.ChatV1, error) {
 	chat, err := repo.dao.GetByUid(ctx, uid, limit, offset)
 	if err != nil {
-		return []domain.Chat{}, err
+		return []domain.ChatV1{}, err
 	}
 	return repo.toChats(chat), nil
 }
@@ -96,6 +114,48 @@ func (repo *ChatRepo) GetHistoryMessageList(ctx context.Context, sn string) ([]d
 		return repo.toDomainMessage(messages), nil
 	}
 	return repo.toMessage(messageCache), nil
+}
+
+func (repo *ChatRepo) DetailV1(ctx context.Context, sn string) (domain.ChatV1, error) {
+	var (
+		eg    errgroup.Group
+		turns []dao.Turn
+		chat  dao.Chat
+	)
+	eg.Go(func() error {
+		var err error
+		turns, err = repo.dao.GetTurnsBySN(ctx, sn)
+		return err
+	})
+
+	eg.Go(func() error {
+		var err error
+		chat, err = repo.dao.GetBySN(ctx, sn)
+		return err
+	})
+	err := eg.Wait()
+	if err != nil {
+		return domain.ChatV1{}, err
+	}
+
+	vars := map[string]any{}
+	if chat.Vars.Valid {
+		vars = chat.Vars.Val
+	}
+	return domain.ChatV1{
+		Sn:    chat.Sn,
+		Uid:   chat.Uid,
+		Title: chat.Title,
+		Vars:  vars,
+		Ctime: time.UnixMilli(chat.Ctime),
+		Turns: slice.Map(turns, func(idx int, src dao.Turn) *domain.Turn {
+			return &domain.Turn{
+				ID:           src.ID,
+				UserRun:      src.UserRun.Val,
+				AssistantRun: src.AssistantRun.Val,
+			}
+		}),
+	}, nil
 }
 
 func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error) {
@@ -169,12 +229,17 @@ func (repo *ChatRepo) toMessage(messages []cache.Message) []domain.Message {
 	})
 }
 
-func (repo *ChatRepo) toChats(chats []dao.Chat) []domain.Chat {
-	return slice.Map(chats, func(idx int, src dao.Chat) domain.Chat {
-		return domain.Chat{
-			Sn:    src.Sn,
-			Title: src.Title,
-			Ctime: time.UnixMilli(src.Ctime),
-		}
+func (repo *ChatRepo) toChats(chats []dao.Chat) []domain.ChatV1 {
+	return slice.Map(chats, func(idx int, src dao.Chat) domain.ChatV1 {
+		return repo.toChatV1(src)
 	})
+}
+
+func (repo *ChatRepo) toChatV1(chat dao.Chat) domain.ChatV1 {
+	return domain.ChatV1{
+		Sn:    chat.Sn,
+		Uid:   chat.Uid,
+		Title: chat.Title,
+		Ctime: time.UnixMilli(chat.Ctime),
+	}
 }

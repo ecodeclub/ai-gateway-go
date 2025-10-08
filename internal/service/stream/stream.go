@@ -12,29 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package repository
+package stream
 
 import (
-	"strconv"
-
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 )
 
-type ModelRepository struct {
-}
-
-func NewModelRepository() *ModelRepository {
-	return &ModelRepository{}
-}
-
-func (repo *ModelRepository) FindById(id int64) (domain.Model, error) {
-	// TODO 找到并且组合 model, provider
-	return domain.Model{
-		ID:   id,
-		Name: "model" + strconv.FormatInt(id, 10),
-		Provider: domain.Provider{
-			ID:   id,
-			Name: "provider" + strconv.FormatInt(id, 10),
-		},
-	}, nil
+//go:generate mockgen -source=./stream.go -destination=../mocks/stream.mock.go -package=mocks -typed Handler
+type Handler interface {
+	Stream(ctx *domain.StreamContext) error
 }

@@ -67,7 +67,6 @@ type InvocationConfigVersion struct {
 	Version      string
 	Prompt       string
 	SystemPrompt string
-	JSONSchema   string
 	Attributes   Attributes
 	Functions    []Function
 	Temperature  float32

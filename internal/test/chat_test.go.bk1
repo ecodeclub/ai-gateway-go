@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	fcall2 "github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
+	openaihdl "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
 	"log"
 	"os"
 	"testing"
@@ -14,8 +16,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
-	openaihdl "github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/openai"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/openai/openai-go/v2"
@@ -75,13 +75,13 @@ func (s *ChatTestSuite) SetupSuite() {
 	db := testioc.InitDB()
 	s.configRepo = repository.NewInvocationConfigRepo(dao.NewInvocationConfigDAO(db))
 	s.providerRepo = repository.NewProviderRepository(dao.NewProviderDAO(db))
-	invokeLLMCall := fcall.NewInvokeLLMFuncCall(
+	invokeLLMCall := fcall2.NewInvokeLLMFuncCall(
 		s.configRepo,
 		ioc.InitRender(),
 	)
 	registry := ioc.InitFunctionCallRegistry(
-		fcall.NewAskUserFunctionCall(),
-		fcall.NewEmitJsonFunctionCall(),
+		fcall2.NewAskUserFunctionCall(),
+		fcall2.NewEmitJsonFunctionCall(),
 		invokeLLMCall,
 	)
 
@@ -693,15 +693,15 @@ func (s *ChatTestSuite) TestChatService_Stream() {
 					Attributes:   nil,
 					Functions: []domain.Function{
 						{
-							Name:       fcall.NameAskUser,
+							Name:       fcall2.NameAskUser,
 							Definition: askUserJSON,
 						},
 						{
-							Name:       fcall.NameEmitJSON,
+							Name:       fcall2.NameEmitJSON,
 							Definition: emitJSON,
 						},
 						{
-							Name:       fcall.NameInvokeLLM,
+							Name:       fcall2.NameInvokeLLM,
 							Definition: invokeLLMJSON,
 						},
 					},

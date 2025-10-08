@@ -27,5 +27,6 @@ func InitTables(db *gorm.DB) error {
 		&Quota{},
 		&TempQuota{},
 		&QuotaRecord{},
+		&Turn{},
 	)
 }

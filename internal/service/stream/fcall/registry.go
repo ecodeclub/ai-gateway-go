@@ -19,10 +19,9 @@ func NewFunctionCallRegistry() *Registry {
 }
 
 // Register 注册对应的funcCall
-func (f *Registry) Register(fc FunctionCall) error {
+func (f *Registry) Register(fc FunctionCall) {
 	name := fc.Name()
 	f.calls.Store(name, fc)
-	return nil
 }
 
 // Lookup 按名索引对应的funcCall

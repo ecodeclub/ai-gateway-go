@@ -23,6 +23,7 @@ import (
 func main() {
 	egoApp := ego.New()
 	app := ioc.InitApp()
+	app.AfterCreated()
 
 	err := egoApp.
 		// Invoker 在 Ego 里面，应该叫做初始化函数

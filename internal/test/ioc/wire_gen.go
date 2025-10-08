@@ -14,7 +14,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 )
 
 // Injectors from wire.go:
@@ -28,16 +28,16 @@ func InitApp(to TestOnly) *TestApp {
 	chatCache := cache.NewChatCache(cmdable)
 	chatRepo := repository.NewChatRepo(chatDAO, chatCache)
 	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
-	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
-	handler := to.LLM
-	quotaDao := dao.NewQuotaDao(db)
-	quotaRepo := repository.NewQuotaRepo(quotaDao)
-	quotaService := ioc.InitQuota(quotaRepo)
 	providerDAO := dao.NewProviderDAO(db)
 	providerRepository := repository.NewProviderRepository(providerDAO)
+	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO, providerRepository)
+	quotaDAO := dao.NewQuotaDao(db)
+	quotaRepo := repository.NewQuotaRepo(quotaDAO)
+	quotaService := ioc.InitQuota(quotaRepo)
 	providerService := ioc.InitProvider(providerRepository)
-	chatService := service.NewChatService(chatRepo, invocationConfigRepo, handler, quotaService, providerService)
-	chatServer := grpc.NewChatServer(chatService)
+	chatService := service.NewChatService(chatRepo, invocationConfigRepo, quotaService, providerService)
+	handler := to.Handler
+	chatServer := grpc.NewChatServer(chatService, handler)
 	component := ioc.InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
@@ -49,21 +49,15 @@ func InitApp(to TestOnly) *TestApp {
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
-	defaultRender := ioc.InitRender()
-	invokeLLMFuncCall := fcall.NewInvokeLLMFuncCall(invocationConfigRepo, defaultRender)
-	askUserFunctionCall := fcall.NewAskUserFunctionCall()
-	emitJsonFunctionCall := fcall.NewEmitJsonFunctionCall()
-	registry := ioc.InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall)
+	registry := fcall.NewFunctionCallRegistry()
 	testApp := &TestApp{
-		GrpcSever:         component,
-		GinServer:         eginComponent,
-		DB:                db,
-		Rdb:               cmdable,
-		InvokeLLMFuncCall: invokeLLMFuncCall,
-		funcCallRegistry:  registry,
-		LLM:               handler,
-		ChatService:       chatService,
-		QuotaService:      quotaService,
+		GrpcSever:        component,
+		GinServer:        eginComponent,
+		DB:               db,
+		Rdb:              cmdable,
+		funcCallRegistry: registry,
+		ChatService:      chatService,
+		QuotaService:     quotaService,
 	}
 	return testApp
 }

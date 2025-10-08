@@ -16,8 +16,10 @@ package service
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
+
+	"github.com/ecodeclub/ai-gateway-go/internal/errs"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
@@ -52,20 +54,18 @@ func (q *QuotaService) Deduct(ctx context.Context, uid int64, amount int64, key 
 	return q.repo.Deduct(ctx, uid, amount, key)
 }
 
-func (q *QuotaService) HasEnoughQuota(ctx context.Context, uid int64) (bool, error) {
+func (q *QuotaService) HasEnoughQuota(ctx context.Context, uid int64) error {
 	quota, err := q.repo.GetQuota(ctx, uid)
 	if err != nil {
-		return false, err
+		return err
 	}
 	now := time.Now()
 	lastClearTime := time.Unix(quota.DebtStartTime, 0)
 
 	lapsed := now.Sub(lastClearTime)
 	threshold := 30 * 24 * time.Hour
-	log.Printf("quota.Amout: %d, q.maxDebt = %d, %v\n", quota.Amount, q.maxDebt, quota.Amount >= q.maxDebt)
-	log.Printf("lapsed: %d, threshold: %d , %v \n", lapsed, threshold, lapsed > threshold)
 	if quota.Amount >= q.maxDebt && lapsed > threshold {
-		return false, nil
+		return fmt.Errorf("%w, 欠债未还 uid %d", errs.ErrAccountOverdue, uid)
 	}
-	return true, nil
+	return nil
 }

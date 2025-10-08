@@ -15,10 +15,10 @@
 package domain
 
 type StreamRequest struct {
-	PreviousResponseID string
-	CallID             string
-	Messages           []Message
-	ConfigVersion      InvocationConfigVersion
+	CallID string
+	// 这是一个包含了历史消息和用户正常输入的
+	Messages      []Message
+	ConfigVersion InvocationConfigVersion
 }
 
 type StreamEvent struct {
@@ -28,6 +28,7 @@ type StreamEvent struct {
 	Content          string
 	Done             bool
 	Error            error
-	InputToken       int64
-	OutputToken      int64
+	InputTokens      int64
+	OutputTokens     int64
+	Attachments      map[string]string
 }
