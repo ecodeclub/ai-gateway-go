@@ -13,7 +13,13 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/rebuildctx"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 )
 
 // Injectors from wire.go:
@@ -25,21 +31,22 @@ func InitApp() *App {
 	chatCache := cache.NewChatCache(cmdable)
 	chatRepo := repository.NewChatRepo(chatDAO, chatCache)
 	invocationConfigDAO := dao.NewInvocationConfigDAO(db)
-	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO)
-	askUserFunctionCall := fcall.NewAskUserFunctionCall()
-	emitJsonFunctionCall := fcall.NewEmitJsonFunctionCall()
-	defaultRender := InitRender()
-	invokeLLMFuncCall := fcall.NewInvokeLLMFuncCall(invocationConfigRepo, defaultRender)
-	registry := InitFunctionCallRegistry(askUserFunctionCall, emitJsonFunctionCall, invokeLLMFuncCall)
-	handler := InitLLMHandler(registry)
-	quotaDao := dao.NewQuotaDao(db)
-	quotaRepo := repository.NewQuotaRepo(quotaDao)
-	quotaService := InitQuota(quotaRepo)
 	providerDAO := dao.NewProviderDAO(db)
 	providerRepository := repository.NewProviderRepository(providerDAO)
+	invocationConfigRepo := repository.NewInvocationConfigRepo(invocationConfigDAO, providerRepository)
+	quotaDAO := dao.NewQuotaDao(db)
+	quotaRepo := repository.NewQuotaRepo(quotaDAO)
+	quotaService := InitQuota(quotaRepo)
 	providerService := InitProvider(providerRepository)
-	chatService := service.NewChatService(chatRepo, invocationConfigRepo, handler, quotaService, providerService)
-	chatServer := grpc.NewChatServer(chatService)
+	chatService := service.NewChatService(chatRepo, invocationConfigRepo, quotaService, providerService)
+	rebuildContextHandler := rebuildctx.NewRebuildContextHandler(chatRepo, invocationConfigRepo, providerRepository)
+	handler := render.NewHandler()
+	storeHandler := store.NewHandler(chatRepo)
+	client := InitOpenAIClient()
+	registry := fcall.NewFunctionCallRegistry()
+	openaiHandler := openai.NewHandler(client, registry)
+	streamHandler := InitStreamHandler(rebuildContextHandler, handler, storeHandler, openaiHandler)
+	chatServer := grpc.NewChatServer(chatService, streamHandler)
 	component := InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
@@ -51,9 +58,16 @@ func InitApp() *App {
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
+	baseFCall := fcall.NewBaseFCall(streamHandler, invocationConfigRepo)
+	rag := InitKBaseRAG(baseFCall)
+	analysisDialogFCall := analyzer.NewAnalysisDialogFCall(baseFCall)
+	fCall := savedoc.NewFCall(baseFCall)
+	v := InitFuncCall(rag, analysisDialogFCall, fCall)
 	app := &App{
 		GrpcSever: component,
 		GinServer: eginComponent,
+		Registry:  registry,
+		FCalls:    v,
 	}
 	return app
 }

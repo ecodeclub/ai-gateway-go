@@ -14,11 +14,9 @@
 
 package ioc
 
-import (
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
-)
+import "github.com/ecodeclub/ai-gateway-go/internal/service/stream"
 
 // TestOnly 这里增加字段，记得要在 wire 里面的 FieldsOf 里面增加对应的字段名字
 type TestOnly struct {
-	LLM llm.Handler
+	Handler stream.Handler
 }

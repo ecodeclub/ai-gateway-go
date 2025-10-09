@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package llm
+package errs
 
 import (
-	"context"
-
-	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"errors"
 )
 
-//go:generate mockgen -source=./llm.go -destination=../mocks/llm.mock.go -package=mocks -typed Handler
-type Handler interface {
-	Stream(ctx context.Context, req domain.StreamRequest) (chan domain.StreamEvent, error)
-}
+var (
+	ErrAccountOverdue      = errors.New("账户欠费")
+	ErrInsufficientBalance = errors.New("余额不足")
+)

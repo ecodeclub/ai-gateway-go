@@ -29,7 +29,7 @@ import (
 type QuotaTestSuite struct {
 	suite.Suite
 	*testioc.TestApp
-	dao *dao.QuotaDao
+	dao *dao.QuotaDAO
 }
 
 func TestQuota(t *testing.T) {
@@ -101,7 +101,7 @@ func (s *QuotaTestSuite) TestDeduct() {
 				require.NoError(t, err)
 			},
 			after: func(ctx context.Context, t *testing.T) {
-				quota, err := s.dao.GetQuotaByUid(ctx, 2)
+				quota, err := s.dao.GetOrInitQuotaByUid(ctx, 2)
 				require.NoError(t, err)
 				assert.Equal(t, int64(5), quota.Amount)
 			},
@@ -132,7 +132,7 @@ func (s *QuotaTestSuite) TestDeduct() {
 				require.Len(t, list, 1)
 				assert.Equal(t, list[0].Amount, int64(0))
 
-				quota, err := s.dao.GetQuotaByUid(ctx, 3)
+				quota, err := s.dao.GetOrInitQuotaByUid(ctx, 3)
 				require.NoError(t, err)
 				assert.Equal(t, int64(2), quota.Amount)
 			},
@@ -145,7 +145,7 @@ func (s *QuotaTestSuite) TestDeduct() {
 			before: func(context.Context, *testing.T) {
 			},
 			after: func(ctx context.Context, t *testing.T) {
-				quota, err := s.dao.GetQuotaByUid(ctx, 4)
+				quota, err := s.dao.GetOrInitQuotaByUid(ctx, 4)
 				require.NoError(t, err)
 				assert.Equal(t, int64(-2), quota.Amount)
 				assert.NotZero(t, quota.DebtStartTime)
@@ -177,7 +177,7 @@ func (s *QuotaTestSuite) TestDeduct() {
 				require.Len(t, list, 1)
 				assert.Equal(t, list[0].Amount, int64(0))
 
-				quota, err := s.dao.GetQuotaByUid(ctx, 5)
+				quota, err := s.dao.GetOrInitQuotaByUid(ctx, 5)
 				require.NoError(t, err)
 				assert.Equal(t, int64(-1), quota.Amount)
 				assert.NotZero(t, quota.DebtStartTime)
@@ -209,7 +209,7 @@ func (s *QuotaTestSuite) TestDeduct() {
 				require.Len(t, list, 1)
 				assert.Equal(t, list[0].Amount, int64(0))
 
-				quota, err := s.dao.GetQuotaByUid(ctx, 6)
+				quota, err := s.dao.GetOrInitQuotaByUid(ctx, 6)
 				require.NoError(t, err)
 				assert.Equal(t, int64(-10), quota.Amount)
 				assert.NotZero(t, quota.DebtStartTime)

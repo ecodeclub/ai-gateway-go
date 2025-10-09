@@ -32,3 +32,4 @@ logs
 **/local.yaml
 .tool-versions
 .DS_Store
+local

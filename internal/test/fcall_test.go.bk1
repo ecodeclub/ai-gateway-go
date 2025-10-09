@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"testing"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/mocks"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	"github.com/stretchr/testify/suite"

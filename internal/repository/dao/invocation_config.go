@@ -41,7 +41,6 @@ type InvocationConfigVersion struct {
 	Version      string           `gorm:"column:version;type:varchar(255)"`
 	Prompt       string           `gorm:"column:prompt"`
 	SystemPrompt string           `gorm:"column:system_prompt"`
-	JSONSchema   sql.Null[string] `gorm:"column:json_schema;type:longText;comment:'结构化数据的JSONSchema'"`
 	Attributes   sql.Null[string] `gorm:"column:attributes;type:longText;comment:'用来渲染最终的Prompt'"`
 	Functions    sql.Null[string] `gorm:"column:functions;type:longText;comment:'函数调用定义'"`
 	Temperature  float32          `gorm:"column:temperature"`
@@ -71,7 +70,8 @@ func (p *InvocationConfigDAO) Save(ctx context.Context, cfg InvocationConfig) (i
 
 func (p *InvocationConfigDAO) List(ctx context.Context, offset, limit int) ([]InvocationConfig, error) {
 	var res []InvocationConfig
-	err := p.db.WithContext(ctx).Offset(offset).Limit(limit).Order("utime DESC").Find(&res).Error
+	err := p.db.WithContext(ctx).Offset(offset).Limit(limit).
+		Order("utime DESC").Find(&res).Error
 	return res, err
 }
 

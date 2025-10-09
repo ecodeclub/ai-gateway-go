@@ -16,21 +16,16 @@ package service
 
 import (
 	"context"
-	"log"
-	"math"
-	"time"
 
 	"github.com/gotomicro/ego/core/elog"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
 )
 
 type ChatService struct {
 	repo            *repository.ChatRepo
 	configRepo      *repository.InvocationConfigRepo
-	llmHandler      llm.Handler
 	logger          *elog.Component
 	quotaService    *QuotaService
 	providerService *ProviderService
@@ -39,139 +34,26 @@ type ChatService struct {
 func NewChatService(
 	repo *repository.ChatRepo,
 	configRepo *repository.InvocationConfigRepo,
-	handler llm.Handler,
 	quotaService *QuotaService,
 	provider *ProviderService,
 ) *ChatService {
 	return &ChatService{
 		repo:            repo,
 		configRepo:      configRepo,
-		llmHandler:      handler,
 		quotaService:    quotaService,
 		providerService: provider,
 		logger:          elog.DefaultLogger.With(elog.FieldComponent("service.ChatService")),
 	}
 }
 
-func (c *ChatService) Save(ctx context.Context, chat domain.Chat) (string, error) {
+func (c *ChatService) Save(ctx context.Context, chat domain.ChatV1) (string, error) {
 	return c.repo.Save(ctx, chat)
 }
 
-func (c *ChatService) List(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.Chat, error) {
+func (c *ChatService) List(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.ChatV1, error) {
 	return c.repo.GetByUid(ctx, uid, limit, offset)
 }
 
-func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error) {
-	return c.repo.Detail(ctx, sn)
-}
-
-func (c *ChatService) Stream(ctx context.Context, req domain.ChatStreamRequest) (chan domain.StreamEvent, error) {
-	// 有bug，测试中无论如何设置配额都无法通过这个检查。暂时注释掉
-	// ok, err := c.quotaService.HasEnoughQuota(ctx, req.Uid)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if !ok {
-	// 	return nil, errs.ErrAccountOverdue
-	// }
-
-	configVersion, err := c.configRepo.GetActiveVersionByID(ctx, req.InvocationConfigID)
-	if err != nil {
-		return nil, err
-	}
-	model, err := c.providerService.ModelDetail(ctx, configVersion.Model.ID)
-	if err != nil {
-		return nil, err
-	}
-	configVersion.Model = model
-
-	err = c.repo.AddMessages(ctx, req.Sn, req.Messages)
-	if err != nil {
-		return nil, err
-	}
-
-	msgs, err := c.repo.GetHistoryMessageList(ctx, req.Sn)
-	if err != nil {
-		return nil, err
-	}
-
-	llmEvents, err := c.llmHandler.Stream(ctx, domain.StreamRequest{
-		Messages:      msgs,
-		ConfigVersion: configVersion,
-	})
-	if err != nil {
-		return nil, err
-	}
-	events := make(chan domain.StreamEvent, 10)
-	go c.forward(ctx, model, req, llmEvents, events)
-	return events, nil
-}
-
-func (c *ChatService) forward(ctx context.Context, _ domain.Model, req domain.ChatStreamRequest, llmEvents, respEvents chan domain.StreamEvent) {
-	var (
-		reasoningContent string
-		content          string
-
-		inputToken  int64
-		outputToken int64
-	)
-	defer func() {
-		if reasoningContent != "" || content != "" {
-			message := domain.Message{
-				Role:             domain.SYSTEM,
-				ReasoningContent: reasoningContent,
-				Content:          content,
-			}
-			saveCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-			err := c.repo.AddMessages(saveCtx, req.Sn, []domain.Message{message})
-			cancel()
-			if err != nil {
-				c.logger.Error("将LLM返回的消息流聚合后，写入数据库失败", elog.FieldErr(err))
-			}
-			log.Printf("saved llm response message: %#v\n", message)
-		}
-
-		// 有bug，暂时注释掉，下方代码
-		// amount := int64(
-		// 	float64(model.InputPrice)*float64(inputToken)/1000 +
-		// 		float64(model.OutputPrice)*float64(outputToken)/1000 + 0.5,
-		// )
-		// c.deduct(req.Uid, req.Key, amount)
-
-		respEvents <- domain.StreamEvent{Done: true}
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case evt, ok := <-llmEvents:
-			if !ok || evt.Done {
-				inputToken += evt.InputToken
-				outputToken += evt.OutputToken
-				return
-			}
-
-			reasoningContent += evt.ReasoningContent
-			content += evt.Content
-			respEvents <- evt
-		}
-	}
-}
-
-func (c *ChatService) deduct(uid int64, key string, amount int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	defer cancel()
-	maxRetry := 3
-	for i := 0; i < maxRetry; i++ {
-		err := c.quotaService.Deduct(ctx, uid, amount, key)
-		if err != nil {
-			c.logger.Error("扣减失败",
-				elog.FieldErr(err),
-				elog.Int64("uid", uid),
-				elog.String("key", key),
-				elog.Int64("amount", amount),
-			)
-		}
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
-	}
+func (c *ChatService) Detail(ctx context.Context, sn string) (domain.ChatV1, error) {
+	return c.repo.DetailV1(ctx, sn)
 }

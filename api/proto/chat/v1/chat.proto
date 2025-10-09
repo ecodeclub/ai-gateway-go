@@ -44,6 +44,60 @@ service Service {
   // 这部分是真的发起会话
   // Stream 是采用流式接口发起一轮对话
   rpc Stream(StreamRequest) returns (stream StreamResponse);
+
+  rpc StreamV1(StreamV1Request) returns (stream StreamV1Response);
+}
+
+message StreamV1Request {
+  string chat_sn = 1;
+  // 这必然是用户的输入
+  UserInput input = 2;
+  // 对应的配置的 ID
+  int64 invocation_config_id = 3;
+  int64 uid = 4;
+  string key = 5;
+}
+
+message StreamV1Response {
+  // 这边采用
+  oneof event {
+    Delta delta = 1;
+    Attachments attachments = 2;
+    Error error = 3;
+    // 执行到了什么步骤的信息
+    StepUpdate step_update = 4;
+    Usage usage = 5;
+  }
+}
+
+message Usage {
+  int64 input_tokens = 1;
+  int64 output_tokens = 2;
+  int64 total_tokens = 3;
+}
+
+message UserInput {
+  string content = 1;
+  repeated string files = 2;
+}
+
+// Error 后续要考虑引入错误码？
+message Error {
+  // 错误信息
+  string message = 1;
+}
+
+message StepUpdate {
+  string name = 1;
+  string summary = 2;
+}
+
+message Attachments {
+  map<string, string> entries = 1;
+}
+
+message Delta {
+  string content = 1;
 }
 
 message SaveRequest {

@@ -18,6 +18,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/sqlx"
+
 	"gorm.io/gorm/clause"
 
 	"gorm.io/gorm"
@@ -31,12 +34,22 @@ func NewChatDAO(db *gorm.DB) *ChatDAO {
 	return &ChatDAO{db: db}
 }
 
+func (dao *ChatDAO) SaveTurn(ctx context.Context, turn Turn) (int64, error) {
+	now := time.Now().UnixMilli()
+	turn.Ctime = now
+	turn.Utime = now
+	err := dao.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.AssignmentColumns([]string{"user_run", "assistant_run", "utime"}),
+	}).Create(&turn).Error
+	return turn.ID, err
+}
+
 func (dao *ChatDAO) Save(ctx context.Context, c Chat) error {
 	c.Utime = time.Now().Unix()
 	c.Ctime = time.Now().Unix()
 	return dao.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			DoUpdates: clause.AssignmentColumns([]string{"title", "utime"}),
+			DoUpdates: clause.AssignmentColumns([]string{"title", "utime", "vars"}),
 		}).Create(&c).Error
 }
 
@@ -62,7 +75,7 @@ func (dao *ChatDAO) GetBySN(ctx context.Context, sn string) (Chat, error) {
 func (dao *ChatDAO) GetMessages(ctx context.Context, sn string) ([]Message, error) {
 	var messages []Message
 	err := dao.db.WithContext(ctx).Where("chat_sn = ?", sn).
-		Order("id DESC").
+		Order("id ASC").
 		Find(&messages).Error
 	if err != nil {
 		return []Message{}, err
@@ -80,13 +93,22 @@ func (dao *ChatDAO) AddMessages(ctx context.Context, messages []Message) error {
 	return dao.db.WithContext(ctx).Create(&messages).Error
 }
 
+func (dao *ChatDAO) GetTurnsBySN(ctx context.Context, sn string) ([]Turn, error) {
+	var turns []Turn
+	err := dao.db.WithContext(ctx).Where("chat_sn = ?", sn).
+		Order("id ASC").Find(&turns).Error
+	return turns, err
+}
+
 type Chat struct {
 	ID    int64  `gorm:"primary_key;autoIncrement"`
 	Sn    string `gorm:"uniqueIndex;column:sn;size:36"`
 	Uid   int64  `gorm:"column:uid;index"`
 	Title string `gorm:"column:title"`
-	Ctime int64  `gorm:"column:ctime"`
-	Utime int64  `gorm:"column:utime"`
+	// 整个对话中产生的关键内容，大概率是一个 JSON 字段
+	Vars  sqlx.JsonColumn[map[string]any] `gorm:"column:vars;type:text"` // 扩展字段
+	Ctime int64                           `gorm:"column:ctime"`
+	Utime int64                           `gorm:"column:utime"`
 }
 
 type Message struct {
@@ -97,4 +119,14 @@ type Message struct {
 	Role          string `gorm:"column:role;type:varchar(128);"`
 	Ctime         int64  `gorm:"column:ctime"`
 	Utime         int64  `gorm:"column:utime"`
+}
+
+// Turn 大部分不参与
+type Turn struct {
+	ID           int64                                 `gorm:"primary_key;column:id;autoIncrement"`
+	ChatSN       string                                `gorm:"column:chat_sn;type:varchar(128);index"`
+	UserRun      sqlx.JsonColumn[*domain.UserRun]      `gorm:"column:user_run;type:json"`
+	AssistantRun sqlx.JsonColumn[*domain.AssistantRun] `gorm:"column:assistant_run;type:json"`
+	Utime        int64                                 `gorm:"column:utime"`
+	Ctime        int64                                 `gorm:"column:ctime"`
 }

@@ -16,8 +16,7 @@ package ioc
 
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/gotomicro/ego/server/egin"
 	"github.com/gotomicro/ego/server/egrpc"
 	"github.com/redis/go-redis/v9"
@@ -25,13 +24,11 @@ import (
 )
 
 type TestApp struct {
-	GrpcSever         *egrpc.Component
-	GinServer         *egin.Component
-	DB                *gorm.DB
-	Rdb               redis.Cmdable
-	InvokeLLMFuncCall *fcall.InvokeLLMFuncCall
-	funcCallRegistry  *fcall.Registry
-	LLM               llm.Handler
-	ChatService       *service.ChatService
-	QuotaService      *service.QuotaService
+	GrpcSever        *egrpc.Component
+	GinServer        *egin.Component
+	DB               *gorm.DB
+	Rdb              redis.Cmdable
+	funcCallRegistry *fcall.Registry
+	ChatService      *service.ChatService
+	QuotaService     *service.QuotaService
 }

@@ -15,44 +15,67 @@
 package ioc
 
 import (
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/llm/fcall"
-	openaihdl "github.com/ecodeclub/ai-gateway-go/internal/service/llm/platform/openai"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
+	iopenai "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/rebuildctx"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 	"github.com/gotomicro/ego/core/econf"
 	"github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
 )
 
-func InitLLMHandler(registry *fcall.Registry) llm.Handler {
-	type AliyunConfig struct {
+func InitOpenAIClient() openai.Client {
+	type OpenAIConfig struct {
 		APIKey  string `json:"apiKey"`
 		BaseURL string `json:"baseURL"`
-		Model   string `json:"model"`
 	}
-	var cfg AliyunConfig
+	var cfg OpenAIConfig
 
-	err := econf.UnmarshalKey("aliyun", &cfg)
+	err := econf.UnmarshalKey("openai", &cfg)
 	if err != nil {
 		panic(err)
 	}
-	return openaihdl.NewHandler(openai.NewClient(
+	return openai.NewClient(
 		option.WithAPIKey(cfg.APIKey),
 		option.WithBaseURL(cfg.BaseURL),
-	), registry)
+	)
 }
 
-func InitFunctionCallRegistry(
-	askUser *fcall.AskUserFunctionCall,
-	emitJSON *fcall.EmitJsonFunctionCall,
-	invokeLLM *fcall.InvokeLLMFuncCall,
-) *fcall.Registry {
-	registry := fcall.NewFunctionCallRegistry()
-	fcs := []fcall.FunctionCall{askUser, emitJSON, invokeLLM}
-	for i := range fcs {
-		err := registry.Register(fcs[i])
-		if err != nil {
-			panic(err)
-		}
+func InitStreamHandler(
+	rebuildHdl *rebuildctx.RebuildContextHandler,
+	renderHdl *render.Handler,
+	storeHdl *store.Handler,
+	openaiHdl *iopenai.Handler,
+) stream.Handler {
+	// 组装各个 next
+	// 当前顺序 rebuild -> render -> store -> openai
+	rebuildHdl.Next = renderHdl
+	renderHdl.Next = storeHdl
+	storeHdl.Next = openaiHdl
+	return rebuildHdl
+}
+
+func InitFuncCall(
+	f3 *kbase.RAG,
+	f4 *analyzer.AnalysisDialogFCall,
+	f5 *savedoc.FCall,
+) []fcall.FunctionCall {
+	return []fcall.FunctionCall{f3, f4, f5}
+}
+
+func InitKBaseRAG(base *fcall.BaseFCall) *kbase.RAG {
+	type KBaseRAGConfig struct {
+		URL string `json:"url" yaml:"url"`
 	}
-	return registry
+	var cfg KBaseRAGConfig
+	err := econf.UnmarshalKey("kbase", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	return kbase.NewKBaseRAG(cfg.URL, base)
 }
