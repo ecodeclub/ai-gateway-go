@@ -26,12 +26,11 @@ import (
 // 我觉得这个功能和 emit_json 有一点重复，可以考虑用这个取代掉 emit_json
 // 这个实现的关键点就是会把 Doc 放入到 ctx.Chat.Vars 里面
 type FCall struct {
-	base   *fcall.BaseFCall
 	logger *elog.Component
 }
 
-func NewFCall(base *fcall.BaseFCall) *FCall {
-	return &FCall{base: base,
+func NewFCall() *FCall {
+	return &FCall{
 		logger: elog.DefaultLogger.With(elog.FieldComponent("fcall.save_doc"))}
 }
 
@@ -47,10 +46,9 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 	}
 	c.logger.Debug("保存变量", elog.String("varName", saveReq.VarName), elog.String("type", saveReq.Type), elog.String("content", saveReq.Content))
 	ctx.Chat.Vars[saveReq.VarName] = saveReq.Content
-	if saveReq.NextInvCfgID > 0 {
-		err = c.base.InvokeLLM(ctx, saveReq.NextInvCfgID)
-	}
-	return fcall.Response{}, err
+	return fcall.Response{
+		NextInvCfgID: saveReq.NextInvCfgID,
+	}, err
 }
 
 type Request struct {

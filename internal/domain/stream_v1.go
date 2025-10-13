@@ -26,13 +26,22 @@ type ChatV1 struct {
 	Sn    string
 	Uid   int64
 	Title string
+
+	// 第三方的 conversation id
+	// 目前只有 openai 需要使用
+	LLMConversation LLMConversation
+
 	// Vars 跨 step 传递的变量
 	// 该字段和 Attachments 的区别是这个是变量
 	// 小心 any 类型中确切类型是数字的问题
-	Vars   map[string]any
-	Digest *Digest
-	Turns  []*Turn
-	Ctime  time.Time
+	Vars  map[string]any
+	Turns []*Turn
+	Ctime time.Time
+}
+
+// LLMConversation 代表第三方的 Conversation
+type LLMConversation struct {
+	ID string
 }
 
 // LastTurn 返回最后一轮，也就是“当前”对话
@@ -41,20 +50,13 @@ func (c *ChatV1) LastTurn() *Turn {
 	return c.Turns[len(c.Turns)-1]
 }
 
-// Digest 对话的摘要
-type Digest struct {
-	Summary string
-}
-
 // CombinedVars 返回合并后的变量，也就是将 Turn 和全局的合并
 func (c *ChatV1) CombinedVars() map[string]any {
 	turn := c.LastTurn()
 	return mapx.Merge(c.Vars, turn.Vars)
 }
 
-// HistoryAsMsg 返回完整的历史记录
-// 但是会忽略掉 assistant 中的空字符串
-func (c *ChatV1) HistoryAsMsg() []HistoryRecord {
+func (c *ChatV1) History() []HistoryRecord {
 	res := make([]HistoryRecord, 0, len(c.Turns)*2)
 	for _, t := range c.Turns {
 		res = append(res, HistoryRecord{
@@ -68,34 +70,6 @@ func (c *ChatV1) HistoryAsMsg() []HistoryRecord {
 				Role:    ai.RoleAssistant,
 			})
 		}
-	}
-	return res
-}
-
-// History 返回历史聊天记录
-// 目前历史记录被设定为 Digest + 最近 3 轮的
-func (c *ChatV1) History() []HistoryRecord {
-	// 返回历史聊天记录，但是这里只返回必要的
-	res := make([]HistoryRecord, 0, 5)
-	const turnsCnt = 2
-	// 从起点开始，或者从最近的两个开始（其实 3 个也可以，但是我觉得没太大的必要）
-	start := max(len(c.Turns)-turnsCnt, 0)
-	for i := start; i < len(c.Turns); i++ {
-		t := c.Turns[i]
-		res = append(res, HistoryRecord{
-			Content: t.UserRun.Content,
-			Role:    ai.RoleUser,
-		}, HistoryRecord{
-			Content: t.AssistantRun.Content,
-			Role:    ai.RoleAssistant,
-		})
-	}
-	if c.Digest != nil {
-		// 加入摘要，并且放到最近以确保权重会比较高
-		res = append(res, HistoryRecord{
-			Role:    ai.RoleAssistant,
-			Content: c.Digest.Summary,
-		})
 	}
 	return res
 }
@@ -122,11 +96,11 @@ type AssistantRun struct {
 	Attachments map[string]string
 }
 
-func (a *AssistantRun) StartLLMStep(cfg InvocationConfigVersion) {
+func (a *AssistantRun) StartLLMStep(cfgID int64) {
 	a.Steps = append(a.Steps, &Step{
 		Type: StepTypeFunctionCall,
 		Data: &StepLLMData{
-			Cfg: cfg,
+			CfgID: cfgID,
 		},
 	})
 }
@@ -168,6 +142,7 @@ func (s *Step) FunctionCallData() *StepFunctionCallData {
 type StepLLMData struct {
 	// 渲染好的 User Prompt
 	RenderedUserPrompt string
+	CfgID              int64
 	// 配置
 	Cfg InvocationConfigVersion
 }
@@ -185,16 +160,17 @@ type StepFunctionCallData struct {
 type UserInput = ai.UserInput
 
 type StreamContext struct {
-	Ctx context.Context
-	// 用户发起一轮对话的最开始的输入
-	Input *UserInput
-
+	Ctx    context.Context
 	Sender StreamEventSender
 	Chat   ChatV1
-	// 这是最开始的配置的 ID。
-	// 如果你不知道是否应该使用这两个字段，那么就说明你不应该使用这个字段
-	CfgID     int64
-	Initiated bool
+}
+
+type RouteInfo struct {
+	NextInvCfgID int64
+}
+
+func (ctx *StreamContext) LLMCid() string {
+	return ctx.Chat.LLMConversation.ID
 }
 
 // History 对话的上下文，要注意的是后续可能会有灵活的策略来决定什么才是需要发送到 LLM 的上下文

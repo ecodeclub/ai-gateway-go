@@ -16,6 +16,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -68,7 +69,7 @@ func (c *ChatServer) toChatV1(chat domain.ChatV1) *ai.Chat {
 		Sn:    chat.Sn,
 		Title: chat.Title,
 		Uid:   chat.Uid,
-		Msgs: slice.Map(chat.HistoryAsMsg(), func(idx int, src domain.HistoryRecord) *ai.Message {
+		Msgs: slice.Map(chat.History(), func(idx int, src domain.HistoryRecord) *ai.Message {
 			return &ai.Message{
 				Role:    src.Role,
 				Content: src.Content,
@@ -87,17 +88,36 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 }
 
 func (c *ChatServer) StreamV1(request *ai.StreamV1Request, resp ai.Service_StreamV1Server) error {
+	chat, err := c.svc.Detail(resp.Context(), request.ChatSn)
+	if err != nil {
+		return fmt.Errorf("查找 Chat 详情失败 %w", err)
+	}
+
+	turn := &domain.Turn{
+		Vars: map[string]any{
+			"Input": request.Input.Content,
+		},
+		UserRun: &domain.UserRun{
+			Content: request.Input.Content,
+			Files:   request.Input.Files,
+		},
+		AssistantRun: &domain.AssistantRun{
+			// 构建当前的步骤，一般来说步骤不会超过 4 个
+			Steps: make([]*domain.Step, 0, 4),
+		},
+	}
+	// 默认第一个步骤就是调用 LLM，这个假设不要轻易破坏了
+	// 后续如果有别的可能，那么就要考虑扩展 invocation_config 与这个地方了
+	turn.AssistantRun.StartLLMStep(request.InvocationConfigId)
+	// 初始化当前这一轮对话
+	chat.Turns = append(chat.Turns, turn)
 	ctx := &domain.StreamContext{
-		Ctx:   resp.Context(),
-		CfgID: request.InvocationConfigId,
-		Input: request.GetInput(),
+		Ctx: resp.Context(),
 		Sender: &StreamEventGRPCSender{
 			server: resp,
 			logger: c.logger.With(elog.FieldComponentName("grpc.StreamEventGRPCSender")),
 		},
-		Chat: domain.ChatV1{
-			Sn: request.ChatSn,
-		},
+		Chat: chat,
 	}
 	return c.streamHdl.Stream(ctx)
 }

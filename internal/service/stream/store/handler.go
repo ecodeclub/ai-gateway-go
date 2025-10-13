@@ -67,8 +67,8 @@ func (h *Handler) Stream(ctx *domain.StreamContext) error {
 			// 之前没有设置标题，现在设置一下
 			if sender.title != "" && ctx.Chat.Title == "" {
 				ctx.Chat.Title = sender.title
-				_, err = h.repo.Save(storeCtx, ctx.Chat)
 			}
+			_, err = h.repo.Save(storeCtx, ctx.Chat)
 			return err
 		})
 		err := eg.Wait()

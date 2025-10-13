@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fcall
+package loadcfg
 
 import (
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -21,28 +21,40 @@ import (
 	"github.com/gotomicro/ego/core/elog"
 )
 
-type BaseFCall struct {
-	handler stream.Handler
+// RebuildContextHandler 重建整个对话上下文
+type RebuildContextHandler struct {
+	repo    *repository.ChatRepo
 	cfgRepo *repository.InvocationConfigRepo
+	priRepo *repository.ProviderRepository
+	Next    stream.Handler
 	logger  *elog.Component
 }
 
-func NewBaseFCall(handler stream.Handler, cfgRepo *repository.InvocationConfigRepo) *BaseFCall {
-	return &BaseFCall{
-		handler: handler,
+func NewLoadConfigHandler(
+	repo *repository.ChatRepo,
+	cfgRepo *repository.InvocationConfigRepo,
+	priRepo *repository.ProviderRepository,
+) *RebuildContextHandler {
+	return &RebuildContextHandler{
+		repo:    repo,
 		cfgRepo: cfgRepo,
-		logger:  elog.DefaultLogger.With(elog.FieldComponentName("BaseFCall")),
+		priRepo: priRepo,
+		logger:  elog.DefaultLogger.With(elog.FieldComponent("handler.rebuild_ctx")),
 	}
 }
 
-func (b *BaseFCall) InvokeLLM(ctx *domain.StreamContext, cfgID int64) error {
-	b.logger.Debug("收到 invoke_llm 请求", elog.Int64("cfgID", cfgID))
-	cfg, err := b.cfgRepo.GetActiveVersionByID(ctx.Ctx, cfgID)
+// Stream 是否移动到 service 会更好？
+func (r *RebuildContextHandler) Stream(ctx *domain.StreamContext) error {
+	stepData := ctx.Chat.LastTurn().AssistantRun.LastStep().LLMData()
+	cfg, err := r.cfgRepo.GetActiveVersionByID(ctx.Ctx, stepData.CfgID)
 	if err != nil {
 		return err
 	}
-	assistant := ctx.Chat.LastTurn().AssistantRun
-	// 插入一个新的 step，并且把数据搞好
-	assistant.StartLLMStep(cfg)
-	return b.handler.Stream(ctx)
+	model, err := r.priRepo.GetModel(ctx.Ctx, cfg.Model.ID)
+	cfg.Model = model
+	stepData.Cfg = cfg
+	if err != nil {
+		return err
+	}
+	return r.Next.Stream(ctx)
 }
