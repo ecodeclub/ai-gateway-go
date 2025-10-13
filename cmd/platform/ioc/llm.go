@@ -20,19 +20,21 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	iopenai "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/rebuildctx"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 	"github.com/gotomicro/ego/core/econf"
-	"github.com/openai/openai-go/v2"
-	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 )
 
-func InitOpenAIClient() openai.Client {
+func InitOpenAIHandler(registry *fcall.Registry) *iopenai.Handler {
 	type OpenAIConfig struct {
 		APIKey  string `json:"apiKey"`
 		BaseURL string `json:"baseURL"`
+		// 一些公共的头部
+		Headers map[string]string `json:"headers"`
 	}
 	var cfg OpenAIConfig
 
@@ -40,24 +42,27 @@ func InitOpenAIClient() openai.Client {
 	if err != nil {
 		panic(err)
 	}
-	return openai.NewClient(
+	client := openai.NewClient(
 		option.WithAPIKey(cfg.APIKey),
 		option.WithBaseURL(cfg.BaseURL),
 	)
+	return iopenai.NewHandler(client, registry, cfg.Headers)
 }
 
 func InitStreamHandler(
-	rebuildHdl *rebuildctx.RebuildContextHandler,
+	loadcfgHdl *loadcfg.RebuildContextHandler,
 	renderHdl *render.Handler,
 	storeHdl *store.Handler,
 	openaiHdl *iopenai.Handler,
 ) stream.Handler {
 	// 组装各个 next
-	// 当前顺序 rebuild -> render -> store -> openai
-	rebuildHdl.Next = renderHdl
+	// 当前顺序 loadcfg -> render -> store -> openai
+	// openai 里面还要发起下一次调用，于是重归 loadcfg
+	loadcfgHdl.Next = renderHdl
 	renderHdl.Next = storeHdl
 	storeHdl.Next = openaiHdl
-	return rebuildHdl
+	openaiHdl.Handler = loadcfgHdl
+	return loadcfgHdl
 }
 
 func InitFuncCall(
@@ -68,7 +73,7 @@ func InitFuncCall(
 	return []fcall.FunctionCall{f3, f4, f5}
 }
 
-func InitKBaseRAG(base *fcall.BaseFCall) *kbase.RAG {
+func InitKBaseRAG() *kbase.RAG {
 	type KBaseRAGConfig struct {
 		URL string `json:"url" yaml:"url"`
 	}
@@ -77,5 +82,5 @@ func InitKBaseRAG(base *fcall.BaseFCall) *kbase.RAG {
 	if err != nil {
 		panic(err)
 	}
-	return kbase.NewKBaseRAG(cfg.URL, base)
+	return kbase.NewKBaseRAG(cfg.URL)
 }

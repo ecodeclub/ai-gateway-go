@@ -52,6 +52,10 @@ func (repo *ChatRepo) Save(ctx context.Context, chat domain.ChatV1) (string, err
 	err := repo.dao.Save(ctx, dao.Chat{
 		Sn:    chat.Sn,
 		Title: chat.Title,
+		LLMConversation: sqlx.JsonColumn[domain.LLMConversation]{
+			Val:   chat.LLMConversation,
+			Valid: true,
+		},
 		Vars: sqlx.JsonColumn[map[string]any]{
 			Val:   chat.Vars,
 			Valid: chat.Vars != nil,
@@ -143,11 +147,12 @@ func (repo *ChatRepo) DetailV1(ctx context.Context, sn string) (domain.ChatV1, e
 		vars = chat.Vars.Val
 	}
 	return domain.ChatV1{
-		Sn:    chat.Sn,
-		Uid:   chat.Uid,
-		Title: chat.Title,
-		Vars:  vars,
-		Ctime: time.UnixMilli(chat.Ctime),
+		Sn:              chat.Sn,
+		Uid:             chat.Uid,
+		Title:           chat.Title,
+		Vars:            vars,
+		LLMConversation: chat.LLMConversation.Val,
+		Ctime:           time.UnixMilli(chat.Ctime),
 		Turns: slice.Map(turns, func(idx int, src dao.Turn) *domain.Turn {
 			return &domain.Turn{
 				ID:           src.ID,

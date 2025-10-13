@@ -23,6 +23,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 )
 
+// ChatService 只负责和 Chat 有关的增删改查工作
 type ChatService struct {
 	repo            *repository.ChatRepo
 	configRepo      *repository.InvocationConfigRepo

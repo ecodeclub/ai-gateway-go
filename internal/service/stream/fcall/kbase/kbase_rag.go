@@ -29,18 +29,16 @@ import (
 type RAG struct {
 	client *http.Client
 	url    string
-	*fcall.BaseFCall
 	logger *elog.Component
 }
 
 // NewKBaseRAG 创建 RAG 实例
 // url 是知识库的查询地址
-func NewKBaseRAG(url string, base *fcall.BaseFCall) *RAG {
+func NewKBaseRAG(url string) *RAG {
 	return &RAG{
-		BaseFCall: base,
-		logger:    elog.DefaultLogger.With(elog.FieldComponent("KBaseRAG")),
-		client:    http.DefaultClient,
-		url:       url,
+		logger: elog.DefaultLogger.With(elog.FieldComponent("KBaseRAG")),
+		client: http.DefaultClient,
+		url:    url,
 	}
 }
 
@@ -74,10 +72,9 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	}
 	k.logger.Debug("RAG 响应", elog.String("body", string(body)))
 	ctx.Chat.Vars[ragReq.VarName] = string(body)
-	if ragReq.NextInvCfgID > 0 {
-		err = k.InvokeLLM(ctx, ragReq.NextInvCfgID)
-	}
-	return fcall.Response{}, err
+	return fcall.Response{
+		NextInvCfgID: ragReq.NextInvCfgID,
+	}, err
 }
 
 type Request struct {

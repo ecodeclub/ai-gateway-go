@@ -10,8 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/wire v0.6.0
 	github.com/gotomicro/ego v1.2.3
-	github.com/nats-io/nats-server/v2 v2.1.2
-	github.com/openai/openai-go/v2 v2.2.2
+	github.com/openai/openai-go/v3 v3.3.0
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.14.4

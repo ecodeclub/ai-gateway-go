@@ -23,7 +23,6 @@ import (
 )
 
 type AnalysisDialogFCall struct {
-	base   *fcall.BaseFCall
 	logger *elog.Component
 }
 
@@ -38,18 +37,12 @@ func (a *AnalysisDialogFCall) Call(ctx *domain.StreamContext, req fcall.Request)
 		return fcall.Response{}, err
 	}
 
-	ctx.Chat.Digest = &domain.Digest{
-		Summary: anaReq.Summary,
-	}
-	a.logger.Debug("生成摘要", elog.String("summary", anaReq.Summary))
-
 	if anaReq.Title != "" {
 		go func() {
 			// 输出一个 title 变更
 			err1 := ctx.Sender.Send(domain.StreamEventV1{
 				StepUpdate: &domain.StepUpdate{
 					Title: anaReq.Title,
-					// summary 一般是不需要放的，除非是你在 DEBUG 环境，你想看看 summary 对不对
 				},
 			})
 			if err1 != nil {
@@ -58,21 +51,18 @@ func (a *AnalysisDialogFCall) Call(ctx *domain.StreamContext, req fcall.Request)
 		}()
 	}
 
-	if anaReq.NextInvCfgID > 0 {
-		err = a.base.InvokeLLM(ctx, anaReq.NextInvCfgID)
-	}
-	return fcall.Response{}, err
+	return fcall.Response{
+		NextInvCfgID: anaReq.NextInvCfgID,
+	}, err
 }
 
-func NewAnalysisDialogFCall(base *fcall.BaseFCall) *AnalysisDialogFCall {
+func NewAnalysisDialogFCall() *AnalysisDialogFCall {
 	return &AnalysisDialogFCall{
-		base:   base,
 		logger: elog.DefaultLogger.With(elog.FieldComponent("AnalysisDialogFCall"))}
 }
 
 type AnalysisDialogRequest struct {
-	Title   string `json:"title"`
-	Summary string `json:"summary"`
+	Title string `json:"title"`
 	// 识别出来用户想要干什么
 	Intent       string `json:"intent"`
 	NextInvCfgID int64  `json:"nextInvCfgID"`

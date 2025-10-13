@@ -16,8 +16,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/rebuildctx"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 )
@@ -39,12 +38,11 @@ func InitApp() *App {
 	quotaService := InitQuota(quotaRepo)
 	providerService := InitProvider(providerRepository)
 	chatService := service.NewChatService(chatRepo, invocationConfigRepo, quotaService, providerService)
-	rebuildContextHandler := rebuildctx.NewRebuildContextHandler(chatRepo, invocationConfigRepo, providerRepository)
+	rebuildContextHandler := loadcfg.NewLoadConfigHandler(chatRepo, invocationConfigRepo, providerRepository)
 	handler := render.NewHandler()
 	storeHandler := store.NewHandler(chatRepo)
-	client := InitOpenAIClient()
 	registry := fcall.NewFunctionCallRegistry()
-	openaiHandler := openai.NewHandler(client, registry)
+	openaiHandler := InitOpenAIHandler(registry)
 	streamHandler := InitStreamHandler(rebuildContextHandler, handler, storeHandler, openaiHandler)
 	chatServer := grpc.NewChatServer(chatService, streamHandler)
 	component := InitGrpcServer(chatServer)
@@ -58,10 +56,9 @@ func InitApp() *App {
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
-	baseFCall := fcall.NewBaseFCall(streamHandler, invocationConfigRepo)
-	rag := InitKBaseRAG(baseFCall)
-	analysisDialogFCall := analyzer.NewAnalysisDialogFCall(baseFCall)
-	fCall := savedoc.NewFCall(baseFCall)
+	rag := InitKBaseRAG()
+	analysisDialogFCall := analyzer.NewAnalysisDialogFCall()
+	fCall := savedoc.NewFCall()
 	v := InitFuncCall(rag, analysisDialogFCall, fCall)
 	app := &App{
 		GrpcSever: component,

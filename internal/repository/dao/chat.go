@@ -49,7 +49,7 @@ func (dao *ChatDAO) Save(ctx context.Context, c Chat) error {
 	c.Ctime = time.Now().Unix()
 	return dao.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			DoUpdates: clause.AssignmentColumns([]string{"title", "utime", "vars"}),
+			DoUpdates: clause.AssignmentColumns([]string{"title", "utime", "vars", "llm_conversation"}),
 		}).Create(&c).Error
 }
 
@@ -105,6 +105,8 @@ type Chat struct {
 	Sn    string `gorm:"uniqueIndex;column:sn;size:36"`
 	Uid   int64  `gorm:"column:uid;index"`
 	Title string `gorm:"column:title"`
+	// 在大模型那边的 LLM 抽象，并不一定所有的模型都支持
+	LLMConversation sqlx.JsonColumn[domain.LLMConversation] `gorm:"column:llm_conversation;type:TEXT"`
 	// 整个对话中产生的关键内容，大概率是一个 JSON 字段
 	Vars  sqlx.JsonColumn[map[string]any] `gorm:"column:vars;type:text"` // 扩展字段
 	Ctime int64                           `gorm:"column:ctime"`
