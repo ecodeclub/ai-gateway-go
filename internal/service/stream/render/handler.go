@@ -16,6 +16,7 @@ package render
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"text/template"
 
@@ -51,7 +52,13 @@ func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
 	stepData := assistant.LastStep().LLMData()
 	// 暂时不用缓存，测试的时候我经常会直接修改数据库数据
 	name := fmt.Sprintf("user-%d", stepData.Cfg.ID)
-	tpl := template.New(name)
+
+	// 注册自定义函数
+	funcMap := template.FuncMap{
+		"fromJson": h.fromJson,
+	}
+
+	tpl := template.New(name).Funcs(funcMap)
 	tpl, err := tpl.Parse(stepData.Cfg.Prompt)
 	if err != nil {
 		return "", err
@@ -59,6 +66,13 @@ func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
 	var buffer bytes.Buffer
 	err = tpl.Execute(&buffer, ctx.Chat.CombinedVars())
 	return buffer.String(), err
+}
+
+// fromJson 将 JSON 字符串解析为 Go 对象
+func (h *Handler) fromJson(jsonStr string) (interface{}, error) {
+	var result interface{}
+	err := json.Unmarshal([]byte(jsonStr), &result)
+	return result, err
 }
 
 // ExecuteContext 模板中能使用什么内容，就取决于这里

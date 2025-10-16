@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <title>程序员模拟面试 · V2 (gRPC StreamV1 + ai-gateway-go)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; color: #1f2328; background: #f6f8fa; }
+        h1 { margin-bottom: 8px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+        .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        button { padding: 10px 14px; border-radius: 8px; border: 1px solid #d0d7de; background: #fff; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        button:hover:not([disabled]) { background: #f3f4f6; }
+        button.primary { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+        button.primary:hover:not([disabled]) { background: #0284c7; }
+        button.destructive { background: #ef4444; color: #fff; border-color: #ef4444; }
+        button.destructive:hover:not([disabled]) { background: #dc2626; }
+        button[disabled] { opacity: .5; cursor: not-allowed; }
+        .recording { background: #ef4444 !important; color: #fff !important; border-color: #ef4444 !important; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .muted { color: #6b7280; font-size: 13px; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; overflow-x: auto; }
+        .score { display:flex; gap:12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .badge { padding: 6px 12px; background:#dbeafe; color:#1e40af; border-radius: 999px; font-size: 13px; font-weight: 500; }
+        .highlight {
+            background: #0f172a !important;
+            border: 3px solid #10b981 !important;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+        }
+        .error { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px; border-radius: 8px; margin-top: 8px; }
+        .loading { color: #6b7280; font-style: italic; }
+        .info { background: #dcfce7; border: 1px solid #16a34a; color: #166534; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-weight: 500; }
+        .meta { background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="info">
+    ✅ <strong>V2 版本 (gRPC StreamV1 + ai-gateway-go)</strong>：
+    使用 <code>gpt-4o-transcribe</code> 转写音频（localhost:8000），
+    然后通过 <code>ai-gateway-go</code> 的 gRPC StreamV1 接口（localhost:8080 代理）处理面试逻辑。
+</div>
+
+<h1>程序员模拟面试 · V2</h1>
+<p class="muted">流程：开始面试 → 播报题目 → 录音 → gpt-4o-transcribe转写 → StreamV1评分 → 循环 → 结束总结</p>
+
+<div class="row">
+    <div class="card">
+        <h3>📋 当前题目 <span id="questionNum" class="muted"></span></h3>
+        <div id="question" style="min-height:60px; font-size:18px; line-height:1.6; color:#1f2937;"></div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap: wrap;">
+            <button id="btnStartInterview" class="primary">开始面试</button>
+            <button id="btnSpeak" disabled>🔊 播放题目</button>
+            <button id="btnNext" disabled>下一题 →</button>
+            <button id="btnDontKnow" disabled>我不会 ⏭️</button>
+        </div>
+        <div id="convMeta" class="meta" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+        <h3>🎤 你的回答（仅语音）</h3>
+        <div style="display:flex; gap:8px; flex-wrap: wrap;">
+            <button id="btnRecord" disabled>开始语音录制</button>
+            <button id="btnSubmit" disabled>提交并评估</button>
+            <button id="btnEnd" class="destructive" disabled>结束面试</button>
+        </div>
+        <p id="recStatus" class="muted" style="margin-top:10px;">等待开始...</p>
+        <audio id="player" controls style="width:100%; margin-top:8px; display:none;"></audio>
+    </div>
+</div>
+
+<div class="row" style="margin-top:20px;">
+    <div class="card">
+        <h3>📝 转写结果（gpt-4o-transcribe）</h3>
+        <pre id="transcriptBox" class="loading">// 提交后转写并显示</pre>
+    </div>
+    <div class="card">
+        <h3>⭐ 单题评分与点评（via gRPC StreamV1）</h3>
+        <div id="scores" class="score"></div>
+        <pre id="judgeBox" class="loading">// 提交后将展示AI的评分和建议</pre>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;" id="summaryCard">
+    <h3>📊 整体总结报告</h3>
+    <pre id="summaryBox" class="loading">// 点击"结束面试"后生成综合评价</pre>
+</div>
+
+<script>
+    // ========== 配置 ==========
+    const AUDIO_PROXY = 'http://localhost:8000';      // 音频转文本代理（Meoying）
+    const INTERVIEW_API = 'http://localhost:8080';    // 面试流程 API（HTTP→gRPC 代理）
+    const INVOCATION_CONFIG_ID = 100001;              // InvocationConfig ID
+    const TRANSCRIBE_MODEL = 'gpt-4o-transcribe';
+
+    // ========== 全局变量 ==========
+    let mediaRecorder, chunks = [], recordStartTime = 0;
+    let isRecording = false;
+    let lastBlob = null;
+    let askedQuestions = [];
+    let history = [];
+    let questionCount = 0;
+    let chatSn = null;                                // Chat SN（替代 conversation_id）
+    let isInterviewStarted = false;
+
+    // ========== DOM 元素 ==========
+    const els = {
+        question: document.getElementById('question'),
+        questionNum: document.getElementById('questionNum'),
+        btnStartInterview: document.getElementById('btnStartInterview'),
+        btnSpeak: document.getElementById('btnSpeak'),
+        btnNext: document.getElementById('btnNext'),
+        btnDontKnow: document.getElementById('btnDontKnow'),
+        btnRecord: document.getElementById('btnRecord'),
+        btnSubmit: document.getElementById('btnSubmit'),
+        btnEnd: document.getElementById('btnEnd'),
+        recStatus: document.getElementById('recStatus'),
+        player: document.getElementById('player'),
+        transcriptBox: document.getElementById('transcriptBox'),
+        judgeBox: document.getElementById('judgeBox'),
+        scores: document.getElementById('scores'),
+        summaryBox: document.getElementById('summaryBox'),
+        summaryCard: document.getElementById('summaryCard'),
+        convMeta: document.getElementById('convMeta')
+    };
+
+    // ========== 工具函数 ==========
+    function speak(text) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'zh-CN';
+        speechSynthesis.speak(u);
+    }
+
+    function extractJSON(text) {
+        try {
+            return JSON.parse(text);
+        } catch {}
+
+        const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonBlockMatch) {
+            try {
+                return JSON.parse(jsonBlockMatch[1]);
+            } catch {}
+        }
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                return JSON.parse(jsonMatch[0]);
+            } catch {}
+        }
+
+        return null;
+    }
+
+    function showError(element, message) {
+        const div = document.createElement('div');
+        div.className = 'error';
+        div.textContent = `❌ ${message}`;
+        element.innerHTML = '';
+        element.appendChild(div);
+    }
+
+    // ========== 重置面试状态 ==========
+    function resetInterview() {
+        isRecording = false;
+        lastBlob = null;
+        askedQuestions = [];
+        history = [];
+        questionCount = 0;
+        chatSn = null;
+
+        els.question.textContent = '';
+        els.questionNum.textContent = '';
+        els.convMeta.style.display = 'none';
+        els.btnSpeak.disabled = true;
+        els.btnNext.disabled = true;
+        els.btnDontKnow.disabled = true;
+        els.btnRecord.disabled = true;
+        els.btnSubmit.disabled = true;
+        els.btnEnd.disabled = true;
+        els.recStatus.textContent = '等待开始...';
+        els.player.style.display = 'none';
+        els.transcriptBox.textContent = '// 提交后转写并显示';
+        els.transcriptBox.className = 'loading';
+        els.judgeBox.textContent = '// 提交后将展示AI的评分和建议';
+        els.judgeBox.className = 'loading';
+        els.scores.innerHTML = '';
+        els.summaryBox.textContent = '// 点击"结束面试"后生成综合评价';
+        els.summaryBox.className = 'loading';
+        els.summaryBox.classList.remove('highlight');
+
+        console.log('✅ 面试状态已重置');
+    }
+
+    // ========== 创建 Chat ==========
+    async function createChat() {
+        try {
+            const r = await fetch(`${INTERVIEW_API}/api/interview/chat/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid: 123,
+                    title: "MySQL 模拟面试"
+                })
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            chatSn = data.chat_sn;
+            els.convMeta.textContent = `📌 Chat SN: ${chatSn}`;
+            els.convMeta.style.display = 'block';
+            console.log('✅ 创建 Chat:', chatSn);
+        } catch (e) {
+            console.error('❌ 创建 Chat 失败:', e);
+            alert('无法创建会话，请检查服务器');
+            throw e;
+        }
+    }
+
+    // ========== 流式请求 StreamV1 ==========
+    async function streamRequest(userInput) {
+        els.judgeBox.textContent = '评估中...';
+        els.judgeBox.className = 'loading';
+        els.scores.innerHTML = '';
+
+        try {
+            const response = await fetch(`${INTERVIEW_API}/api/interview/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_sn: chatSn,
+                    input: userInput,
+                    config_id: INVOCATION_CONFIG_ID,
+                    uid: 123
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            // SSE 流式读取
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let accumulated = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const json = JSON.parse(line.slice(6));
+                            console.log('📨 收到 SSE 数据:', json);
+
+                            // 注意：gRPC proto 生成的字段是首字母大写的
+                            const event = json.Event || json.event;
+                            
+                            // 处理 Delta 事件
+                            if (event && event.Delta) {
+                                accumulated += event.Delta.content;
+                                els.judgeBox.textContent = accumulated;
+                            }
+
+                            // 处理 Error 事件
+                            if (event && event.Error) {
+                                console.error('❌ 收到错误事件:', event.Error);
+                                showError(els.judgeBox, event.Error.message);
+                            }
+
+                            // 处理 Usage 事件
+                            if (event && event.Usage) {
+                                console.log('Token 使用:', event.Usage);
+                            }
+
+                            // 处理 StepUpdate 事件
+                            if (event && event.StepUpdate) {
+                                console.log('步骤更新:', event.StepUpdate);
+                            }
+                        } catch (e) {
+                            console.error('解析 SSE 失败:', e, '原始数据:', line);
+                        }
+                    }
+
+                    if (line.startsWith('event: done')) {
+                        console.log('✅ Stream 完成');
+                    }
+
+                    if (line.startsWith('event: error')) {
+                        console.error('❌ Stream 错误，完整行:', line);
+                    }
+                }
+            }
+
+            els.judgeBox.className = '';
+
+            // 解析最终结果
+            console.log('🔍 完整累积内容:', accumulated);
+            console.log('🔍 累积内容长度:', accumulated.length);
+            
+            try {
+                const result = extractJSON(accumulated);
+                console.log('🔍 解析结果:', result);
+                if (!result) {
+                    console.warn('⚠️ 无法解析 JSON，显示原始文本');
+                    console.log('原始文本内容:', accumulated);
+                    return;
+                }
+
+                // 处理出题 (type: question)
+                if (result.type === 'question' && result.question) {
+                    els.question.textContent = result.question;
+                    askedQuestions.push(result.question);
+                    els.btnNext.disabled = false;
+                }
+
+                // 处理评分 (type: evaluation)
+                if (result.type === 'evaluation') {
+                    // 渲染评分徽章
+                    if (result.scores) {
+                        ['content_score', 'coverage_score', 'structure_score'].forEach(k => {
+                            if (result.scores[k] !== undefined) {
+                                const score = result.scores[k];
+                                const div = document.createElement('div');
+                                div.className = 'badge';
+                                const label = k.replace('_score', '').replace('_', ' ');
+                                div.textContent = `${label}: ${score}`;
+                                div.style.background = score >= 80 ? '#dcfce7' : score >= 60 ? '#fef3c7' : '#fee2e2';
+                                div.style.color = score >= 80 ? '#166534' : score >= 60 ? '#92400e' : '#991b1b';
+                                els.scores.appendChild(div);
+                            }
+                        });
+                    }
+
+                    // 渲染下一题
+                    if (result.next_question) {
+                        els.question.textContent = result.next_question;
+                        askedQuestions.push(result.next_question);
+                        els.btnNext.disabled = false;
+                    }
+                }
+
+                // 处理总结 (type: summary) - 在结束面试时处理
+
+            } catch (e) {
+                console.error('解析结果失败:', e);
+            }
+
+        } catch (e) {
+            console.error('❌ Stream 请求失败:', e);
+            showError(els.judgeBox, '请求失败：' + e.message);
+        }
+    }
+
+    // ========== 录音控制 ==========
+    async function toggleRecord() {
+        if (isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            els.btnRecord.classList.remove('recording');
+            els.btnRecord.textContent = '开始语音录制';
+            const duration = ((Date.now() - recordStartTime) / 1000).toFixed(1);
+            els.recStatus.textContent = `录音已停止（时长：${duration}秒）`;
+            els.btnEnd.disabled = false;
+            els.btnDontKnow.disabled = false;
+        } else {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                chunks = [];
+                recordStartTime = Date.now();
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const duration = (Date.now() - recordStartTime) / 1000;
+                    if (duration < 0.5) {
+                        els.recStatus.textContent = '❌ 录音时长过短（<0.5秒），请重新录制';
+                        els.btnSubmit.disabled = true;
+                        return;
+                    }
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    lastBlob = blob;
+                    els.player.src = URL.createObjectURL(blob);
+                    els.player.style.display = 'block';
+                    els.btnSubmit.disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                els.btnRecord.classList.add('recording');
+                els.btnRecord.textContent = '⏹ 结束语音录制';
+                els.recStatus.textContent = '🔴 录音中...';
+                els.btnEnd.disabled = true;
+                els.btnNext.disabled = true;
+                els.btnDontKnow.disabled = true;
+                els.btnSubmit.disabled = true;
+                els.player.style.display = 'none';
+            } catch (e) {
+                els.recStatus.textContent = '❌ 无法访问麦克风，请检查浏览器权限';
+                console.error('❌ 录音失败:', e);
+            }
+        }
+    }
+
+    // ========== 音频转文本 ==========
+    async function transcribeAudio(blob) {
+        const formData = new FormData();
+        formData.append('file', blob, 'audio.webm');
+        formData.append('model', TRANSCRIBE_MODEL);
+        formData.append('language', 'zh');
+
+        console.log('转写音频，模型:', TRANSCRIBE_MODEL);
+        const resp = await fetch(`${AUDIO_PROXY}/api/audio/transcriptions`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!resp.ok) {
+            const errorText = await resp.text();
+            console.error('❌ Audio Transcriptions API 错误:', errorText);
+            throw new Error(`转写失败: HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        return data.text || '';
+    }
+
+    // ========== UI 重置 ==========
+    function resetUIForNextQuestion() {
+        els.player.style.display = 'none';
+        els.transcriptBox.textContent = '// 提交后转写并显示';
+        els.transcriptBox.className = 'loading';
+        els.judgeBox.textContent = '// 提交后将展示AI的评分和建议';
+        els.judgeBox.className = 'loading';
+        els.scores.innerHTML = '';
+        els.btnSubmit.disabled = true;
+        els.btnNext.disabled = true;
+        els.btnRecord.disabled = false;
+        els.btnDontKnow.disabled = false;
+        els.recStatus.textContent = '未录音';
+        lastBlob = null;
+    }
+
+    // ========== 事件绑定 ==========
+    els.btnStartInterview.onclick = async () => {
+        // 如果已经面试过，先重置状态
+        if (isInterviewStarted) {
+            resetInterview();
+        }
+
+        els.btnStartInterview.disabled = true;
+        els.btnStartInterview.textContent = '面试中...';
+
+        await createChat();
+
+        questionCount++;
+        els.questionNum.textContent = `(第 ${questionCount} 题)`;
+        await streamRequest("开始面试");
+
+        els.btnSpeak.disabled = false;
+        els.btnSpeak.onclick = () => speak(els.question.textContent);
+        els.btnRecord.disabled = false;
+        els.btnEnd.disabled = false;
+        els.btnDontKnow.disabled = false;
+        els.recStatus.textContent = '就绪，可以开始录音';
+
+        isInterviewStarted = true;
+    };
+
+    els.btnRecord.onclick = async () => {
+        els.btnRecord.disabled = true;
+        await toggleRecord();
+        els.btnRecord.disabled = false;
+    };
+
+    els.btnSubmit.onclick = async () => {
+        if (!lastBlob) {
+            alert('请先录音');
+            return;
+        }
+        els.btnSubmit.disabled = true;
+        els.btnRecord.disabled = true;
+
+        // 1. 转写音频
+        els.transcriptBox.textContent = `转写中（${TRANSCRIBE_MODEL}）...`;
+        els.transcriptBox.className = 'loading';
+
+        try {
+            const transcript = await transcribeAudio(lastBlob);
+            els.transcriptBox.textContent = transcript || '// 转写为空';
+            els.transcriptBox.className = '';
+
+            // 2. 评分并生成下一题
+            const q = els.question.textContent.trim();
+            await streamRequest(transcript);
+
+            // 3. 保存历史
+            history.push({ question: q, transcript });
+
+        } catch (e) {
+            showError(els.transcriptBox, '转写失败：' + e.message);
+            console.error(e);
+        }
+
+        els.btnSubmit.disabled = false;
+        els.btnRecord.disabled = false;
+    };
+
+    els.btnNext.onclick = () => {
+        questionCount++;
+        els.questionNum.textContent = `(第 ${questionCount} 题)`;
+        resetUIForNextQuestion();
+    };
+
+    els.btnDontKnow.onclick = async () => {
+        const q = els.question.textContent.trim();
+        history.push({ question: q, transcript: '我不会', judge: { note: '跳过' } });
+
+        questionCount++;
+        els.questionNum.textContent = `(第 ${questionCount} 题)`;
+
+        // 请求下一题
+        await streamRequest("我不会，请给我下一题");
+        resetUIForNextQuestion();
+    };
+
+    els.btnEnd.onclick = async () => {
+        if (history.length === 0) {
+            alert('您还没有回答任何问题，确定要结束吗？');
+            return;
+        }
+        els.btnEnd.disabled = true;
+        els.btnEnd.textContent = '生成中...';
+        els.summaryBox.classList.add('highlight');
+        els.summaryBox.textContent = '正在生成综合报告...';
+        els.summaryBox.className = 'loading highlight';
+
+        try {
+            // 调用 StreamV1 生成总结
+            const response = await fetch(`${INTERVIEW_API}/api/interview/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_sn: chatSn,
+                    input: "结束面试，请生成整体总结报告",
+                    config_id: INVOCATION_CONFIG_ID,
+                    uid: 123
+                })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let summaryText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const json = JSON.parse(line.slice(6));
+                        // 注意：gRPC proto 生成的字段是首字母大写的
+                        const event = json.Event || json.event;
+                        if (event && event.Delta) {
+                            summaryText += event.Delta.content;
+                            els.summaryBox.textContent = summaryText;
+                        }
+                    }
+                }
+            }
+
+            els.summaryBox.className = 'highlight';
+
+            // 聚焦到总结报告
+            setTimeout(() => {
+                els.summaryCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+
+        } catch (e) {
+            console.error('❌ 总结失败:', e);
+            showError(els.summaryBox, '生成总结失败，请重试');
+        }
+
+        els.btnEnd.textContent = '结束面试';
+        els.btnStartInterview.disabled = false;
+        els.btnStartInterview.textContent = '开始新面试';
+    };
+</script>
+</body>
+</html>
+
