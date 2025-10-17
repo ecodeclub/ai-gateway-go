@@ -170,7 +170,7 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 	stream *ssestream.Stream[responses.ResponseStreamEventUnion]) error {
 	// defer close(events)
 	textDeltaCount := 0
-	functionCallCount := 0
+	//functionCallCount := 0
 	var pendingFunctionCalls []responses.ResponseFunctionToolCall // 收集所有 function calls
 
 	for stream.Next() {
@@ -198,76 +198,123 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 				h.logger.Debug("非 function call 类型的 output item", elog.String("type", item.Type))
 				continue
 			}
-			functionCallCount++
+
 			fc := item.AsFunctionCall()
 			h.logger.Warn("🔧 LLM 调用了 function call",
-				elog.String("function", fc.Name),
-				elog.String("arguments", fc.Arguments),
+				elog.Any("fc", fc),
+				elog.String("ID", fc.ID),
+				elog.String("CallID", fc.CallID),
+				elog.String("Name", fc.Name),
+				elog.String("Arguments", fc.Arguments),
 				elog.Int("textDeltaCount", textDeltaCount))
 
 			// 不立即处理，先收集起来
 			pendingFunctionCalls = append(pendingFunctionCalls, fc)
+			//functionCallCount = len(pendingFunctionCalls)
 		}
 	}
 
 	h.logger.Info("✅ Stream 处理完成",
 		elog.Int("textDeltaCount", textDeltaCount),
-		elog.Int("functionCallCount", functionCallCount))
+		elog.Int("functionCallCount", len(pendingFunctionCalls)))
 
 	// Stream 完成后，再处理 function calls
 	if len(pendingFunctionCalls) > 0 {
 		h.logger.Info("🔄 开始处理待处理的 function calls", elog.Int("count", len(pendingFunctionCalls)))
-		for _, fc := range pendingFunctionCalls {
-			err := h.handleFC(ctx, cfg, fc)
-			if err != nil {
-				return err
-			}
+		err := h.handleFC(ctx, cfg, pendingFunctionCalls)
+		if err != nil {
+			return err
 		}
 	}
 
 	return stream.Err()
 }
 
-func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion, fc responses.ResponseFunctionToolCall) error {
-	h.logger.Info("🔧 开始处理 function call",
-		elog.String("function", fc.Name),
-		elog.String("callID", fc.CallID),
-		elog.String("arguments", fc.Arguments))
-
-	fn, err := h.registry.Lookup(fc.Name)
-	if err != nil {
-		h.logger.Error("❌ 函数调用未找到",
-			elog.String("函数名", fc.Name),
-			elog.FieldErr(err),
-		)
-		return err
-	}
-
-	h.logger.Debug("✅ 找到 function，开始执行", elog.String("function", fc.Name))
-	fcallResp, err := fn.Call(ctx, fcall.Request{Args: []byte(fc.Arguments)})
-	if err != nil {
-		h.logger.Error("❌ 执行函数调用失败",
-			elog.String("函数名", fc.Name),
-			elog.String("参数值", fc.Arguments),
-			elog.FieldErr(err),
-		)
-	} else {
-		h.logger.Info("✅ Function 执行成功",
+func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion, fcs []responses.ResponseFunctionToolCall) error {
+	params := make([]responses.ResponseInputItemFunctionCallOutputParam, 0, len(fcs))
+	seenName := make(map[string]int)
+	seenNextInvCfgID := make(map[string]int)
+	nextInvCfgIDs := make([]int64, 0, len(fcs))
+	for _, fc := range fcs {
+		h.logger.Info("🔧 开始处理 function call",
 			elog.String("function", fc.Name),
+			elog.String("callID", fc.CallID),
+			elog.String("arguments", fc.Arguments))
+
+		if idx, ok := seenName[fc.Name]; ok {
+			p := params[idx]
+			p.CallID = fc.CallID
+			params = append(params, p)
+			if idx2, ok := seenNextInvCfgID[fc.Name]; ok {
+				nextInvCfgIDs = append(nextInvCfgIDs, nextInvCfgIDs[idx2])
+			}
+			continue
+		}
+
+		fn, err := h.registry.Lookup(fc.Name)
+		if err != nil {
+			h.logger.Error("❌ 函数调用未找到",
+				elog.String("函数名", fc.Name),
+				elog.FieldErr(err),
+			)
+			return err
+		}
+
+		h.logger.Debug("✅ 找到 function，开始执行", elog.String("function", fc.Name))
+		fcallResp, err := fn.Call(ctx, fcall.Request{Args: []byte(fc.Arguments)})
+		if err != nil {
+			h.logger.Error("❌ 执行函数调用失败",
+				elog.String("函数名", fc.Name),
+				elog.String("参数值", fc.Arguments),
+				elog.FieldErr(err),
+			)
+		} else {
+			h.logger.Info("✅ Function 执行成功",
+				elog.String("function", fc.Name),
+				elog.String("content", fcallResp.Content))
+
+			if fcallResp.NextInvCfgID > 0 {
+				nextInvCfgIDs = append(nextInvCfgIDs, fcallResp.NextInvCfgID)
+				seenNextInvCfgID[fc.Name] = len(nextInvCfgIDs) - 1
+			}
+		}
+
+		// 不管有没有问题，都要返回一个 response
+		h.logger.Debug("📤 准备返回 function call 结果给 OpenAI",
+			elog.String("callID", fc.CallID),
 			elog.String("content", fcallResp.Content))
+
+		params = append(params, h.toFCResponseOfFunctionCallOutput(fc, fcallResp))
+		seenName[fc.Name] = len(params) - 1
 	}
 
-	// 不管有没有问题，都要返回一个 response
-	h.logger.Debug("📤 准备返回 function call 结果给 OpenAI",
-		elog.String("callID", fc.CallID),
-		elog.String("content", fcallResp.Content))
+	h.logger.Info("📤 收集到的Function Call Output",
+		elog.Any("params", params),
+		elog.Any("nextInvCfgIDs", nextInvCfgIDs))
+
+	respBody := responses.ResponseNewParams{
+		Model: cfg.Model.Name,
+		Conversation: responses.ResponseNewParamsConversationUnion{
+			OfConversationObject: &responses.ResponseConversationParam{
+				ID: ctx.Chat.LLMConversation.ID,
+			},
+		},
+		Input: responses.ResponseNewParamsInputUnion{
+			OfInputItemList: slice.Map(params, func(_ int, src responses.ResponseInputItemFunctionCallOutputParam) responses.ResponseInputItemUnionParam {
+				return responses.ResponseInputItemUnionParam{
+					OfFunctionCallOutput: &src,
+				}
+			}),
+		},
+	}
 
 	// 重试机制：处理 conversation lock 失败
 	var resp *responses.Response
 	var err1 error
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
-		resp, err1 = h.client.Responses.New(ctx.Ctx, h.toFCResulInput(ctx, cfg, fc, fcallResp), h.options...)
+		// 【重要】：必须在一次响应将【所有】的Function Call Output传递回去，包含大模型重试的Function Call Output。
+		resp, err1 = h.client.Responses.New(ctx.Ctx, respBody, h.options...)
 		if err1 == nil {
 			break
 		}
@@ -278,7 +325,7 @@ func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfi
 			h.logger.Warn("⚠️ Conversation lock 失败，等待重试",
 				elog.Int("attempt", i+1),
 				elog.Int("maxRetries", maxRetries),
-				elog.String("callID", fc.CallID))
+				elog.Any("respBody", respBody))
 			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond) // 递增等待时间
 			continue
 		}
@@ -289,50 +336,34 @@ func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfi
 
 	if err1 != nil {
 		h.logger.Error("❌ 返回 FC 响应给 OpenAI 失败（已重试）",
-			elog.String("函数名", fc.Name),
-			elog.String("callID", fc.CallID),
+			elog.Any("respBody", respBody),
 			elog.Int("retries", maxRetries),
 			elog.FieldErr(err1))
 		return err1
 	}
 
 	h.logger.Info("✅ 成功返回 function call 结果给 OpenAI",
-		elog.String("function", fc.Name),
-		elog.String("callID", fc.CallID),
+		elog.Any("respBody", respBody),
 		elog.String("responseID", resp.ID))
 
-	if err == nil && fcallResp.NextInvCfgID > 0 {
+	for _, id := range nextInvCfgIDs {
 		turn := ctx.Chat.LastTurn()
-		turn.AssistantRun.StartLLMStep(fcallResp.NextInvCfgID)
-		h.logger.Warn("🔄 需要执行下一个 LLM 调用", elog.Int64("nextCfgID", fcallResp.NextInvCfgID))
+		turn.AssistantRun.StartLLMStep(id)
+		h.logger.Warn("🔄 需要执行下一个 LLM 调用", elog.Int64("nextCfgID", id))
 		return h.Handler.Stream(ctx)
 	}
-	return err
+	return nil
 }
 
-func (h *Handler) toFCResulInput(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion, fc responses.ResponseFunctionToolCall, fcallResp fcall.Response) responses.ResponseNewParams {
+func (h *Handler) toFCResponseOfFunctionCallOutput(fc responses.ResponseFunctionToolCall, fcallResp fcall.Response) responses.ResponseInputItemFunctionCallOutputParam {
 	// 暂时固定为 completed
 	const fcStatusCompleted = "completed"
-	return responses.ResponseNewParams{
-		Model: cfg.Model.Name,
-		Conversation: responses.ResponseNewParamsConversationUnion{
-			OfConversationObject: &responses.ResponseConversationParam{
-				ID: ctx.Chat.LLMConversation.ID,
-			},
+	return responses.ResponseInputItemFunctionCallOutputParam{
+		CallID: fc.CallID,
+		Output: responses.ResponseInputItemFunctionCallOutputOutputUnionParam{
+			OfString: param.NewOpt(fcallResp.Content),
 		},
-		Input: responses.ResponseNewParamsInputUnion{
-			OfInputItemList: []responses.ResponseInputItemUnionParam{
-				{
-					OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
-						CallID: fc.CallID,
-						Output: responses.ResponseInputItemFunctionCallOutputOutputUnionParam{
-							OfString: param.NewOpt(fcallResp.Content),
-						},
-						Status: fcStatusCompleted,
-					},
-				},
-			},
-		},
+		Status: fcStatusCompleted,
 	}
 }
 
