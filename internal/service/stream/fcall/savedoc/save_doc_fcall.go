@@ -47,6 +47,7 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 	c.logger.Debug("保存变量", elog.String("varName", saveReq.VarName), elog.String("type", saveReq.Type), elog.String("content", saveReq.Content))
 	ctx.Chat.Vars[saveReq.VarName] = saveReq.Content
 	return fcall.Response{
+		Content:      "success",
 		NextInvCfgID: saveReq.NextInvCfgID,
 	}, err
 }
