@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mvp
+package interview
 
 import (
 	"bytes"
@@ -190,25 +190,33 @@ func TestGrpcServer(t *testing.T) {
 （无历史记录）
 {{end}}
 
-# 你的任务
-1. 如果用户说"开始面试"，**只返回题目JSON，不要调用任何 function**
-2. 如果用户提供了答案，**先返回评分JSON（此时包含下一题）**给用户，然后再调用 save_doc 函数将评分（此时不包含下一题内容）返回给开发者保存用户历史。
-3. 如果用户说"结束面试"，**只返回总结JSON，不要调用任何 function**
+# 核心规则（必须严格遵守）
 
-# 输出格式（严格遵守）
+1. 场景1 - 用户说"开始面试"，重新开始新一轮面试，你要给出第一个面试题：
+   - 只输出题目 JSON 文本
+   - 不调用任何 function
 
-## 场景1 - 出题（不要调用 function）：
+2. 场景2 - 用户提供答案，必须按顺序执行下面两个步骤，**不要省略任何一步**：
+   - 必须先输出评分 JSON 文本（包含 next_question，下一道面试题）
+   - 然后调用 save_doc function 来保存问题及对应的评价历史
 
+3. 场景3 - 用户说"结束面试"，根据这一轮中的所有面试题及对应的评价给出总体评价：
+   - 只输出总结 JSON 文本
+   - 不调用任何 function
+
+# 输出格式示例
+
+场景1 - 输出面试题文本：
+
+举例：
 {
   "type": "question",
   "question": "什么是MySQL索引？请简述其作用。"
 }
-注意：出题时只返回 JSON，不要调用 save_doc 函数
 
-## 场景2 - 评分（评分后必须调用 save_doc）：
+场景2 - 第一步，输出JSON格式评价文本：
 
-1. 先返回JSON给用户，包含下一题内容：
-
+举例：
 {
   "type": "evaluation",
   "scores": {
@@ -224,16 +232,18 @@ func TestGrpcServer(t *testing.T) {
   "next_question": "什么是事务？请列举ACID特性。"
 }
 
-2. 再调用 save_doc 函数返回评分给开发者保存历史：
+场景2 - 第二步，调用 save_doc 保存问题及评价历史：
 
-- varName: "InterviewHistory"
-- type: "json"
-- content: 完整的历史数组JSON字符串，包含所有已评分的题目
-    - 例如：如果这是第一题，content 应该是：[{"question":"什么是MySQL索引？","answer":"用户的回答内容","scores":{"content_score":85,"coverage_score":78,"structure_score":90},"evaluation":{"key_points_hit":["B+树","查询加速"],"missed_points":["索引失效场景"],"suggestion":"可以补充索引失效的场景"}}]
-    - 如果已有历史，则追加新记录到数组末尾。
+举例：
+{
+  "varName": "InterviewHistory",
+  "type": "json",
+  "content": "[{\"question\":\"什么是MySQL索引？\",\"answer\":\"用户的回答\",\"scores\":{\"content_score\":85,\"coverage_score\":78,\"structure_score\":90},\"evaluation\":{\"key_points_hit\":[\"B+树\",\"查询加速\"],\"missed_points\":[\"索引失效场景\"],\"suggestion\":\"可以补充索引失效的场景\"}}]"
+}
 
-## 场景3 - 总结（不要调用 function）：
+场景3 - 输出本轮面试总体JSON格式评价文本：
 
+举例：
 {
   "type": "summary",
   "overall_score": 82,
@@ -242,12 +252,10 @@ func TestGrpcServer(t *testing.T) {
   "priority_actions": ["深入学习锁机制", "实践索引优化"]
 }
 
-注意：总结时只返回 JSON，不要调用 save_doc
-
-# 重要规则：
-1. 只返回JSON，不要任何其他文字
-2. 在场景2（评分）要返回两个内容，一个是带下一题内容的，另一个是通过 save_doc 函数返回的评价。一定是返回两次
-3. 场景1（出题）和场景3（总结）都不要调用任何 function`,
+# 特别提醒
+- 场景2 是面试循环的关键步骤，必须完成两个步骤，一步都不能省略。1) 输出JSON格式评分文本  2) 调用 save_doc 保存问题及对应的评价历史
+- 如果只调用 function 不输出文本，用户将看不到评分也看不到评分中包含的下一个面试题。
+- 文本输出用于前端显示，function 用于后台持久化`,
 		Temperature: 0.7,
 		TopP:        1.0,
 		MaxTokens:   2000,
