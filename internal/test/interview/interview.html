@@ -62,7 +62,7 @@
         <div style="display:flex; gap:8px; flex-wrap: wrap;">
             <button id="btnRecord" disabled>开始语音录制</button>
             <button id="btnSubmit" disabled>提交并评估</button>
-            <button id="btnEnd" class="destructive" disabled>结束面试</button>
+<!--            <button id="btnEnd" class="destructive" disabled>结束面试</button>-->
         </div>
         <p id="recStatus" class="muted" style="margin-top:10px;">等待开始...</p>
         <audio id="player" controls style="width:100%; margin-top:8px; display:none;"></audio>
@@ -99,9 +99,14 @@
     let lastBlob = null;
     let askedQuestions = [];
     let history = [];
-    let questionCount = 0;
     let chatSn = null;                                // Chat SN（替代 conversation_id）
     let isInterviewStarted = false;
+    let isLastQuestion = false;                       // 标记是否最后一题
+    
+    // ========== 去重状态 ==========
+    let seenQuestions = new Set();                    // 题目去重：用 question_id
+    let seenEvaluations = new Set();                  // 评价去重：用 question_id
+    let summaryReceived = false;                      // 总结去重：只有一个
 
     // ========== DOM 元素 ==========
     const els = {
@@ -131,28 +136,6 @@
         speechSynthesis.speak(u);
     }
 
-    function extractJSON(text) {
-        try {
-            return JSON.parse(text);
-        } catch {}
-
-        const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonBlockMatch) {
-            try {
-                return JSON.parse(jsonBlockMatch[1]);
-            } catch {}
-        }
-
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                return JSON.parse(jsonMatch[0]);
-            } catch {}
-        }
-
-        return null;
-    }
-
     function showError(element, message) {
         const div = document.createElement('div');
         div.className = 'error';
@@ -161,14 +144,118 @@
         element.appendChild(div);
     }
 
+    // ========== JSON 处理函数 ==========
+    function handleJSONResult(result) {
+        if (!result || !result.type) {
+            console.warn('⚠️ 无效的JSON结果:', result);
+            return;
+        }
+        
+        console.log('🔍 处理JSON类型:', result.type);
+        
+        switch (result.type) {
+            case 'question':
+                // 题目去重：用 question_id
+                if (seenQuestions.has(result.question_id)) {
+                    console.log('⏭️ 跳过重复的题目:', result.question_id);
+                    return;
+                }
+                seenQuestions.add(result.question_id);
+                displayQuestion(result);
+                break;
+            case 'evaluation':
+                // 评价去重：用 question_id
+                if (seenEvaluations.has(result.question_id)) {
+                    console.log('⏭️ 跳过重复的评价:', result.question_id);
+                    return;
+                }
+                seenEvaluations.add(result.question_id);
+                displayEvaluation(result);
+                break;
+            case 'summary':
+                // 总结去重：只有一个
+                if (summaryReceived) {
+                    console.log('⏭️ 跳过重复的总结');
+                    return;
+                }
+                summaryReceived = true;
+                displaySummary(result);
+                break;
+            default:
+                console.warn('❓ 未知类型:', result.type);
+        }
+    }
+
+    function displayQuestion(q) {
+        els.question.textContent = q.question;
+        // remaining_questions 包含当前题，所以实际剩余 = remaining_questions - 1
+        const actualRemaining = q.remaining_questions - 1;
+        els.questionNum.textContent = `(第 ${q.current} 题，剩余 ${actualRemaining} 题)`;
+        
+        // 🚨 判断是否最后一题
+        // remaining_questions 包含当前题，所以 remaining_questions === 1 才是最后一题
+        if (q.remaining_questions === 1) {
+            console.log('⚠️ 这是最后一题');
+            isLastQuestion = true;
+        } else {
+            isLastQuestion = false;
+        }
+        
+        // 启用按钮
+        els.btnSpeak.disabled = false;
+        els.btnRecord.disabled = false;
+        els.btnEnd.disabled = false;
+        els.btnDontKnow.disabled = false;
+    }
+
+    function displayEvaluation(e) {
+        // 渲染评分
+        els.scores.innerHTML = '';
+        ['content_score', 'coverage_score', 'structure_score'].forEach(k => {
+            const score = e.scores[k];
+            const div = document.createElement('div');
+            div.className = 'badge';
+            const label = k.replace('_score', '');
+            div.textContent = `${label}: ${score}`;
+            div.style.background = score >= 80 ? '#dcfce7' : score >= 60 ? '#fef3c7' : '#fee2e2';
+            div.style.color = score >= 80 ? '#166534' : score >= 60 ? '#92400e' : '#991b1b';
+            els.scores.appendChild(div);
+        });
+        
+        // 渲染评价详情
+        els.judgeBox.textContent = JSON.stringify(e.evaluation, null, 2);
+        els.judgeBox.className = '';
+        
+        // 启用下一题按钮
+        els.btnNext.disabled = false;
+        
+        // 🚨 注意：不再需要自动结束逻辑，因为现在由命令驱动
+        // 前端会根据 isLastQuestion 状态发送正确的命令
+    }
+
+    function displaySummary(s) {
+        els.summaryBox.textContent = JSON.stringify(s, null, 2);
+        els.summaryBox.className = 'highlight';
+        els.summaryCard.scrollIntoView({ behavior: 'smooth' });
+        
+        // 重置按钮状态
+        els.btnStartInterview.disabled = false;
+        els.btnStartInterview.textContent = '开始新面试';
+    }
+
     // ========== 重置面试状态 ==========
     function resetInterview() {
         isRecording = false;
         lastBlob = null;
         askedQuestions = [];
         history = [];
-        questionCount = 0;
         chatSn = null;
+        isLastQuestion = false;
+        
+        // 重置去重状态
+        seenQuestions.clear();
+        seenEvaluations.clear();
+        summaryReceived = false;
 
         els.question.textContent = '';
         els.questionNum.textContent = '';
@@ -219,7 +306,7 @@
 
     // ========== 流式请求 StreamV1 ==========
     async function streamRequest(userInput) {
-        els.judgeBox.textContent = '评估中...';
+        els.judgeBox.textContent = '处理中...';
         els.judgeBox.className = 'loading';
         els.scores.innerHTML = '';
 
@@ -262,10 +349,22 @@
                             // 注意：gRPC proto 生成的字段是首字母大写的
                             const event = json.Event || json.event;
                             
-                            // 处理 Delta 事件
+                            // 处理 Delta 事件（forward_result 发送的 JSON）
                             if (event && event.Delta) {
                                 accumulated += event.Delta.content;
-                                els.judgeBox.textContent = accumulated;
+                                
+                                // 尝试解析完整的 JSON
+                                try {
+                                    const result = JSON.parse(accumulated);
+                                    if (result && result.type) {
+                                        console.log('✅ 成功解析JSON:', result.type);
+                                        handleJSONResult(result);
+                                        accumulated = ''; // 清空已处理的内容
+                                    }
+                                } catch (e) {
+                                    // JSON 还未完整，继续累积
+                                    console.log('⏳ JSON 未完整，继续累积...');
+                                }
                             }
 
                             // 处理 Error 事件
@@ -276,12 +375,12 @@
 
                             // 处理 Usage 事件
                             if (event && event.Usage) {
-                                console.log('Token 使用:', event.Usage);
+                                console.log('📊 Token 使用:', event.Usage);
                             }
 
                             // 处理 StepUpdate 事件
                             if (event && event.StepUpdate) {
-                                console.log('步骤更新:', event.StepUpdate);
+                                console.log('📝 步骤更新:', event.StepUpdate);
                             }
                         } catch (e) {
                             console.error('解析 SSE 失败:', e, '原始数据:', line);
@@ -299,58 +398,6 @@
             }
 
             els.judgeBox.className = '';
-
-            // 解析最终结果
-            console.log('🔍 完整累积内容:', accumulated);
-            console.log('🔍 累积内容长度:', accumulated.length);
-            
-            try {
-                const result = extractJSON(accumulated);
-                console.log('🔍 解析结果:', result);
-                if (!result) {
-                    console.warn('⚠️ 无法解析 JSON，显示原始文本');
-                    console.log('原始文本内容:', accumulated);
-                    return;
-                }
-
-                // 处理出题 (type: question)
-                if (result.type === 'question' && result.question) {
-                    els.question.textContent = result.question;
-                    askedQuestions.push(result.question);
-                    els.btnNext.disabled = false;
-                }
-
-                // 处理评分 (type: evaluation)
-                if (result.type === 'evaluation') {
-                    // 渲染评分徽章
-                    if (result.scores) {
-                        ['content_score', 'coverage_score', 'structure_score'].forEach(k => {
-                            if (result.scores[k] !== undefined) {
-                                const score = result.scores[k];
-                                const div = document.createElement('div');
-                                div.className = 'badge';
-                                const label = k.replace('_score', '').replace('_', ' ');
-                                div.textContent = `${label}: ${score}`;
-                                div.style.background = score >= 80 ? '#dcfce7' : score >= 60 ? '#fef3c7' : '#fee2e2';
-                                div.style.color = score >= 80 ? '#166534' : score >= 60 ? '#92400e' : '#991b1b';
-                                els.scores.appendChild(div);
-                            }
-                        });
-                    }
-
-                    // 渲染下一题
-                    if (result.next_question) {
-                        els.question.textContent = result.next_question;
-                        askedQuestions.push(result.next_question);
-                        els.btnNext.disabled = false;
-                    }
-                }
-
-                // 处理总结 (type: summary) - 在结束面试时处理
-
-            } catch (e) {
-                console.error('解析结果失败:', e);
-            }
 
         } catch (e) {
             console.error('❌ Stream 请求失败:', e);
@@ -459,8 +506,7 @@
 
         await createChat();
 
-        questionCount++;
-        els.questionNum.textContent = `(第 ${questionCount} 题)`;
+        // 请求第一题（题目编号由后端的current字段控制）
         await streamRequest("开始面试");
 
         els.btnSpeak.disabled = false;
@@ -496,9 +542,18 @@
             els.transcriptBox.textContent = transcript || '// 转写为空';
             els.transcriptBox.className = '';
 
-            // 2. 评分并生成下一题
+            // 2. 🚨 根据是否最后一题发送不同命令
             const q = els.question.textContent.trim();
-            await streamRequest(transcript);
+            let command;
+            if (isLastQuestion) {
+                command = "评价答案并生成面试总结";
+                console.log('📝 发送命令:', command);
+            } else {
+                command = "评价答案并获取下一题";
+                console.log('📝 发送命令:', command);
+            }
+            
+            await streamRequest(command);
 
             // 3. 保存历史
             history.push({ question: q, transcript });
@@ -513,8 +568,7 @@
     };
 
     els.btnNext.onclick = () => {
-        questionCount++;
-        els.questionNum.textContent = `(第 ${questionCount} 题)`;
+        // 题目编号由后端的current字段控制，这里只需要重置UI
         resetUIForNextQuestion();
     };
 
@@ -522,16 +576,22 @@
         const q = els.question.textContent.trim();
         history.push({ question: q, transcript: '我不会', judge: { note: '跳过' } });
 
-        questionCount++;
-        els.questionNum.textContent = `(第 ${questionCount} 题)`;
-
-        // 请求下一题
-        await streamRequest("我不会，请给我下一题");
+        // 🚨 根据是否最后一题发送不同命令
+        let command;
+        if (isLastQuestion) {
+            command = "评价答案并生成面试总结";
+            console.log('📝 发送命令:', command);
+        } else {
+            command = "评价答案并获取下一题";
+            console.log('📝 发送命令:', command);
+        }
+        
+        await streamRequest(command);
         resetUIForNextQuestion();
     };
 
     els.btnEnd.onclick = async () => {
-        if (history.length === 0) {
+        if (history.length === 0 && !isLastQuestion) {
             alert('您还没有回答任何问题，确定要结束吗？');
             return;
         }
@@ -542,50 +602,9 @@
         els.summaryBox.className = 'loading highlight';
 
         try {
-            // 调用 StreamV1 生成总结
-            const response = await fetch(`${INTERVIEW_API}/api/interview/stream`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_sn: chatSn,
-                    input: "结束面试，请生成整体总结报告",
-                    config_id: INVOCATION_CONFIG_ID,
-                    uid: 123
-                })
-            });
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let summaryText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const json = JSON.parse(line.slice(6));
-                        // 注意：gRPC proto 生成的字段是首字母大写的
-                        const event = json.Event || json.event;
-                        if (event && event.Delta) {
-                            summaryText += event.Delta.content;
-                            els.summaryBox.textContent = summaryText;
-                        }
-                    }
-                }
-            }
-
-            els.summaryBox.className = 'highlight';
-
-            // 聚焦到总结报告
-            setTimeout(() => {
-                els.summaryCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
+            // 🚨 发送"结束面试"命令
+            console.log('📝 发送命令: 结束面试');
+            await streamRequest("结束面试");
 
         } catch (e) {
             console.error('❌ 总结失败:', e);
@@ -593,8 +612,7 @@
         }
 
         els.btnEnd.textContent = '结束面试';
-        els.btnStartInterview.disabled = false;
-        els.btnStartInterview.textContent = '开始新面试';
+        els.btnEnd.disabled = false;
     };
 </script>
 </body>

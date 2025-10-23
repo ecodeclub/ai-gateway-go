@@ -54,10 +54,10 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	}
 
 	// 规避 JSON 转义问题
-	k.logger.Debug("ragReq.Query："+string(ragReq.Query), elog.String("varName", ragReq.VarName))
+	k.logger.Debug("ragReq.EsDsl："+string(ragReq.EsDsl), elog.String("varName", ragReq.VarName))
 
 	response := httpx.NewRequest(ctx.Ctx, http.MethodPost, k.url).
-		Client(k.client).JSONBody(ragReq.Query).Do()
+		Client(k.client).JSONBody(ragReq.EsDsl).Do()
 
 	//if response.Err() != nil {
 	//	return fcall.Response{}, fmt.Errorf("执行知识库查询失败, err: %v", response.Err())
@@ -73,6 +73,7 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	k.logger.Debug("RAG 响应", elog.String("body", string(body)))
 	ctx.Chat.Vars[ragReq.VarName] = string(body)
 	return fcall.Response{
+		Content:      string(body),
 		NextInvCfgID: ragReq.NextInvCfgID,
 	}, err
 }
@@ -82,6 +83,6 @@ type Request struct {
 	VarName string `json:"varName"`
 	// 如果指定了 NextInvCfgID，则在查询完成后，继续调用 LLM
 	NextInvCfgID int64 `json:"nextInvCfgID"`
-	// 参考 kbase 中 search 接口的入参
-	Query json.RawMessage `json:"query"`
+	// 完整的 Elasticsearch DSL 查询对象，会直接透传给 ES
+	EsDsl json.RawMessage `json:"es_dsl"`
 }

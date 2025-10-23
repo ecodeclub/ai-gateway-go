@@ -17,6 +17,7 @@ package interview
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,6 +37,8 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/forward"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	openaistream "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
@@ -43,11 +46,20 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 	_ "github.com/ecodeclub/ai-gateway-go/internal/test"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
+	elasticsearch "github.com/elastic/go-elasticsearch/v9"
 	openai3 "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+//go:embed system_prompt.md
+var systemPrompt string
+
+//go:embed user_prompt.md
+var userPrompt string
 
 // TestGrpcServer 启动 gRPC 服务器用于面试功能测试
 // 端口: 9090
@@ -87,8 +99,19 @@ func TestGrpcServer(t *testing.T) {
 		option.WithBaseURL(baseURL),
 	)
 
-	// 2. 初始化测试应用（使用 IOC）
+	// 2. 准备Kbase测试数据（ES中的面试题）
+	prepareKbaseTestData(t)
+
+	// 3. 初始化测试应用（使用 IOC）
 	registry := fcall.NewFunctionCallRegistry()
+
+	// 注册 kbase_rag function call
+	kbaseRAG := kbase.NewKBaseRAG("http://localhost:8082/api/v1/es_search")
+	registry.Register(kbaseRAG)
+
+	// 注册 forward_result function call
+	forwardResult := forward.NewResult()
+	registry.Register(forwardResult)
 
 	// 注册 save_doc function call
 	saveDocFCall := savedoc.NewFCall()
@@ -111,10 +134,10 @@ func TestGrpcServer(t *testing.T) {
 		Handler: streamHandler,
 	})
 
-	// 3. 准备测试数据
+	// 4. 准备测试数据
 	log.Println("📝 准备测试数据...")
 
-	// 3.1 创建 Provider（OpenAI）
+	// 4.1 创建 Provider（OpenAI）
 	providerID, err := providerDAO.SaveProvider(ctx, dao.Provider{
 		Name:   "OpenAI",
 		APIKey: "test-api-key", // 测试环境使用占位符
@@ -124,9 +147,9 @@ func TestGrpcServer(t *testing.T) {
 	}
 	log.Printf("   ✓ 创建 Provider: OpenAI (ID: %d)", providerID)
 
-	// 3.2 创建 Model（gpt-4o-mini）
+	// 4.2 创建 Model
 	modelID, err := providerDAO.SaveModel(ctx, dao.Model{
-		Name:        "gpt-4o-mini",
+		Name:        openai3.ChatModelGPT5ChatLatest,
 		Pid:         providerID,
 		InputPrice:  150, // $0.150 / 1M tokens
 		OutputPrice: 600, // $0.600 / 1M tokens
@@ -135,9 +158,9 @@ func TestGrpcServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建 Model 失败: %v", err)
 	}
-	log.Printf("   ✓ 创建 Model: gpt-4o-mini (ID: %d)", modelID)
+	log.Printf("   ✓ 创建 Model: gpt-5 (ID: %d)", modelID)
 
-	// 3.3 创建 BizConfig
+	// 4.3 创建 BizConfig
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizRepo := repository.NewBizConfigRepository(bizConfigDAO)
 	bizSvc := service.NewBizConfigService(bizRepo)
@@ -152,7 +175,7 @@ func TestGrpcServer(t *testing.T) {
 	}
 	log.Printf("   ✓ 创建 BizConfig: 面试测试 (ID: %d)", bizID)
 
-	// 3.4 创建 InvocationConfig
+	// 4.4 创建 InvocationConfig
 	invSvc := service.NewInvocationConfigService(invConfigRepo, bizRepo, providerRepo)
 
 	cfgID, err := invSvc.Save(ctx, domain.InvocationConfig{
@@ -166,105 +189,347 @@ func TestGrpcServer(t *testing.T) {
 	}
 	log.Printf("   ✓ 创建 InvocationConfig: MySQL模拟面试助手 (ID: %d)", cfgID)
 
-	// 3.5 创建 InvocationConfigVersion（active）
+	// 4.5 创建 InvocationConfigVersion（active）
 	versionID, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
 		Config:       domain.InvocationConfig{ID: cfgID},
 		Model:        domain.Model{ID: modelID},
 		Version:      "v1.0",
 		Status:       domain.InvocationCfgVersionStatusActive,
-		SystemPrompt: "你是专业的MySQL面试官助手，负责出题、评分和总结。",
-		Prompt: `你是MySQL面试官，负责出题、评分和总结。
-
-用户输入：{{.Input}}
-
-# 当前面试历史
-{{if .InterviewHistory}}
-{{$history := fromJson .InterviewHistory}}
-已答题目：
-{{range $record := $history}}
-- {{$record.question}}
-  回答：{{$record.answer}}
-  评分：内容{{$record.scores.content_score}} 完整性{{$record.scores.coverage_score}} 结构{{$record.scores.structure_score}}
-{{end}}
-{{else}}
-（无历史记录）
-{{end}}
-
-# 核心规则（必须严格遵守）
-
-1. 场景1 - 用户说"开始面试"，重新开始新一轮面试，你要给出第一个面试题：
-   - 只输出题目 JSON 文本
-   - 不调用任何 function
-
-2. 场景2 - 用户提供答案，必须按顺序执行下面两个步骤，**不要省略任何一步**：
-   - 必须先输出评分 JSON 文本（包含 next_question，下一道面试题）
-   - 然后调用 save_doc function 来保存问题及对应的评价历史
-
-3. 场景3 - 用户说"结束面试"，根据这一轮中的所有面试题及对应的评价给出总体评价：
-   - 只输出总结 JSON 文本
-   - 不调用任何 function
-
-# 输出格式示例
-
-场景1 - 输出面试题文本：
-
-举例：
-{
-  "type": "question",
-  "question": "什么是MySQL索引？请简述其作用。"
-}
-
-场景2 - 第一步，输出JSON格式评价文本：
-
-举例：
-{
-  "type": "evaluation",
-  "scores": {
-    "content_score": 85,
-    "coverage_score": 78,
-    "structure_score": 90
-  },
-  "evaluation": {
-    "key_points_hit": ["B+树", "查询加速"],
-    "missed_points": ["索引失效场景"],
-    "suggestion": "可以补充索引失效的场景"
-  },
-  "next_question": "什么是事务？请列举ACID特性。"
-}
-
-场景2 - 第二步，调用 save_doc 保存问题及评价历史：
-
-举例：
-{
-  "varName": "InterviewHistory",
-  "type": "json",
-  "content": "[{\"question\":\"什么是MySQL索引？\",\"answer\":\"用户的回答\",\"scores\":{\"content_score\":85,\"coverage_score\":78,\"structure_score\":90},\"evaluation\":{\"key_points_hit\":[\"B+树\",\"查询加速\"],\"missed_points\":[\"索引失效场景\"],\"suggestion\":\"可以补充索引失效的场景\"}}]"
-}
-
-场景3 - 输出本轮面试总体JSON格式评价文本：
-
-举例：
-{
-  "type": "summary",
-  "overall_score": 82,
-  "strengths": ["基础扎实", "表达清晰"],
-  "weaknesses": ["高级特性欠缺"],
-  "priority_actions": ["深入学习锁机制", "实践索引优化"]
-}
-
-# 特别提醒
-- 场景2 是面试循环的关键步骤，必须完成两个步骤，一步都不能省略。1) 输出JSON格式评分文本  2) 调用 save_doc 保存问题及对应的评价历史
-- 如果只调用 function 不输出文本，用户将看不到评分也看不到评分中包含的下一个面试题。
-- 文本输出用于前端显示，function 用于后台持久化`,
-		Temperature: 0.7,
-		TopP:        1.0,
-		MaxTokens:   2000,
+		SystemPrompt: systemPrompt, // 静态内容：状态机定义、规则、示例（可被LLM缓存）
+		Prompt:       userPrompt,   // 动态内容：用户输入、历史记录（每次都不同）
+		Temperature:  0,
+		TopP:         1.0,
+		MaxTokens:    200000,
 		Functions: []domain.Function{
+			{
+				Name: "kbase_rag",
+				Definition: `{
+  "name": "kbase_rag",
+  "description": "从知识库中检索资源（面试题、面经、案例等）。传入完整的Elasticsearch DSL查询对象，会直接透传给ES执行。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "varName": {
+        "type": "string",
+        "description": "变量名，用于保存本次查询结果。使用 Question_N 格式命名，例如 Question_1"
+      },
+      "es_dsl": {
+        "type": "object",
+        "description": "Elasticsearch DSL 查询对象，包含 index 和 query 两个字段。",
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "type": "string",
+            "description": "ES索引名称，固定为 interview_questions_mysql",
+            "enum": ["interview_questions_mysql"]
+          },
+          "query": {
+            "type": "object",
+            "description": "ES查询体，包含四个平级字段：query、size、sort、aggs",
+            "additionalProperties": false,
+            "properties": {
+              "query": {
+                "type": "object",
+                "description": "ES查询体，必须包含bool查询结构",
+                "additionalProperties": false,
+                "properties": {
+                  "bool": {
+                    "type": "object",
+                    "description": "布尔查询，必须包含must和must_not",
+                    "additionalProperties": false,
+                    "properties": {
+                      "must": {
+                        "type": "array",
+                        "description": "必须匹配的条件",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "term": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "level": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "value": {
+                                      "type": "string",
+                                      "const": "junior"
+                                    }
+                                  },
+                                  "required": ["value"]
+                                }
+                              },
+                              "required": ["level"]
+                            }
+                          },
+                          "required": ["term"]
+                        }
+                      },
+                      "must_not": {
+                        "type": "array",
+                        "description": "必须不匹配的条件",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "terms": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "question_id": {
+                                  "type": "array",
+                                  "items": {"type": "integer"},
+                                  "description": "要排除的题目ID列表"
+                                }
+                              },
+                              "required": ["question_id"]
+                            }
+                          },
+                          "required": ["terms"]
+                        }
+                      }
+                    },
+                    "required": ["must", "must_not"]
+                  }
+                },
+                "required": ["bool"]
+              },
+              "size": {
+                "type": "integer",
+                "description": "返回结果数量，固定为 1",
+                "enum": [1]
+              },
+              "sort": {
+                "type": "array",
+                "description": "排序规则数组，必须使用随机排序",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "_script": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {"type": "string", "const": "number"},
+                        "script": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "source": {"type": "string", "const": "Math.random()"}
+                          },
+                          "required": ["source"]
+                        },
+                        "order": {"type": "string", "const": "asc"}
+                      },
+                      "required": ["type", "script", "order"]
+                    }
+                  },
+                  "required": ["_script"]
+                },
+                "minItems": 1
+              },
+              "aggs": {
+                "type": "object",
+                "description": "聚合统计对象，必须包含remaining_questions",
+                "additionalProperties": false,
+                "properties": {
+                  "remaining_questions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "cardinality": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "field": {"type": "string", "const": "question_id"}
+                        },
+                        "required": ["field"]
+                      }
+                    },
+                    "required": ["cardinality"]
+                  }
+                },
+                "required": ["remaining_questions"]
+              }
+            },
+            "required": ["query", "size", "sort", "aggs"]
+          }
+        },
+        "required": ["index", "query"]
+      }
+    },
+    "required": ["varName", "es_dsl"]
+  }
+}`,
+			},
+			{
+				Name: "forward_result",
+				Definition: `{
+  "name": "forward_result",
+  "description": "将结构化的JSON数据发送给前端用户。根据type字段区分数据类型：question(题目)、evaluation(评价)、summary(总结)",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "varName": {
+        "type": "string",
+        "description": "变量名，用于保存结果。题目用Question_N，评价用Evaluation_N，总结用Summary"
+      },
+      "result": {
+        "description": "要发送的JSON对象，根据type字段匹配对应的结构",
+        "anyOf": [
+          {
+            "type": "object",
+            "description": "题目类型",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "question",
+                "description": "固定值question"
+              },
+              "question_id": {
+                "type": "integer",
+                "description": "题目ID，用于后续排除"
+              },
+              "question": {
+                "type": "string",
+                "description": "题目内容（不含答案）"
+              },
+              "remaining_questions": {
+                "type": "integer",
+                "description": "ES返回的剩余题数（包含当前题）"
+              },
+              "current": {
+                "type": "integer",
+                "description": "当前第几题（从1开始）"
+              }
+            },
+            "required": ["type", "question_id", "question", "remaining_questions", "current"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "description": "评价类型",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "evaluation",
+                "description": "固定值evaluation"
+              },
+              "question_id": {
+                "type": "integer",
+                "description": "题目ID，用于前端去重"
+              },
+              "scores": {
+                "type": "object",
+                "properties": {
+                  "content_score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "内容准确性得分"
+                  },
+                  "coverage_score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "知识覆盖度得分"
+                  },
+                  "structure_score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "表达清晰度得分"
+                  }
+                },
+                "required": ["content_score", "coverage_score", "structure_score"],
+                "additionalProperties": false
+              },
+              "evaluation": {
+                "type": "object",
+                "properties": {
+                  "key_points_hit": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "答出的关键点列表"
+                  },
+                  "missed_points": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "遗漏的关键点列表"
+                  },
+                  "suggestion": {
+                    "type": "string",
+                    "description": "改进建议"
+                  }
+                },
+                "required": ["key_points_hit", "missed_points", "suggestion"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "question_id", "scores", "evaluation"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "description": "总结类型",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "summary",
+                "description": "固定值summary"
+              },
+              "total_questions": {
+                "type": "integer",
+                "description": "题库总题数"
+              },
+              "answered_questions": {
+                "type": "integer",
+                "description": "实际回答题数"
+              },
+              "overall_score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "综合评分"
+              },
+              "strengths": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "优势点列表"
+              },
+              "weaknesses": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "薄弱点列表"
+              },
+              "priority_actions": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "优先改进建议列表"
+              }
+            },
+            "required": ["type", "total_questions", "answered_questions", "overall_score", "strengths", "weaknesses", "priority_actions"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "required": ["varName", "result"],
+    "additionalProperties": false
+  }
+}`,
+			},
 			{
 				Name: "save_doc",
 				Definition: `{
   "name": "save_doc",
-  "description": "保存完整的面试历史记录到变量中，每次评估完回答后必须调用",
+  "description": "保存面试历史记录到变量中。用于保存单题的问答评价记录，或最终的总结报告。",
+  "strict": true,
   "parameters": {
     "type": "object",
     "properties": {
@@ -280,10 +545,11 @@ func TestGrpcServer(t *testing.T) {
       },
       "content": {
         "type": "string",
-        "description": "完整的面试历史，JSON数组字符串。每个元素包含: question(题目), answer(回答), scores(评分对象), evaluation(评价对象)。必须包含之前的所有记录加上当前新记录。"
+        "description": "JSON数组字符串。每个元素包含: question_id, question(题目), answer(回答), scores(评分对象), evaluation(评价对象)。必须包含之前的所有记录加上当前新记录。"
       }
     },
-    "required": ["varName", "content", "type"]
+    "required": ["varName", "content", "type"],
+    "additionalProperties": false
   }
 }`,
 			},
@@ -307,7 +573,7 @@ func TestGrpcServer(t *testing.T) {
 
 	log.Println("\n✅ 数据准备完成，测试环境已就绪")
 
-	// 4. 启动 gRPC 服务器
+	// 5. 启动 gRPC 服务器
 	chatSvc := app.ChatService
 	chatServer := igrpc.NewChatServer(chatSvc, streamHandler)
 
@@ -678,4 +944,437 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// prepareKbaseTestData 准备Kbase测试数据
+// 使用 go-elasticsearch 直接操作ES，创建索引并插入测试题目
+func prepareKbaseTestData(t *testing.T) {
+	// 1. 创建ES客户端
+	esAddr := "http://localhost:9200"
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{esAddr},
+	})
+	require.NoError(t, err, "创建ES客户端失败")
+
+	// 2. 健康检查（最多等待5秒）
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = esClient.Ping(esClient.Ping.WithContext(ctx))
+	require.NoError(t, err, "ES不可用（等待5秒超时），请先启动Elasticsearch服务")
+
+	indexName := "interview_questions_mysql"
+
+	// 3. 删除已存在的索引（如果有）
+	_, err = esClient.Indices.Delete([]string{indexName})
+	assert.NoError(t, err)
+
+	// 4. 创建索引和Mapping
+	createIndexWithMapping(t, esClient, indexName)
+
+	// 5. 插入测试数据
+	questions := buildTestQuestions()
+	for _, q := range questions {
+		insertQuestion(t, esClient, indexName, q)
+	}
+
+	// 6. 刷新索引，确保数据可搜索
+	_, err = esClient.Indices.Refresh(esClient.Indices.Refresh.WithIndex(indexName))
+	require.NoError(t, err)
+}
+
+// createIndexWithMapping 创建索引和Mapping
+func createIndexWithMapping(t *testing.T, client *elasticsearch.Client, indexName string) {
+	mapping := `{
+  "mappings": {
+    "properties": {
+      "level": { "type": "keyword" },
+      "question_id": { "type": "integer" },
+      "title": { "type": "text" },
+      "analysis": { "type": "text" },
+      "tags": { "type": "keyword" },
+      "answers": { "type": "object", "enabled": false },
+      "created_at": { "type": "date" },
+      "updated_at": { "type": "date" }
+    }
+  }
+}`
+
+	resp, err := client.Indices.Create(
+		indexName,
+		client.Indices.Create.WithBody(strings.NewReader(mapping)),
+	)
+	require.NoError(t, err, "创建索引失败")
+	defer resp.Body.Close()
+
+	if resp.IsError() {
+		body, _ := io.ReadAll(resp.Body)
+		require.Failf(t, "创建索引失败", "响应: %s", string(body))
+	}
+}
+
+// buildTestQuestions 构建测试题目数据
+func buildTestQuestions() []map[string]any {
+	now := time.Now().Format(time.RFC3339)
+
+	return []map[string]any{
+		{
+			"question_id": 1,
+			"level":       "junior",
+			"title":       "什么是事务？请简述ACID特性",
+			"analysis":    "事务是数据库操作的基本单位，ACID是事务的四个基本特性：原子性(Atomicity)、一致性(Consistency)、隔离性(Isolation)、持久性(Durability)。",
+			"tags":        []string{"事务", "ACID", "基础概念"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "事务是保证一组数据库操作要么全部成功，要么全部失败的机制。ACID是：原子性(Atomicity)表示事务不可分割、一致性(Consistency)保证数据完整性、隔离性(Isolation)多个事务互不干扰、持久性(Durability)事务提交后永久保存。",
+					"key_points": []string{"原子性", "一致性", "隔离性", "持久性"},
+				},
+				"25k": map[string]any{
+					"content":    "在15K基础上，需要理解四种隔离级别：读未提交(Read Uncommitted)、读已提交(Read Committed)、可重复读(Repeatable Read)、串行化(Serializable)。MySQL默认使用可重复读，并通过MVCC(多版本并发控制)实现。",
+					"key_points": []string{"隔离级别", "MVCC", "可重复读", "幻读"},
+				},
+				"35k": map[string]any{
+					"content":    "在25K基础上，还需深入：锁机制(行锁、表锁、间隙锁、Next-Key Lock)、事务日志(undo log用于回滚、redo log用于持久化)、两阶段提交协议、事务优化实践(减小事务范围、避免长事务)。",
+					"key_points": []string{"锁机制", "undo/redo log", "两阶段提交", "性能优化"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+		{
+			"question_id": 2,
+			"level":       "junior",
+			"title":       "什么是索引？索引的作用是什么？",
+			"analysis":    "索引是帮助MySQL高效获取数据的数据结构，类似于书的目录。MySQL主要使用B+树作为索引结构。",
+			"tags":        []string{"索引", "B+树", "查询优化"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "索引是一种数据结构，可以加快数据查询速度。就像书的目录，可以快速找到需要的内容，而不用逐页翻阅。MySQL使用B+树作为索引结构，通过空间换时间的方式提升查询性能。",
+					"key_points": []string{"B+树", "查询加速", "空间换时间"},
+				},
+				"25k": map[string]any{
+					"content":    "需要补充索引类型：聚簇索引(主键索引，数据和索引在一起)、非聚簇索引(二级索引，需要回表)、覆盖索引(查询列都在索引中，不需要回表)。理解索引的优缺点：优点是加速查询，缺点是占用空间且降低写入性能。",
+					"key_points": []string{"聚簇索引", "非聚簇索引", "覆盖索引", "回表"},
+				},
+				"35k": map[string]any{
+					"content":    "深入理解索引失效场景(函数操作、类型转换、like左模糊)、最左前缀原则(联合索引只能从最左边开始使用)、索引下推(ICP)、索引优化实践(选择性高的列、避免冗余索引)。",
+					"key_points": []string{"索引失效", "最左前缀", "索引下推", "索引优化"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+		{
+			"question_id": 3,
+			"level":       "middle", // 干扰项
+			"title":       "如何排查慢查询？",
+			"analysis":    "慢查询优化是数据库性能调优的重要环节，需要从日志分析、执行计划、索引优化等多个角度入手。",
+			"tags":        []string{"慢查询", "性能优化", "explain"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "使用slow_query_log查看慢查询日志，找出执行时间超过阈值的SQL语句。",
+					"key_points": []string{"slow_query_log", "执行时间"},
+				},
+				"25k": map[string]any{
+					"content":    "使用EXPLAIN分析查询计划，重点关注type、key、rows等字段。type最好是ref或const，避免ALL全表扫描。",
+					"key_points": []string{"EXPLAIN", "索引使用", "type字段"},
+				},
+				"35k": map[string]any{
+					"content":    "深入分析执行计划、优化SQL(子查询改JOIN、避免SELECT *)、添加合适的索引、考虑分库分表、使用缓存。",
+					"key_points": []string{"执行计划优化", "索引设计", "SQL重写", "分库分表"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+		{
+			"question_id": 4,
+			"level":       "junior",
+			"title":       "请解释COUNT(*)、COUNT(1)和COUNT(column)的区别",
+			"analysis":    "COUNT是常用的聚合函数，用于统计行数，但不同的写法有不同的含义。",
+			"tags":        []string{"COUNT", "聚合函数", "SQL"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "COUNT(*)统计所有行（包括NULL），COUNT(column)统计该列非NULL的行数，COUNT(1)和COUNT(*)效果相同。",
+					"key_points": []string{"COUNT(*)", "NULL处理", "行数统计"},
+				},
+				"25k": map[string]any{
+					"content":    "COUNT(1)和COUNT(*)性能基本相同，MySQL优化器会自动优化。COUNT(column)需要判断NULL，性能略低。",
+					"key_points": []string{"性能对比", "优化器", "NULL判断"},
+				},
+				"35k": map[string]any{
+					"content":    "不同存储引擎的COUNT实现差异：MyISAM保存了表的行数，COUNT(*)很快；InnoDB需要扫描，可以通过添加索引或使用缓存优化。",
+					"key_points": []string{"InnoDB", "MyISAM", "实现原理", "优化方案"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+		{
+			"question_id": 5,
+			"level":       "junior",
+			"title":       "数据库设计的三大范式是什么？",
+			"analysis":    "数据库范式是设计关系数据库的基本原则，用于减少数据冗余和提高数据完整性。",
+			"tags":        []string{"范式", "数据库设计", "规范化"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "第一范式(1NF)：列不可再分，每个字段都是原子性的。第二范式(2NF)：消除部分依赖，非主键列完全依赖于主键。第三范式(3NF)：消除传递依赖，非主键列不依赖于其他非主键列。",
+					"key_points": []string{"1NF", "2NF", "3NF", "原子性"},
+				},
+				"25k": map[string]any{
+					"content":    "需要举例说明：如订单表包含客户信息违反2NF，应拆分为订单表和客户表。理解反范式化：为了性能有时会适当冗余数据。",
+					"key_points": []string{"实际案例", "表拆分", "反范式化"},
+				},
+				"35k": map[string]any{
+					"content":    "理解BCNF(消除主属性对码的部分和传递依赖)、4NF(消除多值依赖)。掌握反范式化的应用场景：高并发读场景、数据仓库、适当的冗余可以减少JOIN提升性能。",
+					"key_points": []string{"BCNF", "4NF", "反范式化场景", "性能权衡"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+		{
+			"question_id": 6,
+			"level":       "junior",
+			"title":       "请解释MySQL的主键和外键",
+			"analysis":    "主键和外键是关系数据库的核心概念，用于唯一标识和建立表之间的关联。",
+			"tags":        []string{"主键", "外键", "约束"},
+			"answers": map[string]any{
+				"15k": map[string]any{
+					"content":    "主键(Primary Key)唯一标识表中的每一条记录，不能为NULL。外键(Foreign Key)用于建立表之间的关联关系，外键的值必须是另一个表的主键值或NULL。",
+					"key_points": []string{"主键唯一性", "外键约束", "表关联"},
+				},
+				"25k": map[string]any{
+					"content":    "主键选择策略：自增ID(简单高效)、UUID(全局唯一但无序)、业务主键(有业务含义)。外键的级联操作：ON DELETE CASCADE(级联删除)、ON UPDATE CASCADE(级联更新)。",
+					"key_points": []string{"主键选择", "级联删除", "级联更新"},
+				},
+				"35k": map[string]any{
+					"content":    "分布式场景下的主键设计：雪花算法(Snowflake)生成分布式ID，兼顾唯一性和趋势递增。外键的性能影响：外键会降低写入性能，高并发场景通常在应用层维护关联关系而不使用外键约束。",
+					"key_points": []string{"分布式ID", "雪花算法", "外键性能", "应用层约束"},
+				},
+			},
+			"created_at": now,
+			"updated_at": now,
+		},
+	}
+}
+
+// insertQuestion 插入单个题目到ES
+func insertQuestion(t *testing.T, client *elasticsearch.Client, indexName string, doc map[string]any) {
+	docJSON, err := json.Marshal(doc)
+	require.NoError(t, err, "序列化文档失败")
+
+	docID := fmt.Sprintf("mysql_%03d", doc["question_id"])
+
+	resp, err := client.Index(
+		indexName,
+		bytes.NewReader(docJSON),
+		client.Index.WithDocumentID(docID),
+	)
+	require.NoError(t, err, "插入文档失败")
+	defer resp.Body.Close()
+
+	if resp.IsError() {
+		body, _ := io.ReadAll(resp.Body)
+		require.Failf(t, "插入文档失败", "[%s]: %s", resp.Status(), string(body))
+	}
+}
+
+// TestKbaseQuestionQuery 测试Kbase题库查询场景
+func TestKbaseQuestionQuery(t *testing.T) {
+	// 前置准备：创建测试数据
+	prepareKbaseTestData(t)
+
+	kbaseBaseURL := "http://localhost:8082"
+	indexName := "interview_questions_mysql"
+
+	// 表格驱动测试
+	tests := []struct {
+		name      string
+		query     map[string]any
+		validator func(t *testing.T, result map[string]any)
+	}{
+		{
+			name:  "场景1_获取第一题",
+			query: buildFirstQuestionQuery(),
+			validator: func(t *testing.T, result map[string]any) {
+				// 验证返回1个结果
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证是第一题（question_id=1）
+				firstHit := hits[0].(map[string]any)
+				source := firstHit["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.Equal(t, 1, qid, "应该返回第一题")
+
+				// ES返回的包含当前题，所以是5（题目1,2,4,5,6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(5), remaining, "ES应该返回5（包含当前题）")
+			},
+		},
+		{
+			name:  "场景2_排除2道题获取下一题",
+			query: buildNextQuestionQuery([]int{1, 2}), // 排除1和2
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证返回的不是1或2
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.NotContains(t, []int{1, 2}, qid, "不应该返回已问过的题目")
+				assert.Contains(t, []int{4, 5, 6}, qid, "应该返回4、5、6之一")
+
+				// ES返回的包含当前题，所以是3（题目4,5,6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(3), remaining, "ES应该返回3（包含当前题）")
+			},
+		},
+		{
+			name:  "场景3_排除4道题获取最后一题",
+			query: buildNextQuestionQuery([]int{1, 2, 4, 5}), // 排除4道，只剩题目6
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证返回的是题目6
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.Equal(t, 6, qid, "应该返回最后一题(ID=6)")
+
+				// ES返回的包含当前题，所以是1（只有题目6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(1), remaining, "ES应该返回1（只剩最后一题）")
+			},
+		},
+		{
+			name:  "场景4_排除所有题目后返回空",
+			query: buildNextQuestionQuery([]int{1, 2, 4, 5, 6}), // 排除所有junior题目
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 0, len(hits), "排除所有题目后应该返回空")
+
+				// 没有题了，剩余数=0
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(0), remaining, "排除所有题目后剩余数应为0")
+			},
+		},
+		{
+			name:  "场景5_验证level过滤有效",
+			query: buildFirstQuestionQuery(), // 只查junior
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				require.Greater(t, len(hits), 0, "应该有返回结果")
+
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+
+				// 验证level是junior
+				assert.Equal(t, "junior", source["level"], "level应该是junior")
+
+				// 验证question_id不是3（3是middle级别）
+				qid := int(source["question_id"].(float64))
+				assert.NotEqual(t, 3, qid, "不应该返回middle级别的题目(ID=3)")
+			},
+		},
+	}
+
+	// 执行所有测试
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := executeESQuery(t, kbaseBaseURL, indexName, tt.query)
+			tt.validator(t, result)
+		})
+	}
+}
+
+// buildFirstQuestionQuery 构建获取第一题的查询
+func buildFirstQuestionQuery() map[string]any {
+	return map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": []map[string]any{
+					{"term": map[string]any{"level": "junior"}},
+				},
+			},
+		},
+		"size": 1,
+		"sort": []map[string]any{
+			{"question_id": map[string]any{"order": "asc"}},
+		},
+		"aggs": map[string]any{
+			"remaining_questions": map[string]any{
+				"cardinality": map[string]any{
+					"field": "question_id",
+				},
+			},
+		},
+	}
+}
+
+// buildNextQuestionQuery 构建获取下一题的查询（排除已问）
+func buildNextQuestionQuery(excludeIDs []int) map[string]any {
+	return map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": []map[string]any{
+					{"term": map[string]any{"level": "junior"}},
+				},
+				"must_not": []map[string]any{
+					{"terms": map[string]any{"question_id": excludeIDs}},
+				},
+			},
+		},
+		"size": 1,
+		"sort": []map[string]any{
+			{
+				"_script": map[string]any{
+					"type": "number",
+					"script": map[string]any{
+						"source": "Math.random()",
+					},
+					"order": "asc",
+				},
+			},
+		},
+		"aggs": map[string]any{
+			"remaining_questions": map[string]any{
+				"cardinality": map[string]any{
+					"field": "question_id",
+				},
+			},
+		},
+	}
+}
+
+// executeESQuery 执行ES查询
+func executeESQuery(t *testing.T, baseURL, index string, query map[string]any) map[string]any {
+	// 调用 kbase 的 /api/v1/es_search 接口
+	requestBody := map[string]any{
+		"index": index,
+		"query": query,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	require.NoError(t, err, "序列化请求失败")
+
+	resp, err := http.Post(
+		baseURL+"/api/v1/es_search",
+		"application/json",
+		bytes.NewBuffer(jsonBody),
+	)
+	require.NoError(t, err, "HTTP请求失败")
+	defer resp.Body.Close()
+
+	require.Equal(t, 200, resp.StatusCode, "请求应该成功")
+
+	var result map[string]any
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err, "解析响应失败")
+
+	return result
 }
