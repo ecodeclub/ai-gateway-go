@@ -17,8 +17,7 @@ package openai
 import (
 	"encoding/json"
 	"errors"
-	"strings"
-	"time"
+	"log"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -71,10 +70,8 @@ func (h *Handler) Stream(ctx *domain.StreamContext) error {
 	cfg := step.LLMData().Cfg
 	params := h.newParams(ctx, cfg)
 	// 这种比较复杂的打印日志的代码，就用一个判断来减少线上消耗
-	if elog.DebugLevel == elog.DebugLevel {
-		val, _ := json.Marshal(params)
-		h.logger.Debug(string(val))
-	}
+	val, _ := json.Marshal(params)
+	h.logger.Debug(string(val))
 	s := h.client.Responses.NewStreaming(ctx.Ctx, params, h.options...)
 	return h.forward(ctx, cfg, s)
 }
@@ -111,6 +108,31 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 			}
 			return responses.ToolUnionParam{OfFunction: &p}
 		}),
+		ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+			// OfAllowedTools 在设置了上方Text字段后的试验结果如下：
+			// required + 可用工具列表： 【会发起函数调用】，输出JSON内容，但是格式与JSON Schema不相符。
+			// {
+			//  "question_id": 5,
+			//  "question": "数据库设计的三大范式是什么？"
+			//}
+			OfAllowedTools: &responses.ToolChoiceAllowedParam{
+				Mode: responses.ToolChoiceAllowedModeRequired,
+				Tools: []map[string]any{
+					{
+						"type": "function",
+						"name": "kbase_rag",
+					},
+					{
+						"type": "function",
+						"name": "forward_result",
+					},
+					{
+						"type": "function",
+						"name": "save_doc",
+					},
+				},
+			},
+		},
 		Temperature:     openai.Float(float64(cfg.Temperature)),
 		TopP:            openai.Float(float64(cfg.TopP)),
 		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
@@ -118,6 +140,7 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 	if cfg.SystemPrompt != "" {
 		params.Instructions = openai.String(cfg.SystemPrompt)
 	}
+	log.Printf("cfg.Functions: %#v\n", cfg.Functions)
 	return params
 }
 
@@ -186,11 +209,13 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 		case "response.output_text.delta":
 			textDeltaCount++
 			text := event.AsResponseOutputTextDelta()
-			h.sendEvt(ctx, domain.StreamEventV1{
-				Delta: &domain.Delta{
-					Content: text.Delta,
-				},
-			})
+			//h.sendEvt(ctx, domain.StreamEventV1{
+			//	Delta: &domain.Delta{
+			//		Content: text.Delta,
+			//	},
+			//})
+			h.logger.Warn("LLM输出非预期文本", elog.String("Delta", text.Delta))
+
 		case "response.output_item.done":
 			item := event.AsResponseOutputItemDone().Item
 			h.logger.Debug("📦 output_item.done", elog.String("itemType", item.Type))
@@ -306,46 +331,50 @@ func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfi
 				}
 			}),
 		},
+		Tools: slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
+			var p responses.FunctionToolParam
+			err := json.Unmarshal([]byte(src.Definition), &p)
+			if err != nil {
+				h.logger.Error("函数定义反序列化失败", elog.String("function", src.Definition), elog.FieldErr(err))
+			}
+			return responses.ToolUnionParam{OfFunction: &p}
+		}),
+		//ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+		//	OfAllowedTools: &responses.ToolChoiceAllowedParam{
+		//		Mode: responses.ToolChoiceAllowedModeAuto,
+		//		Tools: []map[string]any{
+		//			{
+		//				"type": "function",
+		//				"name": "kbase_rag",
+		//			},
+		//			{
+		//				"type": "function",
+		//				"name": "forward_result",
+		//			},
+		//			{
+		//				"type": "function",
+		//				"name": "save_doc",
+		//			},
+		//		},
+		//	},
+		//},
+		Temperature:     openai.Float(float64(cfg.Temperature)),
+		TopP:            openai.Float(float64(cfg.TopP)),
+		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
 	}
 
-	// 重试机制：处理 conversation lock 失败
-	var resp *responses.Response
-	var err1 error
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		// 【重要】：必须在一次响应将【所有】的Function Call Output传递回去，包含大模型重试的Function Call Output。
-		resp, err1 = h.client.Responses.New(ctx.Ctx, respBody, h.options...)
-		if err1 == nil {
-			break
-		}
+	h.logger.Info("🔄 使用流式API返回函数结果并获取 LLM 响应",
+		elog.Any("respBody", respBody))
 
-		// 检查是否是 conversation lock 错误
-		errMsg := err1.Error()
-		if strings.Contains(errMsg, "conversation_lock_failed") || strings.Contains(errMsg, "Failed to acquire conversation lock") {
-			h.logger.Warn("⚠️ Conversation lock 失败，等待重试",
-				elog.Int("attempt", i+1),
-				elog.Int("maxRetries", maxRetries),
-				elog.Any("respBody", respBody))
-			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond) // 递增等待时间
-			continue
-		}
-
-		// 其他错误，不重试
-		break
-	}
-
+	// 【关键】：直接使用流式API，OpenAI 会自动处理函数结果并返回 LLM 的后续输出
+	s := h.client.Responses.NewStreaming(ctx.Ctx, respBody, h.options...)
+	err1 := h.forward(ctx, cfg, s)
 	if err1 != nil {
-		h.logger.Error("❌ 返回 FC 响应给 OpenAI 失败（已重试）",
-			elog.Any("respBody", respBody),
-			elog.Int("retries", maxRetries),
-			elog.FieldErr(err1))
+		h.logger.Error("❌ 处理函数调用后的响应失败", elog.FieldErr(err1))
 		return err1
 	}
 
-	h.logger.Info("✅ 成功返回 function call 结果给 OpenAI",
-		elog.Any("respBody", respBody),
-		elog.String("responseID", resp.ID))
-
+	// 检查是否需要执行下一个配置
 	for _, id := range nextInvCfgIDs {
 		turn := ctx.Chat.LastTurn()
 		turn.AssistantRun.StartLLMStep(id)
