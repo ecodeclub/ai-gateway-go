@@ -53,7 +53,17 @@ func (r *Result) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respo
 		return fcall.Response{}, fmt.Errorf("%s call Unmarshal err: %v", r.Name(), err)
 	}
 
-	// 规避 JSON 转义问题
+	// 规避 JSON 双重转义问题（百炼兼容性处理）
+	// 检测 result 是否被错误地序列化为字符串，如果是则解开一层
+	var resultStr string
+	if err := json.Unmarshal(resReq.Result, &resultStr); err == nil {
+		// resReq.Result 是一个 JSON 字符串（双重转义），需要解开
+		r.logger.Debug("检测到双重转义，自动解开",
+			elog.String("原始值", string(resReq.Result)),
+			elog.String("解开后", resultStr))
+		resReq.Result = []byte(resultStr)
+	}
+
 	r.logger.Debug("resReq.Result："+string(resReq.Result), elog.String("varName", resReq.VarName))
 
 	err = ctx.Sender.Send(domain.StreamEventV1{
