@@ -22,6 +22,7 @@ import (
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
+	"github.com/gotomicro/ego/core/elog"
 )
 
 // Handler 负责渲染 Prompt
@@ -30,10 +31,13 @@ type Handler struct {
 	Next stream.Handler
 	// 一般来说，system prompt 是不会出现占位符等问题的
 	// userPromptTplCache syncx.Map[string, *template.Template]
+	logger *elog.Component
 }
 
 func NewHandler() *Handler {
-	return &Handler{}
+	return &Handler{
+		logger: elog.DefaultLogger.With(elog.FieldComponentName("render.Handler")),
+	}
 }
 
 func (h *Handler) Stream(ctx *domain.StreamContext) error {
@@ -64,8 +68,12 @@ func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
 		return "", err
 	}
 	var buffer bytes.Buffer
-	err = tpl.Execute(&buffer, ctx.Chat.CombinedVars())
-	return buffer.String(), err
+	vars := ctx.Chat.CombinedVars()
+	err = tpl.Execute(&buffer, vars)
+	text := buffer.String()
+
+	h.logger.Info("渲染", elog.Any("vars", vars), elog.String("text", text))
+	return text, err
 }
 
 // fromJson 将 JSON 字符串解析为 Go 对象

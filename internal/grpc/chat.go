@@ -95,11 +95,12 @@ func (c *ChatServer) StreamV1(request *ai.StreamV1Request, resp ai.Service_Strea
 
 	turn := &domain.Turn{
 		Vars: map[string]any{
-			"Input": request.Input.Content,
+			// 变量的构建详见 buildvar 包
 		},
 		UserRun: &domain.UserRun{
-			Content: request.Input.Content,
-			Files:   request.Input.Files,
+			Content:  request.Input.Content,
+			AudioURL: request.Input.AudioUrl,
+			Files:    request.Input.Files,
 		},
 		AssistantRun: &domain.AssistantRun{
 			// 构建当前的步骤，一般来说步骤不会超过 4 个

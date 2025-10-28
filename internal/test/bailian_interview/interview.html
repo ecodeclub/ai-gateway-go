@@ -32,6 +32,7 @@
         .info { background: #dcfce7; border: 1px solid #16a34a; color: #166534; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-weight: 500; }
         .meta { background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
     </style>
+    <script src="https://unpkg.com/cos-js-sdk-v5@1.10.1/dist/cos-js-sdk-v5.min.js"></script>
 </head>
 <body>
 
@@ -71,8 +72,8 @@
 
 <div class="row" style="margin-top:20px;">
     <div class="card">
-        <h3>📝 转写结果（百炼 paraformer-v2）</h3>
-        <pre id="transcriptBox" class="loading">// 提交后转写并显示</pre>
+        <h3>音频URL</h3>
+        <pre id="transcriptBox" class="loading">// 上传OSS后显示公网访问音频URL</pre>
     </div>
     <div class="card">
         <h3>⭐ 单题评分与点评（via gRPC StreamV1）</h3>
@@ -90,6 +91,10 @@
     // ========== 配置 ==========
     const INTERVIEW_API = 'http://localhost:8080';    // 面试流程 API（HTTP→gRPC 代理 + 语音识别）
     const INVOCATION_CONFIG_ID = 100001;              // InvocationConfig ID
+    
+    // ========== 腾讯 COS 配置（请手动填写）==========
+    const COS_BUCKET_NAME = 'webook-1314583317';      // 存储桶名称
+    const COS_REGION = 'ap-nanjing';                   // 地域
 
     // ========== 全局变量 ==========
     let mediaRecorder, chunks = [], recordStartTime = 0;
@@ -303,21 +308,30 @@
     }
 
     // ========== 流式请求 StreamV1 ==========
-    async function streamRequest(userInput) {
+    async function streamRequest(audioUrl, content = null) {
         els.judgeBox.textContent = '处理中...';
         els.judgeBox.className = 'loading';
         els.scores.innerHTML = '';
 
         try {
+            const requestBody = {
+                chat_sn: chatSn,
+                config_id: INVOCATION_CONFIG_ID,
+                uid: 123
+            };
+            
+            // 同时传递音频 URL 和文本命令
+            if (audioUrl) {
+                requestBody.audio_url = audioUrl;
+            }
+            if (content) {
+                requestBody.content = content;
+            }
+
             const response = await fetch(`${INTERVIEW_API}/api/interview/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_sn: chatSn,
-                    input: userInput,
-                    config_id: INVOCATION_CONFIG_ID,
-                    uid: 123
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -453,25 +467,79 @@
         }
     }
 
-    // ========== 音频转文本 ==========
-    async function transcribeAudio(blob) {
-        const formData = new FormData();
-        formData.append('file', blob, 'audio.webm');
-
-        console.log('转写音频，使用百炼 paraformer-v2');
-        const resp = await fetch(`${INTERVIEW_API}/api/audio/transcribe`, {
-            method: 'POST',
-            body: formData
+    // ========== 获取 COS 临时密钥 ==========
+    async function getTempCredentials() {
+        const resp = await fetch(`${INTERVIEW_API}/api/cos/temp-credentials`, {
+            method: 'GET'
         });
 
         if (!resp.ok) {
             const errorText = await resp.text();
-            console.error('❌ 语音识别 API 错误:', errorText);
-            throw new Error(`转写失败: HTTP ${resp.status}`);
+            console.error('❌ 获取临时密钥失败:', errorText);
+            throw new Error(`获取临时密钥失败: HTTP ${resp.status}`);
         }
 
-        const data = await resp.json();
-        return data.text || '';
+        return await resp.json();
+    }
+
+    // ========== 初始化 COS 实例 ==========
+    async function initCOS() {
+        const credentials = await getTempCredentials();
+        
+        const cosInstance = new COS({
+            getAuthorization: function (options, callback) {
+                callback({
+                    TmpSecretId: credentials.tmpSecretId,
+                    TmpSecretKey: credentials.tmpSecretKey,
+                    SecurityToken: credentials.sessionToken,
+                    StartTime: credentials.startTime,
+                    ExpiredTime: credentials.expiredTime,
+                });
+            }
+        });
+        
+        return { cos: cosInstance, credentials };
+    }
+
+    // ========== 上传音频到腾讯 COS ==========
+    async function uploadToCOS(blob) {
+        console.log('🔑 初始化 COS...');
+        const { cos, credentials } = await initCOS();
+        
+        // 生成唯一文件名
+        const timestamp = Date.now();
+        const key = `audio-temp/${timestamp}_audio.webm`;
+        
+        console.log('📤 上传音频到 COS...', key);
+        
+        // 使用 COS SDK 上传
+        return new Promise((resolve, reject) => {
+            cos.putObject({
+                Bucket: credentials.bucket,
+                Region: credentials.region,
+                Key: key,
+                Body: blob,
+                onProgress: function (progressData) {
+                    const percent = Math.round(progressData.percent * 100);
+                    console.log(`上传进度: ${percent}%`);
+                }
+            }, function (err, data) {
+                if (err) {
+                    console.error('❌ 上传失败:', err);
+                    reject(err);
+                } else {
+                    const fileURL = `https://${credentials.bucket}.cos.${credentials.region}.myqcloud.com/${key}`;
+                    console.log('✅ 上传成功:', fileURL);
+                    resolve(fileURL);
+                }
+            });
+        });
+    }
+
+    // ========== 上传音频并返回 URL ==========
+    async function transcribeAudio(blob) {
+        const cosUrl = await uploadToCOS(blob);
+        return cosUrl;
     }
 
     // ========== UI 重置 ==========
@@ -503,7 +571,7 @@
         await createChat();
 
         // 请求第一题（题目编号由后端的current字段控制）
-        await streamRequest("开始面试");
+        await streamRequest(null, "开始面试");
 
         els.btnSpeak.disabled = false;
         els.btnSpeak.onclick = () => speak(els.question.textContent);
@@ -529,33 +597,39 @@
         els.btnSubmit.disabled = true;
         els.btnRecord.disabled = true;
 
-        // 1. 转写音频
-        els.transcriptBox.textContent = '转写中（百炼 paraformer-v2）...';
+        // 1. 上传音频到 COS，获取 URL
+        els.transcriptBox.textContent = '📤 上传音频到 COS...';
         els.transcriptBox.className = 'loading';
 
         try {
-            const transcript = await transcribeAudio(lastBlob);
-            els.transcriptBox.textContent = transcript || '// 转写为空';
+            const audioUrl = await transcribeAudio(lastBlob);
+            els.transcriptBox.textContent = `✅ 音频已上传: ${audioUrl}`;
             els.transcriptBox.className = '';
 
-            // 2. 🚨 根据是否最后一题发送不同命令
+            // 2. 根据是否是最后一题，发送不同的命令
             const q = els.question.textContent.trim();
-            let command;
-            if (isLastQuestion) {
-                command = "评价答案并生成面试总结";
-                console.log('📝 发送命令:', command);
-            } else {
-                command = "评价答案并获取下一题";
-                console.log('📝 发送命令:', command);
-            }
+            console.log('📝 发送音频URL:', audioUrl);
             
-            await streamRequest(command);
+            // 先发送评价命令（第一步）
+            console.log('📝 命令: 评价答案');
+            await streamRequest(audioUrl, "评价答案");
+            
+            // 评价完成后，根据是否最后一题决定下一步
+            if (isLastQuestion) {
+                // 最后一题：生成面试总结
+                console.log('📝 命令: 生成面试总结');
+                await streamRequest(null, "生成面试总结");
+            } else {
+                // 非最后一题：获取下一题
+                console.log('📝 命令: 获取下一题');
+                await streamRequest(null, "获取下一题");
+            }
 
             // 3. 保存历史
-            history.push({ question: q, transcript });
+            history.push({ question: q, audioUrl });
 
         } catch (e) {
-            showError(els.transcriptBox, '转写失败：' + e.message);
+            showError(els.transcriptBox, '上传失败：' + e.message);
             console.error(e);
         }
 
@@ -563,26 +637,37 @@
         els.btnRecord.disabled = false;
     };
 
-    els.btnNext.onclick = () => {
-        // 题目编号由后端的current字段控制，这里只需要重置UI
+    els.btnNext.onclick = async () => {
+        // 禁用按钮防止重复点击
+        els.btnNext.disabled = true;
+        
+        // 发送"获取下一题"命令
+        console.log('📝 命令: 获取下一题');
+        await streamRequest(null, "获取下一题");
+        
+        // 重置UI
         resetUIForNextQuestion();
     };
 
     els.btnDontKnow.onclick = async () => {
         const q = els.question.textContent.trim();
-        history.push({ question: q, transcript: '我不会', judge: { note: '跳过' } });
-
-        // 🚨 根据是否最后一题发送不同命令
-        let command;
+        
+        console.log('⏭️ 跳过题目');
+        
+        // 1. 先评价（用户回答"我不会"）
+        console.log('📝 命令: 评价答案');
+        await streamRequest(null, "评价答案\n我不会");
+        
+        // 2. 根据是否最后一题决定下一步
         if (isLastQuestion) {
-            command = "评价答案并生成面试总结";
-            console.log('📝 发送命令:', command);
+            console.log('📝 命令: 生成面试总结');
+            await streamRequest(null, "生成面试总结");
         } else {
-            command = "评价答案并获取下一题";
-            console.log('📝 发送命令:', command);
+            console.log('📝 命令: 获取下一题');
+            await streamRequest(null, "获取下一题");
         }
         
-        await streamRequest(command);
+        history.push({ question: q, transcript: '我不会', judge: { note: '跳过' } });
         resetUIForNextQuestion();
     };
 
@@ -600,7 +685,7 @@
         try {
             // 🚨 发送"结束面试"命令
             console.log('📝 发送命令: 结束面试');
-            await streamRequest("结束面试");
+            await streamRequest(null, "结束面试");
 
         } catch (e) {
             console.error('❌ 总结失败:', e);

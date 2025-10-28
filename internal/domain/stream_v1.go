@@ -113,7 +113,10 @@ func (a *AssistantRun) LastStep() *Step {
 // UserRun 代表的是用户的输入
 type UserRun struct {
 	// 用户输入的内容
-	Content string
+	// 当AudioURL不为空时，将 AudioURL 转为文本并拼接在Content后面
+	Content  string
+	AudioURL string
+
 	// Files 中存储的是文件地址
 	Files []string
 }

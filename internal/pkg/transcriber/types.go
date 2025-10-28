@@ -12,22 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ioc
+package transcriber
 
-import (
-	"log"
-	"os"
-
-	"github.com/redis/go-redis/v9"
-)
-
-func InitRedis() redis.Cmdable {
-	addr := os.Getenv("TEST_REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:26379"
-	}
-	log.Print("测试 Redis：" + addr)
-	return redis.NewClient(&redis.Options{
-		Addr: addr,
-	})
+type Transcriber interface {
+	Transcribe(fileURLs []string) (texts []string, err error)
 }
