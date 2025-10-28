@@ -793,7 +793,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		}
 	}))
 
-	// 5. 语音识别接口（上传到 COS + 百炼 paraformer-v2）
+	// 5. 语音识别接口（上传到 COS + 百炼 qwen3-asr-flash）
 	mux.HandleFunc("/api/audio/transcribe", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		// 解析 multipart 表单
 		err := r.ParseMultipartForm(32 << 20) // 最大 32MB
@@ -840,12 +840,34 @@ func TestInterviewProxyServer(t *testing.T) {
 		log.Printf("✅ COS 上传成功: %s", cosFileURL)
 
 		// 3. 调用百炼语音识别 API（异步）
-		// 使用 paraformer-v2：无需申请，直接可用
-		log.Printf("🔄 调用百炼 paraformer-v2 识别（异步）...")
+		// 使用 qwen3-asr-flash：无需申请，直接可用
+		log.Printf("🔄 调用百炼 qwen3-asr-flash 识别（异步）...")
 		transcribeReq := map[string]any{
-			"model": "paraformer-v2", // 支持中文、英文，无需申请即可使用
+			"model": "qwen3-asr-flash", // 支持中文、英文，无需申请即可使用
 			"input": map[string]any{
-				"file_urls": []string{cosFileURL},
+				"messages": []map[string]any{
+					{
+						"role": "system",
+						"content": []map[string]any{
+							{
+								"text": "请将以下音频文件URL转换为文字：",
+							},
+						},
+					},
+					{
+						"role": "user",
+						"content": []map[string]any{
+							{
+								"audio": cosFileURL,
+							},
+						},
+					},
+				},
+			},
+			"parameters": map[string]any{
+				"asr_options": map[string]any{
+					"enable_itn": true,
+				},
 			},
 		}
 
@@ -856,9 +878,9 @@ func TestInterviewProxyServer(t *testing.T) {
 		// 否则拼接完整路径 /api/v1/services/audio/asr/transcription
 		var fullURL string
 		if strings.HasSuffix(baseURL, "/api/v1") {
-			fullURL = baseURL + "/services/audio/asr/transcription"
+			fullURL = baseURL + "/services/aigc/multimodal-generation/generation"
 		} else {
-			fullURL = baseURL + "/api/v1/services/audio/asr/transcription"
+			fullURL = baseURL + "/api/v1/services/aigc/multimodal-generation/generation"
 		}
 
 		log.Printf("📡 请求URL: %s", fullURL)
@@ -874,7 +896,6 @@ func TestInterviewProxyServer(t *testing.T) {
 
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("X-DashScope-Async", "enable")
 
 		httpClient := &http.Client{Timeout: 60 * time.Second}
 		resp, err := httpClient.Do(httpReq)
@@ -898,157 +919,36 @@ func TestInterviewProxyServer(t *testing.T) {
 			return
 		}
 
-		// 4. 解析任务ID
+		// 4. 解析文本
 		var submitResp struct {
 			Output struct {
-				TaskID string `json:"task_id"`
+				Choices []struct {
+					Message struct {
+						Content []struct {
+							Text string `json:"text"`
+						} `json:"content"`
+					} `json:"message"`
+				} `json:"choices"`
 			} `json:"output"`
 		}
 
 		err = json.Unmarshal(respBody, &submitResp)
-		if err != nil || submitResp.Output.TaskID == "" {
+		if err != nil || len(submitResp.Output.Choices) == 0 || len(submitResp.Output.Choices[0].Message.Content) == 0 {
 			log.Printf("❌ 解析任务ID失败: %v, 原始响应: %s", err, string(respBody))
 			http.Error(w, "解析任务ID失败", http.StatusInternalServerError)
 			return
 		}
 
-		taskID := submitResp.Output.TaskID
-		log.Printf("✅ 任务已提交: %s", taskID)
+		transcribedText := submitResp.Output.Choices[0].Message.Content[0].Text
+		log.Printf("✅ 识别成功: %s", transcribedText)
 
-		// 5. 轮询任务状态直到完成
-		log.Printf("🔄 开始轮询任务状态...")
-		maxRetries := 20 // 最多轮询60次（约60秒）
-		for i := 0; i < maxRetries; i++ {
-			time.Sleep(3 * time.Second)
-
-			// 构建查询URL（注意：baseURL 可能已经包含 /api/v1）
-			var queryURL string
-			if strings.HasSuffix(baseURL, "/api/v1") {
-				queryURL = baseURL + "/tasks/" + taskID
-			} else {
-				queryURL = baseURL + "/api/v1/tasks/" + taskID
-			}
-
-			queryReq, err := http.NewRequest("GET", queryURL, nil)
-			if err != nil {
-				log.Printf("❌ 创建查询请求失败: %v", err)
-				continue
-			}
-
-			queryReq.Header.Set("Authorization", "Bearer "+apiKey)
-
-			queryResp, err := httpClient.Do(queryReq)
-			if err != nil {
-				log.Printf("❌ 查询任务失败: %v", err)
-				continue
-			}
-
-			queryBody, err := io.ReadAll(queryResp.Body)
-			queryResp.Body.Close()
-			if err != nil {
-				log.Printf("❌ 读取查询响应失败: %v", err)
-				continue
-			}
-
-			var taskResp struct {
-				Output struct {
-					TaskStatus string `json:"task_status"`
-					Results    []struct {
-						FileURL          string `json:"file_url"`
-						TranscriptionURL string `json:"transcription_url"`
-						Transcription    string `json:"transcription"`
-						SubtaskStatus    string `json:"subtask_status"`
-					} `json:"results"`
-				} `json:"output"`
-			}
-
-			err = json.Unmarshal(queryBody, &taskResp)
-			if err != nil {
-				log.Printf("❌ 解析查询响应失败: %v", err)
-				continue
-			}
-
-			log.Printf("📊 任务状态: %s (轮询 %d/%d)", taskResp.Output.TaskStatus, i+1, maxRetries)
-
-			if taskResp.Output.TaskStatus == "SUCCEEDED" {
-				if len(taskResp.Output.Results) == 0 {
-					log.Printf("❌ 识别结果为空")
-					http.Error(w, "识别结果为空", http.StatusInternalServerError)
-					return
-				}
-
-				// 6. 如果有 transcription_url，需要下载并解析结果
-				result := taskResp.Output.Results[0]
-				var transcribedText string
-
-				if result.Transcription != "" {
-					transcribedText = result.Transcription
-				} else if result.TranscriptionURL != "" {
-					log.Printf("🔄 下载转写结果: %s", result.TranscriptionURL)
-					textResp, err := httpClient.Get(result.TranscriptionURL)
-					if err != nil {
-						log.Printf("❌ 下载转写结果失败: %v", err)
-						http.Error(w, fmt.Sprintf("下载转写结果失败: %v", err), http.StatusInternalServerError)
-						return
-					}
-					defer textResp.Body.Close()
-
-					textBody, err := io.ReadAll(textResp.Body)
-					if err != nil {
-						log.Printf("❌ 读取转写结果失败: %v", err)
-						http.Error(w, fmt.Sprintf("读取转写结果失败: %v", err), http.StatusInternalServerError)
-						return
-					}
-
-					// 解析转写结果JSON
-					var transcriptionData struct {
-						Transcripts []struct {
-							Text string `json:"text"`
-						} `json:"transcripts"`
-					}
-
-					err = json.Unmarshal(textBody, &transcriptionData)
-					if err != nil {
-						log.Printf("❌ 解析转写结果JSON失败: %v", err)
-						http.Error(w, fmt.Sprintf("解析转写结果失败: %v", err), http.StatusInternalServerError)
-						return
-					}
-
-					if len(transcriptionData.Transcripts) > 0 {
-						transcribedText = transcriptionData.Transcripts[0].Text
-					} else {
-						log.Printf("❌ 转写结果为空")
-						http.Error(w, "转写结果为空", http.StatusInternalServerError)
-						return
-					}
-				} else {
-					log.Printf("❌ 无法获取转写结果")
-					http.Error(w, "无法获取转写结果", http.StatusInternalServerError)
-					return
-				}
-
-				log.Printf("✅ 识别成功: %s", transcribedText)
-
-				// 7. 返回结果给前端
-				w.Header().Set("Content-Type", "application/json")
-				err = json.NewEncoder(w).Encode(map[string]string{
-					"text":    transcribedText,
-					"cos_url": cosFileURL,
-					"task_id": taskID,
-				})
-				assert.NoError(t, err)
-				return
-			} else if taskResp.Output.TaskStatus == "FAILED" {
-				log.Printf("❌ 任务失败: %s", string(queryBody))
-				http.Error(w, fmt.Sprintf("识别任务失败: %s", string(queryBody)), http.StatusInternalServerError)
-				return
-			}
-			// PENDING 或 RUNNING 状态，继续轮询
-		}
-
-		// 超时
-		log.Printf("❌ 识别超时（超过 %d 秒）", maxRetries)
-		http.Error(w, "识别超时", http.StatusRequestTimeout)
+		// 5. 返回结果给前端
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(map[string]string{
+			"text":    transcribedText,
+			"cos_url": cosFileURL,
+		})
+		assert.NoError(t, err)
 	}))
 
 	// 6. 健康检查
@@ -1067,7 +967,7 @@ func TestInterviewProxyServer(t *testing.T) {
 	log.Println("📍 端点:")
 	log.Println("   - POST /api/interview/chat/create  (创建会话)")
 	log.Println("   - POST /api/interview/stream        (流式面试)")
-	log.Println("   - POST /api/audio/transcribe        (语音识别: COS + paraformer-v2)")
+	log.Println("   - POST /api/audio/transcribe        (语音识别: COS + qwen3-asr-flash)")
 	log.Println("   - GET  /health                      (健康检查)")
 	log.Println("💡 按 Ctrl+C 停止服务器")
 	log.Println("---")
