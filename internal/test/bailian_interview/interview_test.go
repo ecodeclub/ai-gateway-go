@@ -24,7 +24,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -33,11 +32,13 @@ import (
 	chatv1 "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	igrpc "github.com/ecodeclub/ai-gateway-go/internal/grpc"
+	"github.com/ecodeclub/ai-gateway-go/internal/pkg/transcriber"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/bailian"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/buildvar"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/forward"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
@@ -52,7 +53,7 @@ import (
 	"github.com/openai/openai-go/v3/option"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tencentyun/cos-go-sdk-v5"
+	sts "github.com/tencentyun/qcloud-cos-sts-sdk/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -117,8 +118,10 @@ func TestGrpcServer(t *testing.T) {
 	invConfigDAO := dao.NewInvocationConfigDAO(db)
 	invConfigRepo := repository.NewInvocationConfigRepo(invConfigDAO, providerRepo)
 
+	buildvarHdl := buildvar.NewHandler(transcriber.NewQwen3ASRFlash(baseURL, apiKey))
+
 	// 创建 stream handler
-	streamHandler := initStreamHandler(bailianHandler, chatRepo, invConfigRepo, providerRepo)
+	streamHandler := initStreamHandler(bailianHandler, chatRepo, invConfigRepo, providerRepo, buildvarHdl)
 
 	app := testioc.InitApp(testioc.TestOnly{
 		Handler: streamHandler,
@@ -598,15 +601,18 @@ func initStreamHandler(
 	chatRepo *repository.ChatRepo,
 	invConfigRepo *repository.InvocationConfigRepo,
 	providerRepo *repository.ProviderRepository,
+	buildvarHdl *buildvar.Handler,
 ) stream.Handler {
 	loadcfgHdl := loadcfg.NewLoadConfigHandler(chatRepo, invConfigRepo, providerRepo)
 	renderHdl := render.NewHandler()
 	storeHdl := store.NewHandler(chatRepo)
 
 	// 组装责任链: loadcfg -> render -> store -> bailian
-	loadcfgHdl.Next = renderHdl
+	loadcfgHdl.Next = buildvarHdl
+	buildvarHdl.Next = renderHdl
 	renderHdl.Next = storeHdl
 	storeHdl.Next = bailianHdl
+
 	bailianHdl.Handler = loadcfgHdl
 
 	return loadcfgHdl
@@ -648,15 +654,8 @@ func TestInterviewProxyServer(t *testing.T) {
 		t.Fatal("未设置 COS_REGION 环境变量（如：ap-guangzhou）")
 	}
 
-	// 初始化 COS 客户端
-	u, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", cosBucket, cosRegion))
-	b := &cos.BaseURL{BucketURL: u}
-	cosClient := cos.NewClient(b, &http.Client{
-		Transport: &cos.AuthorizationTransport{
-			SecretID:  cosSecretID,
-			SecretKey: cosSecretKey,
-		},
-	})
+	// 注：COS 客户端不再需要，因为现在由浏览器直接上传
+	// 后端只需要提供临时密钥即可
 
 	// 1. 连接到 gRPC 服务器
 	conn, err := grpc.Dial("localhost:9090",
@@ -724,7 +723,8 @@ func TestInterviewProxyServer(t *testing.T) {
 	mux.HandleFunc("/api/interview/stream", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ChatSn   string `json:"chat_sn"`
-			Input    string `json:"input"`
+			Content  string `json:"content"`   // 文本输入
+			AudioURL string `json:"audio_url"` // 音频 URL
 			ConfigId int64  `json:"config_id"`
 			Uid      int64  `json:"uid"`
 		}
@@ -734,14 +734,18 @@ func TestInterviewProxyServer(t *testing.T) {
 			return
 		}
 
-		log.Printf("📥 收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
+		// 优先使用音频 URL，否则使用文本输入
+		userInput := &chatv1.UserInput{
+			Content:  req.Content,
+			AudioUrl: req.AudioURL,
+		}
+
+		log.Printf("📥 收到请求: chat_sn=%s, userInput=%#v", req.ChatSn, userInput)
 
 		// 调用 gRPC StreamV1
 		stream, err := client.StreamV1(context.Background(), &chatv1.StreamV1Request{
-			ChatSn: req.ChatSn,
-			Input: &chatv1.UserInput{
-				Content: req.Input,
-			},
+			ChatSn:             req.ChatSn,
+			Input:              userInput,
 			InvocationConfigId: req.ConfigId,
 			Uid:                req.Uid,
 			Key:                "", // 未使用，传空字符串
@@ -793,165 +797,193 @@ func TestInterviewProxyServer(t *testing.T) {
 		}
 	}))
 
-	// 5. 语音识别接口（上传到 COS + 百炼 qwen3-asr-flash）
-	mux.HandleFunc("/api/audio/transcribe", corsHandler(func(w http.ResponseWriter, r *http.Request) {
-		// 解析 multipart 表单
-		err := r.ParseMultipartForm(32 << 20) // 最大 32MB
-		if err != nil {
-			http.Error(w, fmt.Sprintf("解析表单失败: %v", err), http.StatusBadRequest)
-			return
-		}
+	// 5. COS 临时密钥接口
+	//mux.HandleFunc("/api/cos/temp-credentials", corsHandler(func(w http.ResponseWriter, r *http.Request) {
+	//	log.Printf("🔑 请求 COS 临时密钥")
+	//
+	//	// 使用腾讯云 STS API 获取临时密钥
+	//	// 参考：https://github.com/tencentyun/qcloud-cos-sts-sdk/tree/master/go
+	//
+	//	// 1. 创建 STS 客户端
+	//	stsClient := sts.NewClient(cosSecretID, cosSecretKey, nil)
+	//
+	//	// 2. 配置临时密钥选项
+	//	appid := strings.Split(cosBucket, "-")[len(strings.Split(cosBucket, "-"))-1] // bucket名格式：name-appid
+	//
+	//	opt := &sts.CredentialOptions{
+	//		DurationSeconds: 1800, // 30分钟
+	//		Region:          cosRegion,
+	//		Policy: &sts.CredentialPolicy{
+	//			Statement: []sts.CredentialPolicyStatement{
+	//				{
+	//					Action: []string{
+	//						"cos:PutObject",
+	//						"cos:PostObject",
+	//					},
+	//					Effect: "allow",
+	//					Resource: []string{
+	//						fmt.Sprintf("qcs::cos:%s:uid/%s:%s/audio-temp/*", cosRegion, appid, cosBucket),
+	//					},
+	//				},
+	//			},
+	//		},
+	//	}
+	//
+	//	// 3. 获取临时密钥
+	//	credential, err := stsClient.GetCredential(opt)
+	//	if err != nil {
+	//		log.Printf("❌ 获取临时密钥失败: %v", err)
+	//		http.Error(w, fmt.Sprintf("获取临时密钥失败: %v", err), http.StatusInternalServerError)
+	//		return
+	//	}
+	//
+	//	// 4. 返回给前端
+	//	response := map[string]interface{}{
+	//		"tmpSecretId":  credential.Credentials.TmpSecretID,
+	//		"tmpSecretKey": credential.Credentials.TmpSecretKey,
+	//		"sessionToken": credential.Credentials.SessionToken,
+	//		"startTime":    credential.StartTime,
+	//		"expiredTime":  credential.ExpiredTime,
+	//		"bucket":       cosBucket,
+	//		"region":       cosRegion,
+	//	}
+	//
+	//	log.Printf("✅ 临时密钥已生成: expired_time=%v", credential.ExpiredTime)
+	//
+	//	w.Header().Set("Content-Type", "application/json")
+	//	err = json.NewEncoder(w).Encode(response)
+	//	assert.NoError(t, err)
+	//}))
 
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, fmt.Sprintf("读取文件失败: %v", err), http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
+	// 5. COS 临时密钥接口
+	mux.HandleFunc("/api/cos/temp-credentials", corsHandler(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🔑 请求 COS 临时密钥")
 
-		log.Printf("📤 收到音频文件: %s, 大小: %d 字节", header.Filename, header.Size)
+		// 1. 创建 STS 客户端
+		stsClient := sts.NewClient(cosSecretID, cosSecretKey, nil)
 
-		// 1. 上传到 COS（设置为公共读）
-		// 生成唯一文件名：audio-temp/timestamp_filename.webm
-		timestamp := time.Now().Unix()
-		filename := fmt.Sprintf("audio-temp/%d_%s", timestamp, strings.Replace(header.Filename, " ", "_", -1))
+		// 2. 配置临时密钥选项
+		// Resource 格式有两种：
+		// - 标准格式（推荐）: qcs::cos:{region}:uid/{appid}:{bucket-appid}/{path}
+		// - 简化格式: qcs::cos:{region}::{bucket-appid}/{path}
+		// 从 bucket 名称中提取 appid（格式：bucketname-appid，如 webook-1314583317）
+		parts := strings.Split(cosBucket, "-")
+		appid := parts[len(parts)-1]
 
-		log.Printf("🔄 上传到 COS: %s", filename)
-
-		// 设置上传选项（参考官方示例 Case2）
-		opt := &cos.ObjectPutOptions{
-			ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
-				ContentType: "audio/webm",
-			},
-			ACLHeaderOptions: &cos.ACLHeaderOptions{
-				XCosACL: "public-read", // 设置为公共读
-			},
-		}
-
-		_, err = cosClient.Object.Put(context.Background(), filename, file, opt)
-		if err != nil {
-			log.Printf("❌ COS 上传失败: %v", err)
-			http.Error(w, fmt.Sprintf("上传文件失败: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// 2. 构建 COS 文件的公网访问 URL
-		cosFileURL := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/%s", cosBucket, cosRegion, filename)
-		log.Printf("✅ COS 上传成功: %s", cosFileURL)
-
-		// 3. 调用百炼语音识别 API（异步）
-		// 使用 qwen3-asr-flash：无需申请，直接可用
-		log.Printf("🔄 调用百炼 qwen3-asr-flash 识别（异步）...")
-		transcribeReq := map[string]any{
-			"model": "qwen3-asr-flash", // 支持中文、英文，无需申请即可使用
-			"input": map[string]any{
-				"messages": []map[string]any{
+		opt := &sts.CredentialOptions{
+			DurationSeconds: 1800, // 30分钟
+			Region:          cosRegion,
+			Policy: &sts.CredentialPolicy{
+				Statement: []sts.CredentialPolicyStatement{
 					{
-						"role": "system",
-						"content": []map[string]any{
-							{
-								"text": "请将以下音频文件URL转换为文字：",
-							},
+						Action: []string{
+							"cos:PutObject",
+							"cos:PostObject",
 						},
-					},
-					{
-						"role": "user",
-						"content": []map[string]any{
-							{
-								"audio": cosFileURL,
-							},
+						Effect: "allow",
+						// 标准格式（包含 uid/{appid}）
+						Resource: []string{
+							fmt.Sprintf("qcs::cos:%s:uid/%s:%s/audio-temp/*", cosRegion, appid, cosBucket),
 						},
+						// 如果上面的格式报错，可以尝试简化格式：
+						// Resource: []string{
+						//     fmt.Sprintf("qcs::cos:%s::%s/audio-temp/*", cosRegion, cosBucket),
+						// },
 					},
 				},
 			},
-			"parameters": map[string]any{
-				"asr_options": map[string]any{
-					"enable_itn": true,
-				},
-			},
 		}
 
-		reqBody, _ := json.Marshal(transcribeReq)
-
-		// 构建完整URL（注意：baseURL 可能已经包含 /api/v1）
-		// 如果 baseURL 已经包含 /api/v1，则只拼接 /services/audio/asr/transcription
-		// 否则拼接完整路径 /api/v1/services/audio/asr/transcription
-		var fullURL string
-		if strings.HasSuffix(baseURL, "/api/v1") {
-			fullURL = baseURL + "/services/aigc/multimodal-generation/generation"
-		} else {
-			fullURL = baseURL + "/api/v1/services/aigc/multimodal-generation/generation"
-		}
-
-		log.Printf("📡 请求URL: %s", fullURL)
-		log.Printf("📦 请求体: %s", string(reqBody))
-		log.Printf("🔑 API Key (前10字符): %s...", apiKey[:min(10, len(apiKey))])
-
-		httpReq, err := http.NewRequest("POST", fullURL, bytes.NewReader(reqBody))
+		// 3. 获取临时密钥
+		credential, err := stsClient.GetCredential(opt)
 		if err != nil {
-			log.Printf("❌ 创建请求失败: %v", err)
-			http.Error(w, fmt.Sprintf("创建请求失败: %v", err), http.StatusInternalServerError)
+			log.Printf("❌ 获取临时密钥失败: %v", err)
+			http.Error(w, fmt.Sprintf("获取临时密钥失败: %v", err), http.StatusInternalServerError)
 			return
 		}
 
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-		httpReq.Header.Set("Content-Type", "application/json")
-
-		httpClient := &http.Client{Timeout: 60 * time.Second}
-		resp, err := httpClient.Do(httpReq)
-		if err != nil {
-			log.Printf("❌ 识别请求失败: %v", err)
-			http.Error(w, fmt.Sprintf("识别请求失败: %v", err), http.StatusInternalServerError)
-			return
-		}
-		defer resp.Body.Close()
-
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("❌ 读取响应失败: %v", err)
-			http.Error(w, fmt.Sprintf("读取响应失败: %v", err), http.StatusInternalServerError)
-			return
+		// 4. 返回给前端
+		response := map[string]interface{}{
+			"tmpSecretId":  credential.Credentials.TmpSecretID,
+			"tmpSecretKey": credential.Credentials.TmpSecretKey,
+			"sessionToken": credential.Credentials.SessionToken,
+			"startTime":    credential.StartTime,
+			"expiredTime":  credential.ExpiredTime,
+			"bucket":       cosBucket,
+			"region":       cosRegion,
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("❌ 提交任务失败: HTTP %d, 响应: %s", resp.StatusCode, string(respBody))
-			http.Error(w, fmt.Sprintf("提交任务失败: %s", string(respBody)), resp.StatusCode)
-			return
-		}
+		log.Printf("✅ 临时密钥已生成: expired_time=%v", credential.ExpiredTime)
 
-		// 4. 解析文本
-		var submitResp struct {
-			Output struct {
-				Choices []struct {
-					Message struct {
-						Content []struct {
-							Text string `json:"text"`
-						} `json:"content"`
-					} `json:"message"`
-				} `json:"choices"`
-			} `json:"output"`
-		}
-
-		err = json.Unmarshal(respBody, &submitResp)
-		if err != nil || len(submitResp.Output.Choices) == 0 || len(submitResp.Output.Choices[0].Message.Content) == 0 {
-			log.Printf("❌ 解析任务ID失败: %v, 原始响应: %s", err, string(respBody))
-			http.Error(w, "解析任务ID失败", http.StatusInternalServerError)
-			return
-		}
-
-		transcribedText := submitResp.Output.Choices[0].Message.Content[0].Text
-		log.Printf("✅ 识别成功: %s", transcribedText)
-
-		// 5. 返回结果给前端
 		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(map[string]string{
-			"text":    transcribedText,
-			"cos_url": cosFileURL,
-		})
-		assert.NoError(t, err)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("❌ 编码响应失败: %v", err)
+		}
 	}))
 
-	// 6. 健康检查
+	//// 6. 上传音频到 COS 接口
+	//mux.HandleFunc("/api/upload-audio", corsHandler(func(w http.ResponseWriter, r *http.Request) {
+	//	// 解析 multipart 表单
+	//	err := r.ParseMultipartForm(32 << 20) // 最大 32MB
+	//	if err != nil {
+	//		http.Error(w, fmt.Sprintf("解析表单失败: %v", err), http.StatusBadRequest)
+	//		return
+	//	}
+	//
+	//	file, header, err := r.FormFile("file")
+	//	if err != nil {
+	//		http.Error(w, fmt.Sprintf("读取文件失败: %v", err), http.StatusBadRequest)
+	//		return
+	//	}
+	//	defer file.Close()
+	//
+	//	log.Printf("📤 收到音频文件: %s, 大小: %d 字节", header.Filename, header.Size)
+	//
+	//	// 上传到 COS
+	//	timestamp := time.Now().Unix()
+	//	filename := fmt.Sprintf("audio-temp/%d_%s", timestamp, strings.Replace(header.Filename, " ", "_", -1))
+	//
+	//	log.Printf("🔄 上传到 COS: %s", filename)
+	//
+	//	// 初始化 COS 客户端（需要导入 github.com/tencentyun/cos-go-sdk-v5）
+	//	u, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", cosBucket, cosRegion))
+	//	b := &cos.BaseURL{BucketURL: u}
+	//	cosClient := cos.NewClient(b, &http.Client{
+	//		Transport: &cos.AuthorizationTransport{
+	//			SecretID:  cosSecretID,
+	//			SecretKey: cosSecretKey,
+	//		},
+	//	})
+	//
+	//	opt := &cos.ObjectPutOptions{
+	//		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
+	//			ContentType: "audio/webm",
+	//		},
+	//		ACLHeaderOptions: &cos.ACLHeaderOptions{
+	//			XCosACL: "public-read",
+	//		},
+	//	}
+	//
+	//	_, err = cosClient.Object.Put(context.Background(), filename, file, opt)
+	//	if err != nil {
+	//		log.Printf("❌ COS 上传失败: %v", err)
+	//		http.Error(w, fmt.Sprintf("上传文件失败: %v", err), http.StatusInternalServerError)
+	//		return
+	//	}
+	//
+	//	// 构建 COS 文件的公网访问 URL
+	//	cosFileURL := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/%s", cosBucket, cosRegion, filename)
+	//	log.Printf("✅ COS 上传成功: %s", cosFileURL)
+	//
+	//	// 返回 URL
+	//	w.Header().Set("Content-Type", "application/json")
+	//	err = json.NewEncoder(w).Encode(map[string]string{
+	//		"url": cosFileURL,
+	//	})
+	//	assert.NoError(t, err)
+	//}))
+
+	// 7. 健康检查
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(map[string]string{
@@ -966,8 +998,8 @@ func TestInterviewProxyServer(t *testing.T) {
 	log.Println("📡 转发目标: localhost:9090 (gRPC)")
 	log.Println("📍 端点:")
 	log.Println("   - POST /api/interview/chat/create  (创建会话)")
-	log.Println("   - POST /api/interview/stream        (流式面试)")
-	log.Println("   - POST /api/audio/transcribe        (语音识别: COS + qwen3-asr-flash)")
+	log.Println("   - POST /api/interview/stream        (流式面试，支持音频URL)")
+	log.Println("   - GET  /api/cos/temp-credentials    (获取COS临时密钥)")
 	log.Println("   - GET  /health                      (健康检查)")
 	log.Println("💡 按 Ctrl+C 停止服务器")
 	log.Println("---")

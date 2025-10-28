@@ -31,7 +31,7 @@ import (
 func InitDB() *gorm.DB {
 	dsn := os.Getenv("TEST_MYSQL_DSN")
 	if dsn == "" {
-		dsn = "root:root@tcp(localhost:13306)/ai_gateway_platform"
+		dsn = "root:root@tcp(localhost:23306)/ai_gateway_platform"
 	}
 	log.Print("测试 MySQL：" + dsn)
 	WaitForDBSetup(dsn)

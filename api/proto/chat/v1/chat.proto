@@ -77,8 +77,12 @@ message Usage {
 }
 
 message UserInput {
+  // 文本输入
   string content = 1;
-  repeated string files = 2;
+  // 音频文件 URL（会转写为文本并追加到 content 后）
+  string audio_url = 2;
+  // 其他附件
+  repeated string files = 3;
 }
 
 // Error 后续要考虑引入错误码？
