@@ -619,7 +619,7 @@ func initStreamHandler(
 }
 
 // TestInterviewProxyServer 启动 HTTP → gRPC 代理服务器
-// 端口: 8080
+// 端口: 8081
 // 功能: 将前端 HTTP 请求转换为 gRPC 调用，并将 gRPC 流式响应转换为 SSE
 func TestInterviewProxyServer(t *testing.T) {
 	// 0. 读取环境变量
@@ -994,7 +994,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	log.Println("🚀 HTTP 代理服务器启动于 :8080")
+	log.Println("🚀 HTTP 代理服务器启动于 :8081 (避免与 webook 端口冲突)")
 	log.Println("📡 转发目标: localhost:9090 (gRPC)")
 	log.Println("📍 端点:")
 	log.Println("   - POST /api/interview/chat/create  (创建会话)")
@@ -1004,7 +1004,7 @@ func TestInterviewProxyServer(t *testing.T) {
 	log.Println("💡 按 Ctrl+C 停止服务器")
 	log.Println("---")
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8081", mux); err != nil {
 		t.Fatalf("HTTP 服务器启动失败: %v", err)
 	}
 }
