@@ -619,7 +619,7 @@ func initStreamHandler(
 }
 
 // TestInterviewProxyServer 启动 HTTP → gRPC 代理服务器
-// 端口: 8080
+// 端口: 8081
 // 功能: 将前端 HTTP 请求转换为 gRPC 调用，并将 gRPC 流式响应转换为 SSE
 func TestInterviewProxyServer(t *testing.T) {
 	// 0. 读取环境变量
@@ -798,64 +798,6 @@ func TestInterviewProxyServer(t *testing.T) {
 	}))
 
 	// 5. COS 临时密钥接口
-	//mux.HandleFunc("/api/cos/temp-credentials", corsHandler(func(w http.ResponseWriter, r *http.Request) {
-	//	log.Printf("🔑 请求 COS 临时密钥")
-	//
-	//	// 使用腾讯云 STS API 获取临时密钥
-	//	// 参考：https://github.com/tencentyun/qcloud-cos-sts-sdk/tree/master/go
-	//
-	//	// 1. 创建 STS 客户端
-	//	stsClient := sts.NewClient(cosSecretID, cosSecretKey, nil)
-	//
-	//	// 2. 配置临时密钥选项
-	//	appid := strings.Split(cosBucket, "-")[len(strings.Split(cosBucket, "-"))-1] // bucket名格式：name-appid
-	//
-	//	opt := &sts.CredentialOptions{
-	//		DurationSeconds: 1800, // 30分钟
-	//		Region:          cosRegion,
-	//		Policy: &sts.CredentialPolicy{
-	//			Statement: []sts.CredentialPolicyStatement{
-	//				{
-	//					Action: []string{
-	//						"cos:PutObject",
-	//						"cos:PostObject",
-	//					},
-	//					Effect: "allow",
-	//					Resource: []string{
-	//						fmt.Sprintf("qcs::cos:%s:uid/%s:%s/audio-temp/*", cosRegion, appid, cosBucket),
-	//					},
-	//				},
-	//			},
-	//		},
-	//	}
-	//
-	//	// 3. 获取临时密钥
-	//	credential, err := stsClient.GetCredential(opt)
-	//	if err != nil {
-	//		log.Printf("❌ 获取临时密钥失败: %v", err)
-	//		http.Error(w, fmt.Sprintf("获取临时密钥失败: %v", err), http.StatusInternalServerError)
-	//		return
-	//	}
-	//
-	//	// 4. 返回给前端
-	//	response := map[string]interface{}{
-	//		"tmpSecretId":  credential.Credentials.TmpSecretID,
-	//		"tmpSecretKey": credential.Credentials.TmpSecretKey,
-	//		"sessionToken": credential.Credentials.SessionToken,
-	//		"startTime":    credential.StartTime,
-	//		"expiredTime":  credential.ExpiredTime,
-	//		"bucket":       cosBucket,
-	//		"region":       cosRegion,
-	//	}
-	//
-	//	log.Printf("✅ 临时密钥已生成: expired_time=%v", credential.ExpiredTime)
-	//
-	//	w.Header().Set("Content-Type", "application/json")
-	//	err = json.NewEncoder(w).Encode(response)
-	//	assert.NoError(t, err)
-	//}))
-
-	// 5. COS 临时密钥接口
 	mux.HandleFunc("/api/cos/temp-credentials", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🔑 请求 COS 临时密钥")
 
@@ -921,68 +863,6 @@ func TestInterviewProxyServer(t *testing.T) {
 		}
 	}))
 
-	//// 6. 上传音频到 COS 接口
-	//mux.HandleFunc("/api/upload-audio", corsHandler(func(w http.ResponseWriter, r *http.Request) {
-	//	// 解析 multipart 表单
-	//	err := r.ParseMultipartForm(32 << 20) // 最大 32MB
-	//	if err != nil {
-	//		http.Error(w, fmt.Sprintf("解析表单失败: %v", err), http.StatusBadRequest)
-	//		return
-	//	}
-	//
-	//	file, header, err := r.FormFile("file")
-	//	if err != nil {
-	//		http.Error(w, fmt.Sprintf("读取文件失败: %v", err), http.StatusBadRequest)
-	//		return
-	//	}
-	//	defer file.Close()
-	//
-	//	log.Printf("📤 收到音频文件: %s, 大小: %d 字节", header.Filename, header.Size)
-	//
-	//	// 上传到 COS
-	//	timestamp := time.Now().Unix()
-	//	filename := fmt.Sprintf("audio-temp/%d_%s", timestamp, strings.Replace(header.Filename, " ", "_", -1))
-	//
-	//	log.Printf("🔄 上传到 COS: %s", filename)
-	//
-	//	// 初始化 COS 客户端（需要导入 github.com/tencentyun/cos-go-sdk-v5）
-	//	u, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", cosBucket, cosRegion))
-	//	b := &cos.BaseURL{BucketURL: u}
-	//	cosClient := cos.NewClient(b, &http.Client{
-	//		Transport: &cos.AuthorizationTransport{
-	//			SecretID:  cosSecretID,
-	//			SecretKey: cosSecretKey,
-	//		},
-	//	})
-	//
-	//	opt := &cos.ObjectPutOptions{
-	//		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
-	//			ContentType: "audio/webm",
-	//		},
-	//		ACLHeaderOptions: &cos.ACLHeaderOptions{
-	//			XCosACL: "public-read",
-	//		},
-	//	}
-	//
-	//	_, err = cosClient.Object.Put(context.Background(), filename, file, opt)
-	//	if err != nil {
-	//		log.Printf("❌ COS 上传失败: %v", err)
-	//		http.Error(w, fmt.Sprintf("上传文件失败: %v", err), http.StatusInternalServerError)
-	//		return
-	//	}
-	//
-	//	// 构建 COS 文件的公网访问 URL
-	//	cosFileURL := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/%s", cosBucket, cosRegion, filename)
-	//	log.Printf("✅ COS 上传成功: %s", cosFileURL)
-	//
-	//	// 返回 URL
-	//	w.Header().Set("Content-Type", "application/json")
-	//	err = json.NewEncoder(w).Encode(map[string]string{
-	//		"url": cosFileURL,
-	//	})
-	//	assert.NoError(t, err)
-	//}))
-
 	// 7. 健康检查
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -994,7 +874,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	log.Println("🚀 HTTP 代理服务器启动于 :8080")
+	log.Println("🚀 HTTP 代理服务器启动于 :8081 (避免与 webook 端口冲突)")
 	log.Println("📡 转发目标: localhost:9090 (gRPC)")
 	log.Println("📍 端点:")
 	log.Println("   - POST /api/interview/chat/create  (创建会话)")
@@ -1004,7 +884,7 @@ func TestInterviewProxyServer(t *testing.T) {
 	log.Println("💡 按 Ctrl+C 停止服务器")
 	log.Println("---")
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8081", mux); err != nil {
 		t.Fatalf("HTTP 服务器启动失败: %v", err)
 	}
 }

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
-    <title>程序员模拟面试 · 百炼版 (Assistant API + Paraformer-v2)</title>
+    <title>程序员模拟面试 · 百炼版 (Assistant API + qwen3-asr-flash)</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; color: #1f2328; background: #f6f8fa; }
@@ -37,13 +37,14 @@
 <body>
 
 <div class="info">
-    ✅ <strong>百炼版本 (Assistant API + Paraformer-v2)</strong>：
-    使用百炼 <code>paraformer-v2</code> 转写音频（无需申请，直接可用，通过腾讯 COS），
-    然后通过 <code>ai-gateway-go</code> 的 gRPC StreamV1 接口处理面试逻辑（百炼 Assistant API）。
+    ✅ <strong>百炼版本 (Assistant API + qwen3-asr-flash)</strong>：
+    使用百炼 <code>qwen3-asr-flash</code> 转写音频，
+    然后通过 <code>TestInterviewProxyServer</code> 转发到 <code>ai-gateway-go</code> 的 gRPC StreamV1 接口处理面试逻辑（百炼 Assistant API）。
+    <br/>📍 端口: 8081 (TestInterviewProxyServer)
 </div>
 
 <h1>程序员模拟面试 · 百炼版</h1>
-<p class="muted">流程：开始面试 → 播报题目 → 录音 → paraformer-v2转写 → StreamV1评分 → 循环 → 结束总结</p>
+<p class="muted">流程：开始面试 → 播报题目 → 录音 → qwen3-asr-flash转写 → StreamV1评分 → 循环 → 结束总结</p>
 
 <div class="row">
     <div class="card">
@@ -89,7 +90,7 @@
 
 <script>
     // ========== 配置 ==========
-    const INTERVIEW_API = 'http://localhost:8080';    // 面试流程 API（HTTP→gRPC 代理 + 语音识别）
+    const INTERVIEW_API = 'http://localhost:8081';    // TestInterviewProxyServer 端口
     const INVOCATION_CONFIG_ID = 100001;              // InvocationConfig ID
     
     // ========== 腾讯 COS 配置（请手动填写）==========
