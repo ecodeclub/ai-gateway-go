@@ -310,10 +310,8 @@ type UserInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 文本输入
 	Content string `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
-	// 音频文件 URL（会转写为文本并追加到 content 后）
-	AudioUrl string `protobuf:"bytes,2,opt,name=audio_url,json=audioUrl,proto3" json:"audio_url,omitempty"`
-	// 其他附件
-	Files         []string `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
+	// 就是 URL
+	Files         []string `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -351,13 +349,6 @@ func (*UserInput) Descriptor() ([]byte, []int) {
 func (x *UserInput) GetContent() string {
 	if x != nil {
 		return x.Content
-	}
-	return ""
-}
-
-func (x *UserInput) GetAudioUrl() string {
-	if x != nil {
-		return x.AudioUrl
 	}
 	return ""
 }
@@ -1011,11 +1002,10 @@ const file_chat_v1_chat_proto_rawDesc = "" +
 	"\x05Usage\x12!\n" +
 	"\finput_tokens\x18\x01 \x01(\x03R\vinputTokens\x12#\n" +
 	"\routput_tokens\x18\x02 \x01(\x03R\foutputTokens\x12!\n" +
-	"\ftotal_tokens\x18\x03 \x01(\x03R\vtotalTokens\"X\n" +
+	"\ftotal_tokens\x18\x03 \x01(\x03R\vtotalTokens\";\n" +
 	"\tUserInput\x12\x18\n" +
-	"\acontent\x18\x01 \x01(\tR\acontent\x12\x1b\n" +
-	"\taudio_url\x18\x02 \x01(\tR\baudioUrl\x12\x14\n" +
-	"\x05files\x18\x03 \x03(\tR\x05files\"!\n" +
+	"\acontent\x18\x01 \x01(\tR\acontent\x12\x14\n" +
+	"\x05files\x18\x02 \x03(\tR\x05files\"!\n" +
 	"\x05Error\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\":\n" +
 	"\n" +
