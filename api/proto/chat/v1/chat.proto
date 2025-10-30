@@ -17,23 +17,6 @@ package chat.v1;
 
 option go_package = "v1/chat;chatv1";
 
-message StreamRequest {
-  string sn = 1;
-  Message msg = 2;
-  int64 invocation_config_id = 3;
-  int64 uid = 4;
-  string key = 5;
-  string previous_response_id = 6;
-}
-
-message StreamResponse {
-  bool final = 1;
-  string reasoning_content = 2;
-  string content = 3;
-  string err = 4;
-  string id = 5;
-}
-
 service Service {
   // 这部分是增删改查
   rpc List(ListRequest) returns (ListResponse);
@@ -41,14 +24,11 @@ service Service {
   // 会更新传入过来的字段，没有传递的字段将会被忽略
   // 如果没有对应的 SN，则会执行创建的语义
   rpc Save(SaveRequest) returns (SaveResponse);
-  // 这部分是真的发起会话
-  // Stream 是采用流式接口发起一轮对话
-  rpc Stream(StreamRequest) returns (stream StreamResponse);
 
-  rpc StreamV1(StreamV1Request) returns (stream StreamV1Response);
+  rpc Stream(StreamRequest) returns (stream StreamResponse);
 }
 
-message StreamV1Request {
+message StreamRequest {
   string chat_sn = 1;
   // 这必然是用户的输入
   UserInput input = 2;
@@ -58,7 +38,7 @@ message StreamV1Request {
   string key = 5;
 }
 
-message StreamV1Response {
+message StreamResponse {
   // 这边采用
   oneof event {
     Delta delta = 1;
@@ -78,6 +58,7 @@ message Usage {
 
 message UserInput {
   string content = 1;
+  // 就是 URL
   repeated string files = 2;
 }
 
@@ -102,6 +83,8 @@ message Delta {
 
 message SaveRequest {
   Chat chat = 1;
+  // 挂载在哪一个 biz 下。biz 决定了编排
+  int64 biz_id = 2;
 }
 
 message SaveResponse {

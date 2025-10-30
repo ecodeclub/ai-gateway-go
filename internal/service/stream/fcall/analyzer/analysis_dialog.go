@@ -40,7 +40,7 @@ func (a *AnalysisDialogFCall) Call(ctx *domain.StreamContext, req fcall.Request)
 	if anaReq.Title != "" {
 		go func() {
 			// 输出一个 title 变更
-			err1 := ctx.Sender.Send(domain.StreamEventV1{
+			err1 := ctx.Sender.Send(domain.StreamEvent{
 				StepUpdate: &domain.StepUpdate{
 					Title: anaReq.Title,
 				},
@@ -52,7 +52,7 @@ func (a *AnalysisDialogFCall) Call(ctx *domain.StreamContext, req fcall.Request)
 	}
 
 	return fcall.Response{
-		NextInvCfgID: anaReq.NextInvCfgID,
+		NextState: anaReq.State,
 	}, err
 }
 
@@ -63,7 +63,6 @@ func NewAnalysisDialogFCall() *AnalysisDialogFCall {
 
 type AnalysisDialogRequest struct {
 	Title string `json:"title"`
-	// 识别出来用户想要干什么
-	Intent       string `json:"intent"`
-	NextInvCfgID int64  `json:"nextInvCfgID"`
+	// 识别出来当前多轮对话已经到了什么状态
+	State string `json:"state"`
 }

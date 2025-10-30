@@ -21,19 +21,19 @@ import (
 )
 
 type StreamEventGRPCSender struct {
-	server ai.Service_StreamV1Server
+	server ai.Service_StreamServer
 	logger *elog.Component
 }
 
-func (sender *StreamEventGRPCSender) Send(evt domain.StreamEventV1) error {
+func (sender *StreamEventGRPCSender) Send(evt domain.StreamEvent) error {
 	switch {
 	case evt.Delta != nil:
-		return sender.server.Send(&ai.StreamV1Response{
-			Event: &ai.StreamV1Response_Delta{Delta: &ai.Delta{Content: evt.Delta.Content}},
+		return sender.server.Send(&ai.StreamResponse{
+			Event: &ai.StreamResponse_Delta{Delta: &ai.Delta{Content: evt.Delta.Content}},
 		})
 	case evt.Usage != nil:
-		return sender.server.Send(&ai.StreamV1Response{
-			Event: &ai.StreamV1Response_Usage{
+		return sender.server.Send(&ai.StreamResponse{
+			Event: &ai.StreamResponse_Usage{
 				Usage: &ai.Usage{
 					InputTokens:  evt.Usage.InputTokens,
 					OutputTokens: evt.Usage.OutputTokens,
@@ -43,15 +43,15 @@ func (sender *StreamEventGRPCSender) Send(evt domain.StreamEventV1) error {
 		})
 
 	case evt.StepUpdate != nil:
-		return sender.server.Send(&ai.StreamV1Response{
-			Event: &ai.StreamV1Response_StepUpdate{StepUpdate: &ai.StepUpdate{
+		return sender.server.Send(&ai.StreamResponse{
+			Event: &ai.StreamResponse_StepUpdate{StepUpdate: &ai.StepUpdate{
 				Name:    evt.StepUpdate.Title,
 				Summary: evt.StepUpdate.Summary,
 			}},
 		})
 	case evt.Err != nil:
-		return sender.server.Send(&ai.StreamV1Response{
-			Event: &ai.StreamV1Response_Error{
+		return sender.server.Send(&ai.StreamResponse{
+			Event: &ai.StreamResponse_Error{
 				Error: &ai.Error{
 					Message: evt.Err.Error(),
 				},
@@ -60,8 +60,8 @@ func (sender *StreamEventGRPCSender) Send(evt domain.StreamEventV1) error {
 	default:
 		msg := "未知的事件发生"
 		sender.logger.Error(msg, elog.Any("evt", evt))
-		return sender.server.Send(&ai.StreamV1Response{
-			Event: &ai.StreamV1Response_Error{
+		return sender.server.Send(&ai.StreamResponse{
+			Event: &ai.StreamResponse_Error{
 				Error: &ai.Error{
 					Message: msg,
 				},

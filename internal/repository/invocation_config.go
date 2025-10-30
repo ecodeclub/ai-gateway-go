@@ -87,14 +87,6 @@ func (p *InvocationConfigRepo) SaveVersion(ctx context.Context, version domain.I
 }
 
 func (p *InvocationConfigRepo) toVersionEntity(src domain.InvocationConfigVersion) dao.InvocationConfigVersion {
-	var attributes sql.Null[string]
-	if src.Attributes != nil {
-		attrBytes, _ := json.Marshal(src.Attributes)
-		attributes = sql.Null[string]{
-			V:     string(attrBytes),
-			Valid: true,
-		}
-	}
 	var functions sql.Null[string]
 	if src.Functions != nil {
 		funcBytes, _ := json.Marshal(src.Functions)
@@ -110,7 +102,7 @@ func (p *InvocationConfigRepo) toVersionEntity(src domain.InvocationConfigVersio
 		Version:      src.Version,
 		Prompt:       src.Prompt,
 		SystemPrompt: src.SystemPrompt,
-		Attributes:   attributes,
+		Independent:  src.Independent,
 		Functions:    functions,
 		Temperature:  src.Temperature,
 		TopP:         src.TopP,
@@ -129,10 +121,6 @@ func (p *InvocationConfigRepo) ListVersions(ctx context.Context, invID int64, of
 }
 
 func (p *InvocationConfigRepo) toDomainVersion(v dao.InvocationConfigVersion) domain.InvocationConfigVersion {
-	var attributes map[string]any
-	if v.Attributes.Valid {
-		_ = json.Unmarshal([]byte(v.Attributes.V), &attributes)
-	}
 	var functions []domain.Function
 	if v.Functions.Valid {
 		_ = json.Unmarshal([]byte(v.Functions.V), &functions)
@@ -144,7 +132,7 @@ func (p *InvocationConfigRepo) toDomainVersion(v dao.InvocationConfigVersion) do
 		Version:      v.Version,
 		Prompt:       v.Prompt,
 		SystemPrompt: v.SystemPrompt,
-		Attributes:   attributes,
+		Independent:  v.Independent,
 		Functions:    functions,
 		Temperature:  v.Temperature,
 		TopP:         v.TopP,

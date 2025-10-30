@@ -35,29 +35,29 @@ func NewHandler() *Handler {
 	return &Handler{}
 }
 
-func (h *Handler) Stream(ctx *domain.StreamContext) error {
+func (h *Handler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
 	prompt, err := h.renderUserPrompt(ctx)
 	if err != nil {
-		return err
+		return stream.Response{}, err
 	}
-	turn := ctx.Chat.LastTurn()
-	llmData := turn.AssistantRun.LastStep().LLMData()
-	llmData.RenderedUserPrompt = prompt
+	turn := ctx.Chat.CurrentTurn()
+	step := turn.AssistantRun.CurrentStep()
+	step.RenderedUserPrompt = prompt
 	return h.Next.Stream(ctx)
 }
 
 func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
-	assistant := ctx.Chat.LastTurn().AssistantRun
-	stepData := assistant.LastStep().LLMData()
+	assistant := ctx.Chat.CurrentTurn().AssistantRun
+	step := assistant.CurrentStep()
 	// 暂时不用缓存，测试的时候我经常会直接修改数据库数据
-	name := fmt.Sprintf("user-%d", stepData.Cfg.ID)
+	name := fmt.Sprintf("user-%d", step.Cfg.ID)
 	tpl := template.New(name)
-	tpl, err := tpl.Parse(stepData.Cfg.Prompt)
+	tpl, err := tpl.Parse(step.Cfg.Prompt)
 	if err != nil {
 		return "", err
 	}
 	var buffer bytes.Buffer
-	err = tpl.Execute(&buffer, ctx.Chat.CombinedVars())
+	err = tpl.Execute(&buffer, ctx.Chat.Vars)
 	return buffer.String(), err
 }
 

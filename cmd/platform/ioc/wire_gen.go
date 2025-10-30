@@ -13,8 +13,11 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/orchestrator"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/multifunc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/rawoutput"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
@@ -44,7 +47,8 @@ func InitApp() *App {
 	registry := fcall.NewFunctionCallRegistry()
 	openaiHandler := InitOpenAIHandler(registry)
 	streamHandler := InitStreamHandler(rebuildContextHandler, handler, storeHandler, openaiHandler)
-	chatServer := grpc.NewChatServer(chatService, streamHandler)
+	orchestratorOrchestrator := orchestrator.NewOrchestrator(streamHandler)
+	chatServer := grpc.NewChatServer(chatService, orchestratorOrchestrator)
 	component := InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
@@ -56,14 +60,17 @@ func InitApp() *App {
 	bizConfigHandler := admin.NewBizConfigHandler(bizConfigService)
 	providerHandler := admin.NewProviderHandler(providerService)
 	eginComponent := InitGin(provider, mockHandler, invocationConfigHandler, bizConfigHandler, providerHandler)
+	fCall := multifunc.NewFCall()
+	rawoutputFCall := rawoutput.NewFCall()
 	rag := InitKBaseRAG()
 	analysisDialogFCall := analyzer.NewAnalysisDialogFCall()
-	fCall := savedoc.NewFCall()
-	v := InitFuncCall(rag, analysisDialogFCall, fCall)
+	savedocFCall := savedoc.NewFCall()
+	v := InitFuncCall(rawoutputFCall, rag, analysisDialogFCall, savedocFCall, fCall)
 	app := &App{
 		GrpcSever: component,
 		GinServer: eginComponent,
 		Registry:  registry,
+		MultiFC:   fCall,
 		FCalls:    v,
 	}
 	return app

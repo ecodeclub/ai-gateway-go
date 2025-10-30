@@ -44,17 +44,17 @@ func NewLoadConfigHandler(
 }
 
 // Stream 是否移动到 service 会更好？
-func (r *RebuildContextHandler) Stream(ctx *domain.StreamContext) error {
-	stepData := ctx.Chat.LastTurn().AssistantRun.LastStep().LLMData()
-	cfg, err := r.cfgRepo.GetActiveVersionByID(ctx.Ctx, stepData.CfgID)
+func (r *RebuildContextHandler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
+	step := ctx.Chat.CurrentTurn().AssistantRun.CurrentStep()
+	cfg, err := r.cfgRepo.GetActiveVersionByID(ctx.Ctx, step.Thread.CfgID)
 	if err != nil {
-		return err
+		return stream.Response{}, err
 	}
 	model, err := r.priRepo.GetModel(ctx.Ctx, cfg.Model.ID)
 	cfg.Model = model
-	stepData.Cfg = cfg
+	step.Cfg = cfg
 	if err != nil {
-		return err
+		return stream.Response{}, err
 	}
 	return r.Next.Stream(ctx)
 }

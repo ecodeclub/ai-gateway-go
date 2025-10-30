@@ -14,15 +14,17 @@
 
 package domain
 
-import "time"
+// Thread 是一个抽象概念，它代表的是我在一个对话里面
+// 为了处理用户的输入，而引入的不同处理方式/步骤等
+type Thread struct {
+	// CfgID 从设计上来说，应该不止一个 CfgID，但是目前只有一个
+	CfgID        int64
+	Conversation *LLMConversation
+}
 
-type BizConfig struct {
-	ID        int64
-	Name      string
-	OwnerID   int64
-	OwnerType string // "user" or "organization"
-	Config    string // JSON string
-	Ctime     time.Time
-	Utime     time.Time
-	// 这里先固定写死，试试效果
+func NewThread(cid int64) *Thread {
+	return &Thread{
+		CfgID:        cid,
+		Conversation: &LLMConversation{},
+	}
 }

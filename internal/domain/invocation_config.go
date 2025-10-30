@@ -67,7 +67,7 @@ type InvocationConfigVersion struct {
 	Version      string
 	Prompt       string
 	SystemPrompt string
-	Attributes   Attributes
+	Independent  bool
 	Functions    []Function
 	Temperature  float32
 	TopP         float32

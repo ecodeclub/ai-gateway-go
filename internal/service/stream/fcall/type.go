@@ -35,6 +35,6 @@ type Response struct {
 	// 返回给大模型的数据，目前只考虑返回 string
 	Content string
 
-	// 需要执行下一步调用
-	NextInvCfgID int64
+	// 下一个状态
+	NextState string
 }
