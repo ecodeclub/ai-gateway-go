@@ -57,6 +57,7 @@ message Usage {
 }
 
 message UserInput {
+  // 文本输入
   string content = 1;
   // 就是 URL
   repeated string files = 2;

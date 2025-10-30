@@ -95,8 +95,9 @@ func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamSer
 
 	turn := &domain.Turn{
 		UserRun: &domain.UserRun{
-			Content: request.Input.Content,
-			Files:   request.Input.Files,
+			Content:  request.Input.Content,
+			AudioURL: request.Input.AudioUrl,
+			Files:    request.Input.Files,
 		},
 		AssistantRun: &domain.AssistantRun{
 			// 构建当前的步骤，一般来说步骤不会超过 4 个

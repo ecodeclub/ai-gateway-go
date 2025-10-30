@@ -98,7 +98,7 @@ func (p *InvocationConfigDAO) SaveVersion(ctx context.Context, version Invocatio
 			"version",
 			"prompt",
 			"system_prompt",
-			"json_schema",
+			//"json_schema",
 			"attributes",
 			"functions",
 			"temperature",
