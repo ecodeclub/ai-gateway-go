@@ -35,7 +35,7 @@ func (vo InvocationConfigVO) toDomain() domain.InvocationConfig {
 	return domain.InvocationConfig{
 		ID:   vo.ID,
 		Name: vo.Name,
-		Biz: domain.BizConfig{
+		Biz: domain.Biz{
 			ID: vo.BizID,
 		},
 		Description: vo.Description,

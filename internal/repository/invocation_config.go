@@ -61,7 +61,7 @@ func (p *InvocationConfigRepo) toDomain(cfg dao.InvocationConfig) domain.Invocat
 	return domain.InvocationConfig{
 		ID:   cfg.ID,
 		Name: cfg.Name,
-		Biz: domain.BizConfig{
+		Biz: domain.Biz{
 			ID: cfg.BizID,
 		},
 		Description: cfg.Description,

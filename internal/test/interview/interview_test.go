@@ -160,20 +160,20 @@ func TestGrpcServer(t *testing.T) {
 	}
 	log.Printf("   ✓ 创建 Model: gpt-5 (ID: %d)", modelID)
 
-	// 4.3 创建 BizConfig
+	// 4.3 创建 Biz
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizRepo := repository.NewBizConfigRepository(bizConfigDAO)
 	bizSvc := service.NewBizConfigService(bizRepo)
 
-	bizID, err := bizSvc.Save(ctx, domain.BizConfig{
+	bizID, err := bizSvc.Save(ctx, domain.Biz{
 		Name:      "面试测试",
 		OwnerID:   1,
 		OwnerType: "user",
 	})
 	if err != nil {
-		t.Fatalf("创建 BizConfig 失败: %v", err)
+		t.Fatalf("创建 Biz 失败: %v", err)
 	}
-	log.Printf("   ✓ 创建 BizConfig: 面试测试 (ID: %d)", bizID)
+	log.Printf("   ✓ 创建 Biz: 面试测试 (ID: %d)", bizID)
 
 	// 4.4 创建 InvocationConfig
 	invSvc := service.NewInvocationConfigService(invConfigRepo, bizRepo, providerRepo)
@@ -181,7 +181,7 @@ func TestGrpcServer(t *testing.T) {
 	cfgID, err := invSvc.Save(ctx, domain.InvocationConfig{
 		ID:          100001,
 		Name:        "MySQL模拟面试助手",
-		Biz:         domain.BizConfig{ID: bizID},
+		Biz:         domain.Biz{ID: bizID},
 		Description: "用于MySQL模拟面试的配置",
 	})
 	if err != nil {
@@ -565,7 +565,7 @@ func TestGrpcServer(t *testing.T) {
 		log.Println("\n🧹 清理测试数据...")
 		db.Delete(&dao.InvocationConfigVersion{}, versionID)
 		db.Delete(&dao.InvocationConfig{}, cfgID)
-		db.Delete(&dao.BizConfig{}, bizID)
+		db.Delete(&dao.Biz{}, bizID)
 		db.Delete(&dao.Model{}, modelID)
 		db.Delete(&dao.Provider{}, providerID)
 		log.Println("   ✓ 测试数据已清理")

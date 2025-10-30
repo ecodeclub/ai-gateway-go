@@ -42,10 +42,10 @@ func (m *MockBizConfigService) EXPECT() *MockBizConfigServiceMockRecorder {
 }
 
 // Save mocks base method.
-func (m *MockBizConfigService) Save(ctx context.Context, config domain.BizConfig) (domain.BizConfig, error) {
+func (m *MockBizConfigService) Save(ctx context.Context, config domain.Biz) (domain.Biz, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Save", ctx, config)
-	ret0, _ := ret[0].(domain.BizConfig)
+	ret0, _ := ret[0].(domain.Biz)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -71,10 +71,10 @@ func (mr *MockBizConfigServiceMockRecorder) Delete(ctx, id any) *gomock.Call {
 }
 
 // GetByID mocks base method.
-func (m *MockBizConfigService) GetByID(ctx context.Context, id int64) (domain.BizConfig, error) {
+func (m *MockBizConfigService) GetByID(ctx context.Context, id int64) (domain.Biz, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Detail", ctx, id)
-	ret0, _ := ret[0].(domain.BizConfig)
+	ret0, _ := ret[0].(domain.Biz)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -86,7 +86,7 @@ func (mr *MockBizConfigServiceMockRecorder) GetByID(ctx, id any) *gomock.Call {
 }
 
 // Update mocks base method.
-func (m *MockBizConfigService) Update(ctx context.Context, config domain.BizConfig) error {
+func (m *MockBizConfigService) Update(ctx context.Context, config domain.Biz) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, config)
 	ret0, _ := ret[0].(error)

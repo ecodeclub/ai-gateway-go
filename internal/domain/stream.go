@@ -34,16 +34,18 @@ type Chat struct {
 	// 业务有关的编排信息
 	Orchestration Orchestration
 
+	Biz BizConfig
+
 	Turns []*Turn
 	Ctime time.Time
 }
 
 type Orchestration struct {
 	// Threads 存储的是 Thread 有关的上下文
-	Threads map[string]*Thread
+	Threads map[string]*Thread `json:"threads"`
 
 	// Main 不是主要的意思，而是 main 函数的那个 main，万物起点
-	Main *Thread
+	Main *Thread `json:"main"`
 }
 
 // LLMConversation 代表第三方的 Conversation

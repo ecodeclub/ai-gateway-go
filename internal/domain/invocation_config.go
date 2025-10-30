@@ -35,7 +35,7 @@ const (
 type InvocationConfig struct {
 	ID          int64
 	Name        string
-	Biz         BizConfig
+	Biz         Biz
 	Description string
 	Ctime       time.Time
 	Utime       time.Time

@@ -17,35 +17,37 @@ package dao
 import (
 	"time"
 
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+	"github.com/ecodeclub/ekit/sqlx"
 	"gorm.io/gorm/clause"
 
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
 )
 
-type BizConfig struct {
-	ID        int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	Name      string `gorm:"type:varchar(255)"`
-	OwnerID   int64  `gorm:"column:owner_id;type:bigint;not null"`
-	OwnerType string `gorm:"column:owner_type;type:varchar(20);not null"`
-	Config    string `gorm:"column:config;type:text"`
+type Biz struct {
+	ID        int64                             `gorm:"column:id;primaryKey;autoIncrement"`
+	Name      string                            `gorm:"type:varchar(255)"`
+	OwnerID   int64                             `gorm:"column:owner_id;type:bigint;not null"`
+	OwnerType string                            `gorm:"column:owner_type;type:varchar(20);not null"`
+	Config    sqlx.JsonColumn[domain.BizConfig] `gorm:"column:config;type:text"`
 	Ctime     int64
 	Utime     int64
 }
 
-func (BizConfig) TableName() string {
+func (Biz) TableName() string {
 	return "biz_configs"
 }
 
-type BizConfigDAO struct {
+type BizDAO struct {
 	db *gorm.DB
 }
 
-func NewBizConfigDAO(db *gorm.DB) *BizConfigDAO {
-	return &BizConfigDAO{db: db}
+func NewBizConfigDAO(db *gorm.DB) *BizDAO {
+	return &BizDAO{db: db}
 }
 
-func (d *BizConfigDAO) Save(ctx context.Context, bc BizConfig) (int64, error) {
+func (d *BizDAO) Save(ctx context.Context, bc Biz) (int64, error) {
 	now := time.Now().UnixMilli()
 	bc.Ctime = now
 	bc.Utime = now
@@ -60,21 +62,21 @@ func (d *BizConfigDAO) Save(ctx context.Context, bc BizConfig) (int64, error) {
 	return bc.ID, err
 }
 
-func (d *BizConfigDAO) List(ctx context.Context, offset, limit int) ([]BizConfig, error) {
-	var bc []BizConfig
+func (d *BizDAO) List(ctx context.Context, offset, limit int) ([]Biz, error) {
+	var bc []Biz
 	err := d.db.WithContext(ctx).Order("utime DESC").
 		Offset(offset).Limit(limit).Find(&bc).Error
 	return bc, err
 }
 
-func (d *BizConfigDAO) Count(ctx context.Context) (int64, error) {
+func (d *BizDAO) Count(ctx context.Context) (int64, error) {
 	var total int64
-	err := d.db.WithContext(ctx).Model(&BizConfig{}).Count(&total).Error
+	err := d.db.WithContext(ctx).Model(&Biz{}).Count(&total).Error
 	return total, err
 }
 
-func (d *BizConfigDAO) GetByID(ctx context.Context, id int64) (BizConfig, error) {
-	var bc BizConfig
+func (d *BizDAO) GetByID(ctx context.Context, id int64) (Biz, error) {
+	var bc Biz
 	err := d.db.WithContext(ctx).Where("id = ?", id).First(&bc).Error
 	return bc, err
 }

@@ -92,18 +92,6 @@ func (repo *ChatRepo) SaveTurn(ctx context.Context, sn string, turn *domain.Turn
 	})
 }
 
-func (repo *ChatRepo) AddMessages(ctx context.Context, chatSN string, messages []domain.Message) error {
-	err := repo.dao.AddMessages(ctx, repo.toDaoMessage(chatSN, messages))
-	if err != nil {
-		return err
-	}
-	err = repo.cache.AddMessages(ctx, chatSN, repo.toCacheMessage(messages)...)
-	if err != nil {
-		elog.Error(fmt.Sprintf("写入redis 失败: %s", chatSN), elog.Any("err", err))
-	}
-	return nil
-}
-
 // GetByUid 根据 uid 获取对话列表
 func (repo *ChatRepo) GetByUid(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.Chat, error) {
 	chat, err := repo.dao.GetByUid(ctx, uid, limit, offset)

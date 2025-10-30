@@ -15,6 +15,8 @@
 package admin
 
 import (
+	"encoding/json"
+
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
 	"github.com/ecodeclub/ekit/slice"
@@ -38,13 +40,18 @@ func (h *BizConfigHandler) PrivateRoutes(server *egin.Component) {
 	bg.POST("/detail", ginx.BS(h.Detail))
 }
 
-func (h *BizConfigHandler) Save(ctx *ginx.Context, req BizConfig, _ session.Session) (ginx.Result, error) {
-	id, err := h.svc.Save(ctx, domain.BizConfig{
+func (h *BizConfigHandler) Save(ctx *ginx.Context, req Biz, _ session.Session) (ginx.Result, error) {
+	var cfg domain.BizConfig
+	err := json.Unmarshal([]byte(req.Config), &cfg)
+	if err != nil {
+		return systemErrorResult, err
+	}
+	id, err := h.svc.Save(ctx, domain.Biz{
 		ID:        req.ID,
 		Name:      req.Name,
 		OwnerID:   req.OwnerID,
 		OwnerType: req.OwnerType,
-		Config:    req.Config,
+		Config:    cfg,
 	})
 	if err != nil {
 		return systemErrorResult, err
@@ -61,8 +68,8 @@ func (h *BizConfigHandler) List(ctx *ginx.Context, req ListReq, _ session.Sessio
 		return systemErrorResult, err
 	}
 	return ginx.Result{
-		Data: ginx.DataList[BizConfig]{
-			List: slice.Map(res, func(_ int, src domain.BizConfig) BizConfig {
+		Data: ginx.DataList[Biz]{
+			List: slice.Map(res, func(_ int, src domain.Biz) Biz {
 				return newBizConfig(src)
 			}),
 			Total: int(total),

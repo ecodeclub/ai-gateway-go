@@ -16,13 +16,17 @@ package domain
 
 import "time"
 
-type BizConfig struct {
+type Biz struct {
 	ID        int64
 	Name      string
 	OwnerID   int64
 	OwnerType string // "user" or "organization"
-	Config    string // JSON string
+	Config    BizConfig
 	Ctime     time.Time
 	Utime     time.Time
 	// 这里先固定写死，试试效果
+}
+
+type BizConfig struct {
+	Orchestration Orchestration `json:"orchestration"`
 }
