@@ -12,46 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package savedoc
+package multifunc
 
 import (
 	"encoding/json"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
-	"github.com/gotomicro/ego/core/elog"
+	"github.com/openai/openai-go/v3/responses"
 )
 
-// FCall 保存文档的函数调用
-// 我觉得这个功能和 emit_json 有一点重复，可以考虑用这个取代掉 emit_json
-// 这个实现的关键点就是会把 Doc 放入到 ctx.Chat.Vars 里面
 type FCall struct {
-	logger *elog.Component
+	Registry *fcall.Registry
 }
 
 func NewFCall() *FCall {
-	return &FCall{
-		logger: elog.DefaultLogger.With(elog.FieldComponent("fcall.save_doc"))}
+	return &FCall{}
 }
 
 func (c *FCall) Name() string {
-	return "save_doc"
+	return "multi_call"
 }
 
 func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response, error) {
-	var saveReq Request
-	err := json.Unmarshal(req.Args, &saveReq)
+	var fcReq Request
+	err := json.Unmarshal(req.Args, &fcReq)
 	if err != nil {
 		return fcall.Response{}, err
 	}
-	c.logger.Debug("保存变量", elog.String("varName", saveReq.VarName), elog.String("type", saveReq.Type), elog.String("content", string(saveReq.Content)))
-	ctx.Chat.Vars[saveReq.VarName] = saveReq.Content
-	return fcall.Response{}, err
+	var resp fcall.Response
+	for _, call := range fcReq.Calls {
+		var fc fcall.FunctionCall
+		fc, err = c.Registry.Lookup(call.Name)
+		if err != nil {
+			return fcall.Response{}, err
+		}
+		resp, err = fc.Call(ctx, fcall.Request{
+			Args: []byte(call.Arguments),
+		})
+		if err != nil {
+			return fcall.Response{}, err
+		}
+	}
+	return fcall.Response{
+		NextState: resp.NextState,
+	}, nil
 }
 
 type Request struct {
-	VarName      string          `json:"varName,omitempty"`
-	Type         string          `json:"type,omitempty"`
-	Content      json.RawMessage `json:"content,omitempty"`
-	NextInvCfgID int64           `json:"NextInvCfgID,omitempty"`
+	Calls     []responses.ResponseFunctionToolCall `json:"calls"`
+	NextState string                               `json:"nextState"`
 }

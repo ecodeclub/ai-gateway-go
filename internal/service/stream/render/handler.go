@@ -16,13 +16,11 @@ package render
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"text/template"
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
-	"github.com/gotomicro/ego/core/elog"
 )
 
 // Handler 负责渲染 Prompt
@@ -31,56 +29,36 @@ type Handler struct {
 	Next stream.Handler
 	// 一般来说，system prompt 是不会出现占位符等问题的
 	// userPromptTplCache syncx.Map[string, *template.Template]
-	logger *elog.Component
 }
 
 func NewHandler() *Handler {
-	return &Handler{
-		logger: elog.DefaultLogger.With(elog.FieldComponentName("render.Handler")),
-	}
+	return &Handler{}
 }
 
-func (h *Handler) Stream(ctx *domain.StreamContext) error {
+func (h *Handler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
 	prompt, err := h.renderUserPrompt(ctx)
 	if err != nil {
-		return err
+		return stream.Response{}, err
 	}
-	turn := ctx.Chat.LastTurn()
-	llmData := turn.AssistantRun.LastStep().LLMData()
-	llmData.RenderedUserPrompt = prompt
+	turn := ctx.Chat.CurrentTurn()
+	step := turn.AssistantRun.CurrentStep()
+	step.RenderedUserPrompt = prompt
 	return h.Next.Stream(ctx)
 }
 
 func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
-	assistant := ctx.Chat.LastTurn().AssistantRun
-	stepData := assistant.LastStep().LLMData()
+	assistant := ctx.Chat.CurrentTurn().AssistantRun
+	step := assistant.CurrentStep()
 	// 暂时不用缓存，测试的时候我经常会直接修改数据库数据
-	name := fmt.Sprintf("user-%d", stepData.Cfg.ID)
-
-	// 注册自定义函数
-	funcMap := template.FuncMap{
-		"fromJson": h.fromJson,
-	}
-
-	tpl := template.New(name).Funcs(funcMap)
-	tpl, err := tpl.Parse(stepData.Cfg.Prompt)
+	name := fmt.Sprintf("user-%d", step.Cfg.ID)
+	tpl := template.New(name)
+	tpl, err := tpl.Parse(step.Cfg.Prompt)
 	if err != nil {
 		return "", err
 	}
 	var buffer bytes.Buffer
-	vars := ctx.Chat.CombinedVars()
-	err = tpl.Execute(&buffer, vars)
-	text := buffer.String()
-
-	h.logger.Info("渲染", elog.Any("vars", vars), elog.String("text", text))
-	return text, err
-}
-
-// fromJson 将 JSON 字符串解析为 Go 对象
-func (h *Handler) fromJson(jsonStr string) (interface{}, error) {
-	var result interface{}
-	err := json.Unmarshal([]byte(jsonStr), &result)
-	return result, err
+	err = tpl.Execute(&buffer, ctx.Chat.Vars)
+	return buffer.String(), err
 }
 
 // ExecuteContext 模板中能使用什么内容，就取决于这里

@@ -73,8 +73,7 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	k.logger.Debug("RAG 响应", elog.String("body", string(body)))
 	ctx.Chat.Vars[ragReq.VarName] = string(body)
 	return fcall.Response{
-		Content:      string(body),
-		NextInvCfgID: ragReq.NextInvCfgID,
+		Content: string(body),
 	}, err
 }
 

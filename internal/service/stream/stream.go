@@ -20,5 +20,10 @@ import (
 
 //go:generate mockgen -source=./stream.go -destination=../mocks/stream.mock.go -package=mocks -typed Handler
 type Handler interface {
-	Stream(ctx *domain.StreamContext) error
+	Stream(ctx *domain.StreamContext) (Response, error)
+}
+
+type Response struct {
+	// 切换到下一个状态
+	NextState string
 }

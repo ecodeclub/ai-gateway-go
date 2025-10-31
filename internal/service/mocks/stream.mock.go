@@ -13,7 +13,8 @@ import (
 	reflect "reflect"
 
 	domain "github.com/ecodeclub/ai-gateway-go/internal/domain"
-	gomock "go.uber.org/mock/gomock"
+  "github.com/ecodeclub/ai-gateway-go/internal/service/stream"
+  gomock "go.uber.org/mock/gomock"
 )
 
 // MockHandler is a mock of Handler interface.
@@ -41,11 +42,11 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // Stream mocks base method.
-func (m *MockHandler) Stream(ctx *domain.StreamContext) error {
+func (m *MockHandler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stream", ctx)
 	ret0, _ := ret[0].(error)
-	return ret0
+  return stream.Response{}, ret0
 }
 
 // Stream indicates an expected call of Stream.

@@ -19,6 +19,8 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/multifunc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/rawoutput"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	iopenai "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
@@ -66,11 +68,13 @@ func InitStreamHandler(
 }
 
 func InitFuncCall(
+	f2 *rawoutput.FCall,
 	f3 *kbase.RAG,
 	f4 *analyzer.AnalysisDialogFCall,
 	f5 *savedoc.FCall,
+	f6 *multifunc.FCall,
 ) []fcall.FunctionCall {
-	return []fcall.FunctionCall{f3, f4, f5}
+	return []fcall.FunctionCall{f2, f3, f4, f5, f6}
 }
 
 func InitKBaseRAG() *kbase.RAG {

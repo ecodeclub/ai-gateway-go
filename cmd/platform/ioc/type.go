@@ -21,8 +21,11 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/cache"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/orchestrator"
 	fcall "github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/analyzer"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/multifunc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/rawoutput"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/render"
@@ -43,6 +46,7 @@ var (
 		loadcfg.NewLoadConfigHandler,
 		render.NewHandler,
 		store.NewHandler,
+		orchestrator.NewOrchestrator,
 		// 最终组装链条的地方
 		InitStreamHandler,
 	)
@@ -82,6 +86,8 @@ var (
 		fcall.NewFunctionCallRegistry,
 		analyzer.NewAnalysisDialogFCall,
 		savedoc.NewFCall,
+		rawoutput.NewFCall,
+		multifunc.NewFCall,
 		InitKBaseRAG,
 		InitFuncCall,
 	)
@@ -93,6 +99,7 @@ type App struct {
 	GinServer *egin.Component
 	// 受制于 wire 的特性，只能写成这种样子
 	Registry *fcall.Registry
+	MultiFC  *multifunc.FCall
 	FCalls   []fcall.FunctionCall
 }
 
@@ -100,4 +107,5 @@ func (a *App) AfterCreated() {
 	for _, call := range a.FCalls {
 		a.Registry.Register(call)
 	}
+	a.MultiFC.Registry = a.Registry
 }

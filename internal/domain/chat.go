@@ -30,15 +30,6 @@ type ChatStreamRequest struct {
 	CallID             string
 }
 
-type Chat struct {
-	Sn       string
-	Uid      int64
-	Title    string
-	Messages []Message
-	Ctime    time.Time
-	Utime    time.Time
-}
-
 type Message struct {
 	ID               int64  `json:"id"`
 	Role             string `json:"role"`

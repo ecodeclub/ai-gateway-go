@@ -32,14 +32,14 @@ func NewBizConfigService(repo *repository.BizConfigRepository) *BizConfigService
 	}
 }
 
-func (s *BizConfigService) Save(ctx context.Context, req domain.BizConfig) (int64, error) {
+func (s *BizConfigService) Save(ctx context.Context, req domain.Biz) (int64, error) {
 	return s.repo.Save(ctx, req)
 }
 
-func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domain.BizConfig, int64, error) {
+func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domain.Biz, int64, error) {
 	var (
 		eg    errgroup.Group
-		res   []domain.BizConfig
+		res   []domain.Biz
 		total int64
 	)
 	eg.Go(func() error {
@@ -56,6 +56,6 @@ func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domai
 	return res, total, err
 }
 
-func (s *BizConfigService) Detail(ctx context.Context, id int64) (domain.BizConfig, error) {
+func (s *BizConfigService) Detail(ctx context.Context, id int64) (domain.Biz, error) {
 	return s.repo.GetByID(ctx, id)
 }

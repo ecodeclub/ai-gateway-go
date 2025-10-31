@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package savedoc
+package rawoutput
 
 import (
 	"encoding/json"
@@ -23,35 +23,34 @@ import (
 )
 
 // FCall 保存文档的函数调用
-// 我觉得这个功能和 emit_json 有一点重复，可以考虑用这个取代掉 emit_json
-// 这个实现的关键点就是会把 Doc 放入到 ctx.Chat.Vars 里面
 type FCall struct {
 	logger *elog.Component
 }
 
 func NewFCall() *FCall {
 	return &FCall{
-		logger: elog.DefaultLogger.With(elog.FieldComponent("fcall.save_doc"))}
+		logger: elog.DefaultLogger.With(elog.FieldComponent("fcall.raw_output"))}
 }
 
 func (c *FCall) Name() string {
-	return "save_doc"
+	return "raw_output"
 }
 
 func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response, error) {
-	var saveReq Request
-	err := json.Unmarshal(req.Args, &saveReq)
+	var rawReq Request
+	err := json.Unmarshal(req.Args, &rawReq)
 	if err != nil {
 		return fcall.Response{}, err
 	}
-	c.logger.Debug("保存变量", elog.String("varName", saveReq.VarName), elog.String("type", saveReq.Type), elog.String("content", string(saveReq.Content)))
-	ctx.Chat.Vars[saveReq.VarName] = saveReq.Content
-	return fcall.Response{}, err
+	c.logger.Debug("收到 RawOutput", elog.Any("content", rawReq.Content))
+	const varName = "RawOutput"
+	ctx.Chat.Vars[varName] = rawReq.Content
+	return fcall.Response{
+		NextState: rawReq.State,
+	}, err
 }
 
 type Request struct {
-	VarName      string          `json:"varName,omitempty"`
-	Type         string          `json:"type,omitempty"`
-	Content      json.RawMessage `json:"content,omitempty"`
-	NextInvCfgID int64           `json:"NextInvCfgID,omitempty"`
+	Content string `json:"content,omitempty"`
+	State   string `json:"state,omitempty"`
 }

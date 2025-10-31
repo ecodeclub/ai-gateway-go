@@ -14,9 +14,13 @@
 
 package admin
 
-import "github.com/ecodeclub/ai-gateway-go/internal/domain"
+import (
+	"encoding/json"
 
-type BizConfig struct {
+	"github.com/ecodeclub/ai-gateway-go/internal/domain"
+)
+
+type Biz struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	OwnerID   int64  `json:"ownerID"`
@@ -26,13 +30,14 @@ type BizConfig struct {
 	Utime     int64  `json:"utime"`
 }
 
-func newBizConfig(cfg domain.BizConfig) BizConfig {
-	return BizConfig{
+func newBizConfig(cfg domain.Biz) Biz {
+	val, _ := json.Marshal(cfg.Config)
+	return Biz{
 		ID:        cfg.ID,
 		Name:      cfg.Name,
 		OwnerID:   cfg.OwnerID,
 		OwnerType: cfg.OwnerType,
-		Config:    cfg.Config,
+		Config:    string(val),
 		Ctime:     cfg.Ctime.UnixMilli(),
 		Utime:     cfg.Utime.UnixMilli(),
 	}

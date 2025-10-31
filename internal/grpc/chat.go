@@ -21,7 +21,7 @@ import (
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/orchestrator"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gotomicro/ego/core/elog"
 )
@@ -31,19 +31,19 @@ var _ ai.ServiceServer = &ChatServer{}
 type ChatServer struct {
 	svc *service.ChatService
 	ai.UnimplementedServiceServer
-	logger    *elog.Component
-	streamHdl stream.Handler
+	logger *elog.Component
+	o      *orchestrator.Orchestrator
 }
 
-func NewChatServer(svc *service.ChatService, hdl stream.Handler) *ChatServer {
+func NewChatServer(svc *service.ChatService, o *orchestrator.Orchestrator) *ChatServer {
 	return &ChatServer{svc: svc,
-		streamHdl: hdl,
-		logger:    elog.DefaultLogger.With(elog.FieldComponent("grpc.ChatServer"))}
+		o:      o,
+		logger: elog.DefaultLogger.With(elog.FieldComponent("grpc.ChatServer"))}
 }
 
 func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.SaveResponse, error) {
 	chat := request.GetChat()
-	sn, err := c.svc.Save(ctx, domain.ChatV1{
+	sn, err := c.svc.Save(ctx, domain.Chat{
 		Title: chat.Title,
 		Uid:   chat.Uid,
 		Sn:    chat.Sn,
@@ -59,12 +59,12 @@ func (c *ChatServer) List(ctx context.Context, req *ai.ListRequest) (*ai.ListRes
 	if err != nil {
 		return &ai.ListResponse{}, err
 	}
-	return &ai.ListResponse{Chats: slice.Map(chat, func(idx int, src domain.ChatV1) *ai.Chat {
+	return &ai.ListResponse{Chats: slice.Map(chat, func(idx int, src domain.Chat) *ai.Chat {
 		return c.toChatV1(src)
 	})}, nil
 }
 
-func (c *ChatServer) toChatV1(chat domain.ChatV1) *ai.Chat {
+func (c *ChatServer) toChatV1(chat domain.Chat) *ai.Chat {
 	return &ai.Chat{
 		Sn:    chat.Sn,
 		Title: chat.Title,
@@ -87,42 +87,26 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 	return &ai.DetailResponse{Chat: c.toChatV1(chat)}, nil
 }
 
-func (c *ChatServer) StreamV1(request *ai.StreamV1Request, resp ai.Service_StreamV1Server) error {
+func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
 	chat, err := c.svc.Detail(resp.Context(), request.ChatSn)
 	if err != nil {
 		return fmt.Errorf("查找 Chat 详情失败 %w", err)
 	}
 
 	turn := &domain.Turn{
-		Vars: map[string]any{
-			// 变量的构建详见 buildvar 包
-		},
 		UserRun: &domain.UserRun{
-			Content:  request.Input.Content,
-			AudioURL: request.Input.AudioUrl,
-			Files:    request.Input.Files,
+			Content: request.Input.Content,
+			Files:   request.Input.Files,
 		},
 		AssistantRun: &domain.AssistantRun{
 			// 构建当前的步骤，一般来说步骤不会超过 4 个
 			Steps: make([]*domain.Step, 0, 4),
 		},
 	}
-	// 默认第一个步骤就是调用 LLM，这个假设不要轻易破坏了
-	// 后续如果有别的可能，那么就要考虑扩展 invocation_config 与这个地方了
-	turn.AssistantRun.StartLLMStep(request.InvocationConfigId)
-	// 初始化当前这一轮对话
-	chat.Turns = append(chat.Turns, turn)
-	ctx := &domain.StreamContext{
-		Ctx: resp.Context(),
-		Sender: &StreamEventGRPCSender{
-			server: resp,
-			logger: c.logger.With(elog.FieldComponentName("grpc.StreamEventGRPCSender")),
-		},
-		Chat: chat,
+	sender := &StreamEventGRPCSender{
+		server: resp,
+		logger: c.logger.With(elog.FieldComponentName("grpc.StreamEventGRPCSender")),
 	}
-	return c.streamHdl.Stream(ctx)
-}
-
-func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
-	panic("implement me")
+	chat.Turns = append(chat.Turns, turn)
+	return c.o.Stream(resp.Context(), chat, sender)
 }

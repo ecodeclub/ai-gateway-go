@@ -41,7 +41,7 @@ type InvocationConfigVersion struct {
 	Version      string           `gorm:"column:version;type:varchar(255)"`
 	Prompt       string           `gorm:"column:prompt"`
 	SystemPrompt string           `gorm:"column:system_prompt"`
-	Attributes   sql.Null[string] `gorm:"column:attributes;type:longText;comment:'用来渲染最终的Prompt'"`
+	Independent  bool             `gorm:"column:independent;"`
 	Functions    sql.Null[string] `gorm:"column:functions;type:longText;comment:'函数调用定义'"`
 	Temperature  float32          `gorm:"column:temperature"`
 	TopP         float32          `gorm:"column:top_p"`

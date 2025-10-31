@@ -47,14 +47,14 @@ func NewChatService(
 	}
 }
 
-func (c *ChatService) Save(ctx context.Context, chat domain.ChatV1) (string, error) {
+func (c *ChatService) Save(ctx context.Context, chat domain.Chat) (string, error) {
 	return c.repo.Save(ctx, chat)
 }
 
-func (c *ChatService) List(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.ChatV1, error) {
+func (c *ChatService) List(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.Chat, error) {
 	return c.repo.GetByUid(ctx, uid, limit, offset)
 }
 
-func (c *ChatService) Detail(ctx context.Context, sn string) (domain.ChatV1, error) {
-	return c.repo.DetailV1(ctx, sn)
+func (c *ChatService) Detail(ctx context.Context, sn string) (domain.Chat, error) {
+	return c.repo.Detail(ctx, sn)
 }

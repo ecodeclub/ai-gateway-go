@@ -35,7 +35,7 @@ func (vo InvocationConfigVO) toDomain() domain.InvocationConfig {
 	return domain.InvocationConfig{
 		ID:   vo.ID,
 		Name: vo.Name,
-		Biz: domain.BizConfig{
+		Biz: domain.Biz{
 			ID: vo.BizID,
 		},
 		Description: vo.Description,
@@ -43,26 +43,27 @@ func (vo InvocationConfigVO) toDomain() domain.InvocationConfig {
 }
 
 type InvocationConfigVersionVO struct {
-	ID    int64 `json:"id"`
-	InvID int64 `json:"invID"`
+	ID int64 `json:"id"`
+	// InvocationConfigVO 中的字段
+	InvID   int64  `json:"invID"`
+	InvName string `json:"invName"`
 
 	ModelID           int64  `json:"modelID"`
 	ModelName         string `json:"modelName"`
 	ModelProviderID   int64  `json:"modelProviderID"`
 	ModelProviderName string `json:"modelProviderName"`
 
-	Version      string            `json:"version"`
-	Prompt       string            `json:"prompt"`
-	SystemPrompt string            `json:"systemPrompt"`
-	JSONSchema   string            `json:"jsonSchema"`
-	Attributes   domain.Attributes `json:"attributes,omitempty"`
-	Functions    []FunctionVO      `json:"functions,omitempty"`
-	Temperature  float32           `json:"temperature"`
-	TopP         float32           `json:"topP"`
-	MaxTokens    int               `json:"maxTokens"`
-	Status       string            `json:"status"`
-	Ctime        int64             `json:"ctime"`
-	Utime        int64             `json:"utime"`
+	Version      string       `json:"version"`
+	Prompt       string       `json:"prompt"`
+	SystemPrompt string       `json:"systemPrompt"`
+	Independent  bool         `json:"independent,omitempty"`
+	Functions    []FunctionVO `json:"functions,omitempty"`
+	Temperature  float32      `json:"temperature"`
+	TopP         float32      `json:"topP"`
+	MaxTokens    int          `json:"maxTokens"`
+	Status       string       `json:"status"`
+	Ctime        int64        `json:"ctime"`
+	Utime        int64        `json:"utime"`
 }
 
 type FunctionVO struct {
@@ -78,7 +79,7 @@ func (vo InvocationConfigVersionVO) toDomain() domain.InvocationConfigVersion {
 		Version:      vo.Version,
 		Prompt:       vo.Prompt,
 		SystemPrompt: vo.SystemPrompt,
-		Attributes:   vo.Attributes,
+		Independent:  vo.Independent,
 		Functions: slice.Map(vo.Functions, func(_ int, src FunctionVO) domain.Function {
 			return domain.Function{
 				Name:       src.Name,
@@ -110,6 +111,7 @@ func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigV
 	return InvocationConfigVersionVO{
 		ID:                v.ID,
 		InvID:             v.Config.ID,
+		InvName:           v.Config.Name,
 		ModelID:           v.Model.ID,
 		ModelName:         v.Model.Name,
 		ModelProviderID:   v.Model.Provider.ID,
@@ -117,7 +119,7 @@ func newInvocationCfgVersion(v domain.InvocationConfigVersion) InvocationConfigV
 		Version:           v.Version,
 		Prompt:            v.Prompt,
 		SystemPrompt:      v.SystemPrompt,
-		Attributes:        v.Attributes,
+		Independent:       v.Independent,
 		Functions: slice.Map(v.Functions, func(_ int, src domain.Function) FunctionVO {
 			return FunctionVO{
 				Name:       src.Name,

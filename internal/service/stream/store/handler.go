@@ -41,18 +41,18 @@ func NewHandler(repo *repository.ChatRepo) *Handler {
 		logger: elog.DefaultLogger.With(elog.FieldComponentName("store.Handler"))}
 }
 
-func (h *Handler) Stream(ctx *domain.StreamContext) error {
+func (h *Handler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
 	buffer := h.pool.Get()
 	sender := &collectWriter{
 		buffer: buffer,
-		sender: ctx.Sender,
+		sender: ctx.Sender, // grpc stream server 的封装
 		logger: h.logger.With(elog.FieldComponentName("store.Handler.collectWriter")),
 	}
 	ctx.Sender = sender
 	defer func() {
 		storeCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		turn := ctx.Chat.LastTurn()
+		turn := ctx.Chat.CurrentTurn()
 		turn.AssistantRun.Content = buffer.String()
 		h.pool.Put(buffer)
 		var eg errgroup.Group
@@ -88,7 +88,7 @@ type collectWriter struct {
 }
 
 // Send 将数据收集下来之后，直接转发
-func (c *collectWriter) Send(evt domain.StreamEventV1) error {
+func (c *collectWriter) Send(evt domain.StreamEvent) error {
 	switch {
 	case evt.Delta != nil:
 		_, err := c.buffer.WriteString(evt.Delta.Content)

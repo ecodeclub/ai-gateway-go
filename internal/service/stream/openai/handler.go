@@ -17,7 +17,7 @@ package openai
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"fmt"
 
 	ai "github.com/ecodeclub/ai-gateway-go/api/proto/gen/chat/v1"
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
@@ -61,96 +61,91 @@ func NewHandler(
 	}
 }
 
-func (h *Handler) Stream(ctx *domain.StreamContext) error {
-	err := h.initConversationsIfNeeded(ctx)
+func (h *Handler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
+	step := ctx.Chat.CurrentStep()
+	cfg := step.Cfg
+	params, err := h.newParams(ctx, cfg)
 	if err != nil {
-		return err
+		return stream.Response{}, err
 	}
-	step := ctx.Chat.LastTurn().AssistantRun.LastStep()
-	cfg := step.LLMData().Cfg
-	params := h.newParams(ctx, cfg)
 	// 这种比较复杂的打印日志的代码，就用一个判断来减少线上消耗
-	val, _ := json.Marshal(params)
-	h.logger.Debug(string(val))
+	if h.logger.IsDebugMode() {
+		val, _ := json.Marshal(params)
+		h.logger.Debug(string(val))
+	}
 	s := h.client.Responses.NewStreaming(ctx.Ctx, params, h.options...)
 	return h.forward(ctx, cfg, s)
 }
 
 // initConversationsIfNeeded 初始化并且把 cid3rd 放入到 ctx.Chat 里面
 func (h *Handler) initConversationsIfNeeded(ctx *domain.StreamContext) error {
-	if ctx.Chat.LLMConversation.ID != "" {
+	step := ctx.Chat.CurrentStep()
+	if step.Thread.Conversation.ID != "" {
 		return nil
 	}
 	c, err := h.client.Conversations.New(ctx.Ctx, conversations.ConversationNewParams{}, h.options...)
 	if err != nil {
-		return err
+		return fmt.Errorf("new conversation: %w", err)
 	}
-	ctx.Chat.LLMConversation.ID = c.ID
+	step.Thread.Conversation.ID = c.ID
 	return nil
 }
 
-func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion) responses.ResponseNewParams {
+func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion) (responses.ResponseNewParams, error) {
+
 	input := h.toInput(ctx)
-	h.logger.Debug("调用 OpenAI 的输入", elog.String("cid3rd", ctx.LLMCid()), elog.Any("input", input))
+	step := ctx.Chat.CurrentTurn().AssistantRun.CurrentStep()
+	h.logger.Debug("调用 OpenAI 的输入", elog.String("cid3rd", step.Thread.Conversation.ID), elog.Any("input", input))
 	params := responses.ResponseNewParams{
-		Input: input,
-		Model: cfg.Model.Name,
-		Conversation: responses.ResponseNewParamsConversationUnion{
+		Input:           input,
+		Model:           cfg.Model.Name,
+		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
+	}
+
+	if step.Thread.Conversation.ID == "" {
+		h.logger.Debug("初始化 conversation")
+		err := h.initConversationsIfNeeded(ctx)
+		if err != nil {
+			return responses.ResponseNewParams{}, err
+		}
+		params.Conversation = responses.ResponseNewParamsConversationUnion{
 			OfConversationObject: &responses.ResponseConversationParam{
-				ID: ctx.Chat.LLMConversation.ID,
+				ID: step.Thread.Conversation.ID,
 			},
-		},
-		Tools: slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
+		}
+		// 设置 instructions
+		params.Instructions = openai.String(cfg.SystemPrompt)
+	}
+
+	if len(cfg.Functions) > 0 {
+		params.ToolChoice = responses.ResponseNewParamsToolChoiceUnion{
+			OfToolChoiceMode: param.NewOpt(responses.ToolChoiceOptions("required")),
+		}
+		params.Tools = slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
 			var p responses.FunctionToolParam
 			err := json.Unmarshal([]byte(src.Definition), &p)
 			if err != nil {
 				h.logger.Error("函数定义反序列化失败", elog.String("function", src.Definition), elog.FieldErr(err))
 			}
 			return responses.ToolUnionParam{OfFunction: &p}
-		}),
-		ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
-			// OfAllowedTools 在设置了上方Text字段后的试验结果如下：
-			// required + 可用工具列表： 【会发起函数调用】，输出JSON内容，但是格式与JSON Schema不相符。
-			// {
-			//  "question_id": 5,
-			//  "question": "数据库设计的三大范式是什么？"
-			//}
-			OfAllowedTools: &responses.ToolChoiceAllowedParam{
-				Mode: responses.ToolChoiceAllowedModeRequired,
-				Tools: []map[string]any{
-					{
-						"type": "function",
-						"name": "kbase_rag",
-					},
-					{
-						"type": "function",
-						"name": "forward_result",
-					},
-					{
-						"type": "function",
-						"name": "save_doc",
-					},
-				},
-			},
-		},
-		Temperature:     openai.Float(float64(cfg.Temperature)),
-		TopP:            openai.Float(float64(cfg.TopP)),
-		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
+		})
 	}
-	if cfg.SystemPrompt != "" {
-		params.Instructions = openai.String(cfg.SystemPrompt)
+
+	if cfg.Temperature >= 0 {
+		params.Temperature = openai.Float(float64(cfg.Temperature))
 	}
-	log.Printf("cfg.Functions: %#v\n", cfg.Functions)
-	return params
+
+	if cfg.TopP >= 0 {
+		params.TopP = openai.Float(float64(cfg.TopP))
+	}
+	return params, nil
 }
 
 func (h *Handler) toInput(ctx *domain.StreamContext) responses.ResponseNewParamsInputUnion {
 	history := ctx.History()
 	items := make([]responses.ResponseInputItemUnionParam, 0, len(history)+1)
-	// 把这一次输入加入进去，这里固定将 role 设置为 user，因为这里有一个隐含假设，这一个输入一定是 RoleUser
-	// 只能用当前 step
-	llmData := ctx.Chat.LastTurn().AssistantRun.LastStep().LLMData()
-	items = append(items, h.toInputItem(llmData.RenderedUserPrompt, ai.RoleUser))
+	step := ctx.Chat.CurrentStep()
+	items = append(items, h.toInputItem(step.RenderedUserPrompt, ai.RoleUser))
 	return responses.ResponseNewParamsInputUnion{
 		OfInputItemList: items,
 	}
@@ -190,215 +185,123 @@ func (h *Handler) toInputItem(content, role string) responses.ResponseInputItemU
 
 func (h *Handler) forward(ctx *domain.StreamContext,
 	cfg domain.InvocationConfigVersion,
-	stream *ssestream.Stream[responses.ResponseStreamEventUnion]) error {
-	// defer close(events)
-	textDeltaCount := 0
-	//functionCallCount := 0
-	var pendingFunctionCalls []responses.ResponseFunctionToolCall // 收集所有 function calls
-
-	for stream.Next() {
-		event := stream.Current()
-		h.logger.Debug("📨 收到事件", elog.String("type", event.Type))
-
+	sse *ssestream.Stream[responses.ResponseStreamEventUnion]) (stream.Response, error) {
+	// 一般都只有一个
+	fcallsItems := make([]responses.ResponseFunctionToolCall, 0, 1)
+	for sse.Next() {
+		event := sse.Current()
 		switch event.Type {
 		case "error":
-			h.logger.Error("❌ OpenAI 返回错误", elog.String("error", event.AsError().Message))
-			h.sendEvt(ctx, domain.StreamEventV1{
+			h.sendEvt(ctx, domain.StreamEvent{
 				Err: errors.New(event.AsError().Message),
 			})
 		case "response.output_text.delta":
-			textDeltaCount++
 			text := event.AsResponseOutputTextDelta()
-			//h.sendEvt(ctx, domain.StreamEventV1{
-			//	Delta: &domain.Delta{
-			//		Content: text.Delta,
-			//	},
-			//})
-			h.logger.Warn("LLM输出非预期文本", elog.String("Delta", text.Delta))
-
+			h.sendEvt(ctx, domain.StreamEvent{
+				Delta: &domain.Delta{
+					Content: text.Delta,
+				},
+			})
 		case "response.output_item.done":
 			item := event.AsResponseOutputItemDone().Item
-			h.logger.Debug("📦 output_item.done", elog.String("itemType", item.Type))
 			if item.Type != "function_call" {
 				h.logger.Debug("非 function call 类型的 output item", elog.String("type", item.Type))
 				continue
 			}
-
 			fc := item.AsFunctionCall()
-			h.logger.Warn("🔧 LLM 调用了 function call",
-				elog.Any("fc", fc),
-				elog.String("ID", fc.ID),
-				elog.String("CallID", fc.CallID),
-				elog.String("Name", fc.Name),
-				elog.String("Arguments", fc.Arguments),
-				elog.Int("textDeltaCount", textDeltaCount))
-
-			// 不立即处理，先收集起来
-			pendingFunctionCalls = append(pendingFunctionCalls, fc)
-			//functionCallCount = len(pendingFunctionCalls)
+			fcallsItems = append(fcallsItems, fc)
 		}
 	}
 
-	h.logger.Info("✅ Stream 处理完成",
-		elog.Int("textDeltaCount", textDeltaCount),
-		elog.Int("functionCallCount", len(pendingFunctionCalls)))
-
-	// Stream 完成后，再处理 function calls
-	if len(pendingFunctionCalls) > 0 {
-		h.logger.Info("🔄 开始处理待处理的 function calls", elog.Int("count", len(pendingFunctionCalls)))
-		err := h.handleFC(ctx, cfg, pendingFunctionCalls)
-		if err != nil {
-			return err
-		}
+	err := sse.Err()
+	if len(fcallsItems) == 0 {
+		return stream.Response{}, err
 	}
-
-	return stream.Err()
-}
-
-func (h *Handler) handleFC(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion, fcs []responses.ResponseFunctionToolCall) error {
-	params := make([]responses.ResponseInputItemFunctionCallOutputParam, 0, len(fcs))
-	seenName := make(map[string]int)
-	seenNextInvCfgID := make(map[string]int)
-	nextInvCfgIDs := make([]int64, 0, len(fcs))
-	for _, fc := range fcs {
-		h.logger.Info("🔧 开始处理 function call",
-			elog.String("function", fc.Name),
-			elog.String("callID", fc.CallID),
-			elog.String("arguments", fc.Arguments))
-
-		if idx, ok := seenName[fc.Name]; ok {
-			p := params[idx]
-			p.CallID = fc.CallID
-			params = append(params, p)
-			if idx2, ok := seenNextInvCfgID[fc.Name]; ok {
-				nextInvCfgIDs = append(nextInvCfgIDs, nextInvCfgIDs[idx2])
-			}
+	if err != nil {
+		h.logger.Error("sse 有 ERROR", elog.FieldErr(err))
+	}
+	fcallRespList := make([]FCResp, 0, len(fcallsItems))
+	for _, fc := range fcallsItems {
+		fcallResp, err1 := h.handleFC(ctx, fc)
+		if err1 != nil {
+			h.logger.Error("执行 function call 出现问题", elog.FieldErr(err), elog.Any("fc", fc))
 			continue
 		}
-
-		fn, err := h.registry.Lookup(fc.Name)
-		if err != nil {
-			h.logger.Error("❌ 函数调用未找到",
-				elog.String("函数名", fc.Name),
-				elog.FieldErr(err),
-			)
-			return err
-		}
-
-		h.logger.Debug("✅ 找到 function，开始执行", elog.String("function", fc.Name))
-		fcallResp, err := fn.Call(ctx, fcall.Request{Args: []byte(fc.Arguments)})
-		if err != nil {
-			h.logger.Error("❌ 执行函数调用失败",
-				elog.String("函数名", fc.Name),
-				elog.String("参数值", fc.Arguments),
-				elog.FieldErr(err),
-			)
-		} else {
-			h.logger.Info("✅ Function 执行成功",
-				elog.String("function", fc.Name),
-				elog.String("content", fcallResp.Content))
-
-			if fcallResp.NextInvCfgID > 0 {
-				nextInvCfgIDs = append(nextInvCfgIDs, fcallResp.NextInvCfgID)
-				seenNextInvCfgID[fc.Name] = len(nextInvCfgIDs) - 1
-			}
-		}
-
-		// 不管有没有问题，都要返回一个 response
-		h.logger.Debug("📤 准备返回 function call 结果给 OpenAI",
-			elog.String("callID", fc.CallID),
-			elog.String("content", fcallResp.Content))
-
-		params = append(params, h.toFCResponseOfFunctionCallOutput(fc, fcallResp))
-		seenName[fc.Name] = len(params) - 1
+		fcallRespList = append(fcallRespList, FCResp{
+			FC:   fc,
+			Resp: fcallResp,
+		})
 	}
 
-	h.logger.Info("📤 收集到的Function Call Output",
-		elog.Any("params", params),
-		elog.Any("nextInvCfgIDs", nextInvCfgIDs))
+	// 不管有没有问题，都要返回一个 response，一次性返回所有的 function call 的结果
+	fcRespInput := h.toFCResulInput(ctx, cfg, fcallRespList)
+	if h.logger.IsDebugMode() {
+		val, _ := json.Marshal(fcRespInput)
+		h.logger.Debug(string(val))
+	}
+	_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
+	if err1 != nil {
+		h.logger.Error("返回 FC 响应给 OpenAI 失败",
+			elog.FieldErr(err1))
+	}
+	nextState := ""
+	for _, fc := range fcallRespList {
+		fcallResp := fc.Resp
+		if fcallResp.NextState != "" {
+			nextState = fcallResp.NextState
+		}
+	}
+	return stream.Response{NextState: nextState}, err
+}
 
-	respBody := responses.ResponseNewParams{
+func (h *Handler) handleFC(ctx *domain.StreamContext, fc responses.ResponseFunctionToolCall) (fcall.Response, error) {
+	h.logger.Debug("收到 function call 调用请求", elog.String("function", fc.Name))
+	fn, err := h.registry.Lookup(fc.Name)
+	if err != nil {
+		h.logger.Error("函数调用未找到",
+			elog.FieldCustomKeyValue("函数名", fc.Name),
+			elog.FieldErr(err),
+		)
+		return fcall.Response{}, err
+	}
+	return fn.Call(ctx, fcall.Request{Args: []byte(fc.Arguments)})
+}
+
+func (h *Handler) toFCResulInput(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion, respList []FCResp) responses.ResponseNewParams {
+	// 暂时固定为 completed
+	const fcStatusCompleted = "completed"
+	step := ctx.Chat.CurrentStep()
+	return responses.ResponseNewParams{
 		Model: cfg.Model.Name,
 		Conversation: responses.ResponseNewParamsConversationUnion{
 			OfConversationObject: &responses.ResponseConversationParam{
-				ID: ctx.Chat.LLMConversation.ID,
+				ID: step.Thread.Conversation.ID,
 			},
 		},
 		Input: responses.ResponseNewParamsInputUnion{
-			OfInputItemList: slice.Map(params, func(_ int, src responses.ResponseInputItemFunctionCallOutputParam) responses.ResponseInputItemUnionParam {
+			OfInputItemList: slice.Map[FCResp, responses.ResponseInputItemUnionParam](respList, func(idx int, src FCResp) responses.ResponseInputItemUnionParam {
 				return responses.ResponseInputItemUnionParam{
-					OfFunctionCallOutput: &src,
+					OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
+						CallID: src.FC.CallID,
+						Output: responses.ResponseInputItemFunctionCallOutputOutputUnionParam{
+							OfString: param.NewOpt(src.Resp.Content),
+						},
+						Status: fcStatusCompleted,
+					},
 				}
 			}),
 		},
-		Tools: slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
-			var p responses.FunctionToolParam
-			err := json.Unmarshal([]byte(src.Definition), &p)
-			if err != nil {
-				h.logger.Error("函数定义反序列化失败", elog.String("function", src.Definition), elog.FieldErr(err))
-			}
-			return responses.ToolUnionParam{OfFunction: &p}
-		}),
-		//ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
-		//	OfAllowedTools: &responses.ToolChoiceAllowedParam{
-		//		Mode: responses.ToolChoiceAllowedModeAuto,
-		//		Tools: []map[string]any{
-		//			{
-		//				"type": "function",
-		//				"name": "kbase_rag",
-		//			},
-		//			{
-		//				"type": "function",
-		//				"name": "forward_result",
-		//			},
-		//			{
-		//				"type": "function",
-		//				"name": "save_doc",
-		//			},
-		//		},
-		//	},
-		//},
-		Temperature:     openai.Float(float64(cfg.Temperature)),
-		TopP:            openai.Float(float64(cfg.TopP)),
-		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
-	}
-
-	h.logger.Info("🔄 使用流式API返回函数结果并获取 LLM 响应",
-		elog.Any("respBody", respBody))
-
-	// 【关键】：直接使用流式API，OpenAI 会自动处理函数结果并返回 LLM 的后续输出
-	s := h.client.Responses.NewStreaming(ctx.Ctx, respBody, h.options...)
-	err1 := h.forward(ctx, cfg, s)
-	if err1 != nil {
-		h.logger.Error("❌ 处理函数调用后的响应失败", elog.FieldErr(err1))
-		return err1
-	}
-
-	// 检查是否需要执行下一个配置
-	for _, id := range nextInvCfgIDs {
-		turn := ctx.Chat.LastTurn()
-		turn.AssistantRun.StartLLMStep(id)
-		h.logger.Warn("🔄 需要执行下一个 LLM 调用", elog.Int64("nextCfgID", id))
-		return h.Handler.Stream(ctx)
-	}
-	return nil
-}
-
-func (h *Handler) toFCResponseOfFunctionCallOutput(fc responses.ResponseFunctionToolCall, fcallResp fcall.Response) responses.ResponseInputItemFunctionCallOutputParam {
-	// 暂时固定为 completed
-	const fcStatusCompleted = "completed"
-	return responses.ResponseInputItemFunctionCallOutputParam{
-		CallID: fc.CallID,
-		Output: responses.ResponseInputItemFunctionCallOutputOutputUnionParam{
-			OfString: param.NewOpt(fcallResp.Content),
-		},
-		Status: fcStatusCompleted,
 	}
 }
 
-func (h *Handler) sendEvt(ctx *domain.StreamContext, evt domain.StreamEventV1) {
+func (h *Handler) sendEvt(ctx *domain.StreamContext, evt domain.StreamEvent) {
 	err := ctx.Sender.Send(evt)
 	if err != nil {
 		h.logger.Error("发送数据失败", elog.FieldErr(err))
 	}
+}
+
+type FCResp struct {
+	FC   responses.ResponseFunctionToolCall
+	Resp fcall.Response
 }

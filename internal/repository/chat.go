@@ -45,20 +45,32 @@ func NewChatRepo(d *dao.ChatDAO, c *cache.ChatCache) *ChatRepo {
 	}
 }
 
-func (repo *ChatRepo) Save(ctx context.Context, chat domain.ChatV1) (string, error) {
+func (repo *ChatRepo) Save(ctx context.Context, chat domain.Chat) (string, error) {
 	if chat.Sn == "" {
 		chat.Sn = repo.snGen.Generate(chat.Uid)
 	}
 	err := repo.dao.Save(ctx, dao.Chat{
 		Sn:    chat.Sn,
 		Title: chat.Title,
-		LLMConversation: sqlx.JsonColumn[domain.LLMConversation]{
-			Val:   chat.LLMConversation,
-			Valid: true,
-		},
 		Vars: sqlx.JsonColumn[map[string]any]{
 			Val:   chat.Vars,
 			Valid: chat.Vars != nil,
+		},
+		Orchestration: sqlx.JsonColumn[domain.Orchestration]{
+			Val: domain.Orchestration{
+				Main: domain.NewThread(1),
+				Threads: map[string]*domain.Thread{
+					"resume.project.basic_info":           domain.NewThread(2),
+					"resume.project.domain_contributions": domain.NewThread(3),
+					"resume.project.high_concurrency":     domain.NewThread(4),
+					"resume.project.high_availability":    domain.NewThread(5),
+					"resume.project.leadership":           domain.NewThread(6),
+					"resume.project.other":                domain.NewThread(7),
+					"resume.project.rewrite":              domain.NewThread(8),
+					"render_output":                       domain.NewThread(9),
+				},
+			},
+			Valid: true,
 		},
 		Uid: chat.Uid,
 	})
@@ -80,23 +92,11 @@ func (repo *ChatRepo) SaveTurn(ctx context.Context, sn string, turn *domain.Turn
 	})
 }
 
-func (repo *ChatRepo) AddMessages(ctx context.Context, chatSN string, messages []domain.Message) error {
-	err := repo.dao.AddMessages(ctx, repo.toDaoMessage(chatSN, messages))
-	if err != nil {
-		return err
-	}
-	err = repo.cache.AddMessages(ctx, chatSN, repo.toCacheMessage(messages)...)
-	if err != nil {
-		elog.Error(fmt.Sprintf("写入redis 失败: %s", chatSN), elog.Any("err", err))
-	}
-	return nil
-}
-
 // GetByUid 根据 uid 获取对话列表
-func (repo *ChatRepo) GetByUid(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.ChatV1, error) {
+func (repo *ChatRepo) GetByUid(ctx context.Context, uid int64, limit int64, offset int64) ([]domain.Chat, error) {
 	chat, err := repo.dao.GetByUid(ctx, uid, limit, offset)
 	if err != nil {
-		return []domain.ChatV1{}, err
+		return []domain.Chat{}, err
 	}
 	return repo.toChats(chat), nil
 }
@@ -120,7 +120,7 @@ func (repo *ChatRepo) GetHistoryMessageList(ctx context.Context, sn string) ([]d
 	return repo.toMessage(messageCache), nil
 }
 
-func (repo *ChatRepo) DetailV1(ctx context.Context, sn string) (domain.ChatV1, error) {
+func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error) {
 	var (
 		eg    errgroup.Group
 		turns []dao.Turn
@@ -139,20 +139,20 @@ func (repo *ChatRepo) DetailV1(ctx context.Context, sn string) (domain.ChatV1, e
 	})
 	err := eg.Wait()
 	if err != nil {
-		return domain.ChatV1{}, err
+		return domain.Chat{}, err
 	}
 
 	vars := map[string]any{}
 	if chat.Vars.Valid {
 		vars = chat.Vars.Val
 	}
-	return domain.ChatV1{
-		Sn:              chat.Sn,
-		Uid:             chat.Uid,
-		Title:           chat.Title,
-		Vars:            vars,
-		LLMConversation: chat.LLMConversation.Val,
-		Ctime:           time.UnixMilli(chat.Ctime),
+	return domain.Chat{
+		Sn:            chat.Sn,
+		Uid:           chat.Uid,
+		Title:         chat.Title,
+		Vars:          vars,
+		Orchestration: chat.Orchestration.Val,
+		Ctime:         time.UnixMilli(chat.Ctime),
 		Turns: slice.Map(turns, func(idx int, src dao.Turn) *domain.Turn {
 			return &domain.Turn{
 				ID:           src.ID,
@@ -161,34 +161,6 @@ func (repo *ChatRepo) DetailV1(ctx context.Context, sn string) (domain.ChatV1, e
 			}
 		}),
 	}, nil
-}
-
-func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error) {
-	var (
-		eg       errgroup.Group
-		messages []dao.Message
-		chat     dao.Chat
-	)
-	eg.Go(func() error {
-		var err error
-		chat, err = repo.dao.GetBySN(ctx, sn)
-		return err
-	})
-	eg.Go(func() error {
-		var err error
-		messages, err = repo.dao.GetMessages(ctx, sn)
-		return err
-	})
-
-	err := eg.Wait()
-
-	return domain.Chat{
-		Sn:       chat.Sn,
-		Uid:      chat.Uid,
-		Title:    chat.Title,
-		Ctime:    time.UnixMilli(chat.Ctime),
-		Messages: repo.toDomainMessage(messages),
-	}, err
 }
 
 func (repo *ChatRepo) toDaoMessage(chatSN string, messages []domain.Message) []dao.Message {
@@ -234,14 +206,14 @@ func (repo *ChatRepo) toMessage(messages []cache.Message) []domain.Message {
 	})
 }
 
-func (repo *ChatRepo) toChats(chats []dao.Chat) []domain.ChatV1 {
-	return slice.Map(chats, func(idx int, src dao.Chat) domain.ChatV1 {
+func (repo *ChatRepo) toChats(chats []dao.Chat) []domain.Chat {
+	return slice.Map(chats, func(idx int, src dao.Chat) domain.Chat {
 		return repo.toChatV1(src)
 	})
 }
 
-func (repo *ChatRepo) toChatV1(chat dao.Chat) domain.ChatV1 {
-	return domain.ChatV1{
+func (repo *ChatRepo) toChatV1(chat dao.Chat) domain.Chat {
+	return domain.Chat{
 		Sn:    chat.Sn,
 		Uid:   chat.Uid,
 		Title: chat.Title,

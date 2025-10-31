@@ -35,7 +35,7 @@ const (
 type InvocationConfig struct {
 	ID          int64
 	Name        string
-	Biz         BizConfig
+	Biz         Biz
 	Description string
 	Ctime       time.Time
 	Utime       time.Time
@@ -67,7 +67,7 @@ type InvocationConfigVersion struct {
 	Version      string
 	Prompt       string
 	SystemPrompt string
-	Attributes   Attributes
+	Independent  bool
 	Functions    []Function
 	Temperature  float32
 	TopP         float32
