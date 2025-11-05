@@ -54,7 +54,7 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	}
 
 	// 规避 JSON 转义问题
-	k.logger.Debug("ragReq.EsDsl："+string(ragReq.EsDsl), elog.String("varName", ragReq.VarName))
+	k.logger.Debug("收到LLM的调用请求参数", elog.Any("req", ragReq))
 
 	response := httpx.NewRequest(ctx.Ctx, http.MethodPost, k.url).
 		Client(k.client).JSONBody(ragReq.EsDsl).Do()

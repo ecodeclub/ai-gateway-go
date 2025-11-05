@@ -118,7 +118,7 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 
 	if len(cfg.Functions) > 0 {
 		params.ToolChoice = responses.ResponseNewParamsToolChoiceUnion{
-			OfToolChoiceMode: param.NewOpt(responses.ToolChoiceOptions("required")),
+			OfToolChoiceMode: param.NewOpt(responses.ToolChoiceOptions(responses.ToolChoiceAllowedModeRequired)),
 		}
 		params.Tools = slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
 			var p responses.FunctionToolParam
@@ -194,6 +194,7 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 			h.sendEvt(ctx, domain.StreamEvent{
 				Err: errors.New(event.AsError().Message),
 			})
+			h.logger.Debug("收到错误", elog.String("err", event.AsError().Message))
 		case "response.output_text.delta":
 			text := event.AsResponseOutputTextDelta()
 			h.sendEvt(ctx, domain.StreamEvent{
@@ -201,12 +202,14 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 					Content: text.Delta,
 				},
 			})
+			h.logger.Debug("收到文本", elog.String("output_text.delta", text.Delta))
 		case "response.output_item.done":
 			item := event.AsResponseOutputItemDone().Item
 			if item.Type != "function_call" {
 				h.logger.Debug("非 function call 类型的 output item", elog.String("type", item.Type))
 				continue
 			}
+			h.logger.Debug("收到调用", elog.String("function_call", item.Name))
 			fc := item.AsFunctionCall()
 			fcallsItems = append(fcallsItems, fc)
 		}

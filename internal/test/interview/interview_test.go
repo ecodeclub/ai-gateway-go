@@ -654,6 +654,7 @@ func initStreamHandler(
 // 端口: 8080
 // 功能: 将前端 HTTP 请求转换为 gRPC 调用，并将 gRPC 流式响应转换为 SSE
 func TestInterviewProxyServer(t *testing.T) {
+	elog.DefaultLogger.SetLevel(elog.DebugLevel)
 	// 1. 连接到 gRPC 服务器
 	conn, err := grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

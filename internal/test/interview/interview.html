@@ -507,7 +507,7 @@
         await createChat();
 
         // 请求第一题（题目编号由后端的current字段控制）
-        await streamRequest("开始面试");
+        await streamRequest("执行’开始面试‘命令");
 
         els.btnSpeak.disabled = false;
         els.btnSpeak.onclick = () => speak(els.question.textContent);
