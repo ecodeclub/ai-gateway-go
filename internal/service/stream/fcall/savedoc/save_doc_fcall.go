@@ -46,12 +46,14 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 	}
 	c.logger.Debug("保存变量", elog.String("varName", saveReq.VarName), elog.String("type", saveReq.Type), elog.String("content", string(saveReq.Content)))
 	ctx.Chat.Vars[saveReq.VarName] = saveReq.Content
-	return fcall.Response{}, err
+	return fcall.Response{
+		NextState: saveReq.NextState,
+	}, err
 }
 
 type Request struct {
-	VarName      string          `json:"varName,omitempty"`
-	Type         string          `json:"type,omitempty"`
-	Content      json.RawMessage `json:"content,omitempty"`
-	NextInvCfgID int64           `json:"NextInvCfgID,omitempty"`
+	VarName   string          `json:"varName,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Content   json.RawMessage `json:"content,omitempty"`
+	NextState string          `json:"nextState,omitempty"`
 }

@@ -44,9 +44,10 @@ func NewChatServer(svc *service.ChatService, o *orchestrator.Orchestrator) *Chat
 func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.SaveResponse, error) {
 	chat := request.GetChat()
 	sn, err := c.svc.Save(ctx, domain.Chat{
-		Title: chat.Title,
 		Uid:   chat.Uid,
+		BizID: request.GetBizId(),
 		Sn:    chat.Sn,
+		Title: chat.Title,
 	})
 	if err != nil {
 		return &ai.SaveResponse{}, err

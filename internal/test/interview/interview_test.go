@@ -48,6 +48,7 @@ import (
 	_ "github.com/ecodeclub/ai-gateway-go/internal/test"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
 	elasticsearch "github.com/elastic/go-elasticsearch/v9"
+	"github.com/gotomicro/ego/core/elog"
 	openai3 "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/stretchr/testify/assert"
@@ -64,8 +65,9 @@ var userPrompt string
 
 // TestGrpcServer 启动 gRPC 服务器用于面试功能测试
 // 端口: 9090
-// 功能: 提供 StreamV1 接口，处理面试逻辑
+// 功能: 提供 Stream 接口，处理面试逻辑
 func TestGrpcServer(t *testing.T) {
+	elog.DefaultLogger.SetLevel(elog.DebugLevel)
 	ctx := context.Background()
 
 	// 1. 初始化 stream handler（需要 OpenAI client）
@@ -137,7 +139,7 @@ func TestGrpcServer(t *testing.T) {
 	})
 
 	// 4. 准备测试数据
-	log.Println("📝 准备测试数据...")
+	log.Println("准备测试数据...")
 
 	// 4.1 创建 Provider（OpenAI）
 	providerID, err := providerDAO.SaveProvider(ctx, dao.Provider{
@@ -166,30 +168,41 @@ func TestGrpcServer(t *testing.T) {
 	bizConfigDAO := dao.NewBizConfigDAO(db)
 	bizRepo := repository.NewBizConfigRepository(bizConfigDAO)
 	bizSvc := service.NewBizConfigService(bizRepo)
-
-	bizID, err := bizSvc.Save(ctx, domain.Biz{
-		Name:      "面试测试",
+	biz := domain.Biz{
+		ID:        100000,
+		Name:      "MySQL模拟面试助手",
 		OwnerID:   1,
 		OwnerType: "user",
-	})
-	if err != nil {
-		t.Fatalf("创建 Biz 失败: %v", err)
 	}
-	log.Printf("   ✓ 创建 Biz: 面试测试 (ID: %d)", bizID)
+	_, err = bizSvc.Save(ctx, biz)
+	require.NoError(t, err, "创建 Biz 失败")
+	log.Printf("创建 Biz 成功，ID = %d", biz.ID)
 
 	// 4.4 创建 InvocationConfig
 	invSvc := service.NewInvocationConfigService(invConfigRepo, bizRepo, providerRepo)
 
 	cfgID, err := invSvc.Save(ctx, domain.InvocationConfig{
-		ID:          100001,
+		ID: 100001,
+		// 因为只有一个配置所以与业务名相同，如果分步骤可能是各个步骤的名称。
 		Name:        "MySQL模拟面试助手",
-		Biz:         domain.Biz{ID: bizID},
+		Biz:         domain.Biz{ID: biz.ID},
 		Description: "用于MySQL模拟面试的配置",
 	})
-	if err != nil {
-		t.Fatalf("创建 InvocationConfig 失败: %v", err)
+	require.NoError(t, err)
+	log.Printf("创建 InvocationConfig: MySQL模拟面试助手 (ID: %d)", cfgID)
+
+	// 更新 Biz 设置 BizOrchestration
+	biz.Config = domain.BizConfig{
+		Orchestration: domain.Orchestration{
+			Main:    domain.NewThread(cfgID), // 使用 InvocationConfig.ID
+			Threads: map[string]*domain.Thread{
+				// "continue": domain.NewThread(cfgID), // 继续状态，指向同一个 Thread
+			},
+		},
 	}
-	log.Printf("   ✓ 创建 InvocationConfig: MySQL模拟面试助手 (ID: %d)", cfgID)
+	_, err = bizSvc.Save(ctx, biz)
+	require.NoError(t, err, "更新 Biz BizOrchestration 失败")
+	log.Printf("更新 Biz BizOrchestration (使用 ConfigID: %d)", cfgID)
 
 	// 4.5 创建 InvocationConfigVersion（active）
 	versionID, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
@@ -216,6 +229,10 @@ func TestGrpcServer(t *testing.T) {
       "varName": {
         "type": "string",
         "description": "变量名，用于保存本次查询结果。使用 Question_N 格式命名，例如 Question_1"
+      },
+      "nextState": {
+        "type": "string",
+        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
       },
       "es_dsl": {
         "type": "object",
@@ -364,7 +381,7 @@ func TestGrpcServer(t *testing.T) {
         "required": ["index", "query"]
       }
     },
-    "required": ["varName", "es_dsl"]
+    "required": ["varName", "es_dsl", "nextState"]
   }
 }`,
 			},
@@ -380,6 +397,10 @@ func TestGrpcServer(t *testing.T) {
       "varName": {
         "type": "string",
         "description": "变量名，用于保存结果。题目用Question_N，评价用Evaluation_N，总结用Summary"
+      },
+      "nextState": {
+        "type": "string",
+        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
       },
       "result": {
         "description": "要发送的JSON对象，根据type字段匹配对应的结构",
@@ -521,7 +542,7 @@ func TestGrpcServer(t *testing.T) {
         ]
       }
     },
-    "required": ["varName", "result"],
+    "required": ["varName", "result", "nextState"],
     "additionalProperties": false
   }
 }`,
@@ -548,9 +569,13 @@ func TestGrpcServer(t *testing.T) {
       "content": {
         "type": "string",
         "description": "JSON数组字符串。每个元素包含: question_id, question(题目), answer(回答), scores(评分对象), evaluation(评价对象)。必须包含之前的所有记录加上当前新记录。"
+      },
+      "nextState": {
+        "type": "string",
+        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
       }
     },
-    "required": ["varName", "content", "type"],
+    "required": ["varName", "content", "type", "nextState"],
     "additionalProperties": false
   }
 }`,
@@ -564,16 +589,16 @@ func TestGrpcServer(t *testing.T) {
 
 	// 清理函数
 	defer func() {
-		log.Println("\n🧹 清理测试数据...")
+		log.Println("\n清理测试数据...")
 		db.Delete(&dao.InvocationConfigVersion{}, versionID)
 		db.Delete(&dao.InvocationConfig{}, cfgID)
-		db.Delete(&dao.Biz{}, bizID)
+		db.Delete(&dao.Biz{}, biz.ID)
 		db.Delete(&dao.Model{}, modelID)
 		db.Delete(&dao.Provider{}, providerID)
-		log.Println("   ✓ 测试数据已清理")
+		log.Println("测试数据已清理")
 	}()
 
-	log.Println("\n✅ 数据准备完成，测试环境已就绪")
+	log.Println("\n数据准备完成，测试环境已就绪")
 
 	// 5. 启动 gRPC 服务器
 	chatSvc := app.ChatService
@@ -595,9 +620,10 @@ func TestGrpcServer(t *testing.T) {
 
 	defer grpcServer.Stop()
 
-	log.Println("🚀 gRPC 服务器启动于 :9090")
-	log.Printf("📋 InvocationConfig ID: %d", cfgID)
-	log.Println("💡 按 Ctrl+C 停止服务器")
+	log.Println("gRPC 服务器启动于 :9090")
+	log.Printf("InvocationConfig ID: %d", cfgID)
+	log.Printf("Biz.ID: %d", biz.ID)
+	log.Println("按 Ctrl+C 停止服务器")
 	log.Println("---")
 
 	// 保持运行
@@ -629,8 +655,7 @@ func initStreamHandler(
 // 功能: 将前端 HTTP 请求转换为 gRPC 调用，并将 gRPC 流式响应转换为 SSE
 func TestInterviewProxyServer(t *testing.T) {
 	// 1. 连接到 gRPC 服务器
-	conn, err := grpc.Dial("localhost:9090",
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("连接 gRPC 失败: %v", err)
 	}
@@ -659,6 +684,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		var req struct {
 			Uid   int64  `json:"uid"`
 			Title string `json:"title"`
+			BizId int64  `json:"biz_id"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -666,22 +692,23 @@ func TestInterviewProxyServer(t *testing.T) {
 			return
 		}
 
-		log.Printf("📝 创建 Chat: uid=%d, title=%s", req.Uid, req.Title)
+		log.Printf("创建 Chat: uid=%d, title=%s, biz_id=%d", req.Uid, req.Title, req.BizId)
 
-		// 调用 gRPC Save
+		// 调用 gRPC Save，传入 biz_id
 		resp, err := client.Save(context.Background(), &chatv1.SaveRequest{
 			Chat: &chatv1.Chat{
 				Uid:   req.Uid,
 				Title: req.Title,
 			},
+			BizId: req.BizId,
 		})
 		if err != nil {
-			log.Printf("❌ 创建 Chat 失败: %v", err)
+			log.Printf("创建 Chat 失败: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("✅ Chat 已创建: %s", resp.Sn)
+		log.Printf("Chat 已创建: %s", resp.Sn)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
@@ -689,13 +716,12 @@ func TestInterviewProxyServer(t *testing.T) {
 		})
 	}))
 
-	// 4. StreamV1 流式接口（SSE）
+	// 4. Stream 流式接口（SSE）
 	mux.HandleFunc("/api/interview/stream", corsHandler(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ChatSn   string `json:"chat_sn"`
-			Input    string `json:"input"`
-			ConfigId int64  `json:"config_id"`
-			Uid      int64  `json:"uid"`
+			ChatSn string `json:"chat_sn"`
+			Input  string `json:"input"`
+			Uid    int64  `json:"uid"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -703,20 +729,20 @@ func TestInterviewProxyServer(t *testing.T) {
 			return
 		}
 
-		log.Printf("📥 收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
+		log.Printf("收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
 
-		// 调用 gRPC StreamV1
+		// 调用 gRPC Stream
+		// InvocationConfigId 从 Chat.BizOrchestration 中获取，不需要传入
 		stream, err := client.Stream(context.Background(), &chatv1.StreamRequest{
 			ChatSn: req.ChatSn,
 			Input: &chatv1.UserInput{
 				Content: req.Input,
 			},
-			InvocationConfigId: req.ConfigId,
-			Uid:                req.Uid,
-			Key:                "", // 未使用，传空字符串
+			Uid: req.Uid,
+			Key: "", // 未使用，传空字符串
 		})
 		if err != nil {
-			log.Printf("❌ 调用 StreamV1 失败: %v", err)
+			log.Printf("调用 Stream 失败: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -739,11 +765,11 @@ func TestInterviewProxyServer(t *testing.T) {
 			if err == io.EOF {
 				fmt.Fprintf(w, "event: done\ndata: {}\n\n")
 				flusher.Flush()
-				log.Printf("✅ Stream 完成 (共 %d 个 Delta 事件)", deltaCount)
+				log.Printf("Stream 完成 (共 %d 个 Delta 事件)", deltaCount)
 				break
 			}
 			if err != nil {
-				log.Printf("❌ Stream 错误: %v", err)
+				log.Printf("Stream 错误: %v", err)
 				fmt.Fprintf(w, "event: error\ndata: {\"message\": \"%s\"}\n\n", err.Error())
 				flusher.Flush()
 				break
@@ -757,7 +783,7 @@ func TestInterviewProxyServer(t *testing.T) {
 			// 日志（Delta 事件）
 			if resp.GetDelta() != nil {
 				deltaCount++
-				log.Printf("📤 Delta #%d: %s", deltaCount, resp.GetDelta().Content)
+				log.Printf("Delta #%d: %s", deltaCount, resp.GetDelta().Content)
 			}
 		}
 	}))
@@ -772,13 +798,13 @@ func TestInterviewProxyServer(t *testing.T) {
 		})
 	})
 
-	log.Println("🚀 HTTP 代理服务器启动于 :8080")
-	log.Println("📡 转发目标: localhost:9090 (gRPC)")
-	log.Println("📍 端点:")
+	log.Println("HTTP 代理服务器启动于 :8080")
+	log.Println("转发目标: localhost:9090 (gRPC)")
+	log.Println("端点:")
 	log.Println("   - POST /api/interview/chat/create")
 	log.Println("   - POST /api/interview/stream")
 	log.Println("   - GET  /health")
-	log.Println("💡 按 Ctrl+C 停止服务器")
+	log.Println("按 Ctrl+C 停止服务器")
 	log.Println("---")
 
 	if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -844,9 +870,9 @@ func TestAudioProxyServer(t *testing.T) {
 			targetURL += "?" + r.URL.RawQuery
 		}
 
-		log.Printf("🔄 代理请求: %s %s -> %s", r.Method, r.URL.Path, targetURL)
+		log.Printf("代理请求: %s %s -> %s", r.Method, r.URL.Path, targetURL)
 		if len(bodyBytes) > 0 && len(bodyBytes) < 2000 {
-			log.Printf("📤 请求体: %s", string(bodyBytes))
+			log.Printf("请求体: %s", string(bodyBytes))
 		}
 
 		// 创建新请求
@@ -884,9 +910,9 @@ func TestAudioProxyServer(t *testing.T) {
 			return
 		}
 
-		log.Printf("✅ 响应状态: %d, 大小: %d 字节", resp.StatusCode, len(respBytes))
+		log.Printf("响应状态: %d, 大小: %d 字节", resp.StatusCode, len(respBytes))
 		if len(respBytes) < 2000 {
-			log.Printf("📥 响应体: %s", string(respBytes))
+			log.Printf("响应体: %s", string(respBytes))
 		}
 
 		// 复制响应头（跳过 CORS 头，避免重复）
@@ -927,12 +953,12 @@ func TestAudioProxyServer(t *testing.T) {
 	})
 
 	addr := ":" + port
-	log.Printf("🚀 远程代理服务器启动于 http://localhost%s", addr)
-	log.Printf("📡 转发目标: %s", baseURL)
-	log.Printf("✅ 支持的端点:")
+	log.Printf("远程代理服务器启动于 http://localhost%s", addr)
+	log.Printf("转发目标: %s", baseURL)
+	log.Printf("支持的端点:")
 	log.Printf("   - POST /api/audio/transcriptions")
 	log.Printf("   - GET  /health")
-	log.Printf("💡 提示: 按 Ctrl+C 停止服务器")
+	log.Printf("提示: 按 Ctrl+C 停止服务器")
 	log.Println("---")
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
@@ -948,11 +974,123 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
+// TestKbaseQuestionQuery 测试Kbase题库查询场景
+func TestKbaseQuestionQuery(t *testing.T) {
+	// 前置准备：创建测试数据
+	prepareKbaseTestData(t)
+
+	kbaseBaseURL := "http://localhost:8082"
+	indexName := "interview_questions_mysql"
+
+	// 表格驱动测试
+	tests := []struct {
+		name      string
+		query     map[string]any
+		validator func(t *testing.T, result map[string]any)
+	}{
+		{
+			name:  "场景1_获取第一题",
+			query: buildFirstQuestionQuery(),
+			validator: func(t *testing.T, result map[string]any) {
+				// 验证返回1个结果
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证是第一题（question_id=1）
+				firstHit := hits[0].(map[string]any)
+				source := firstHit["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.Equal(t, 1, qid, "应该返回第一题")
+
+				// ES返回的包含当前题，所以是5（题目1,2,4,5,6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(5), remaining, "ES应该返回5（包含当前题）")
+			},
+		},
+		{
+			name:  "场景2_排除2道题获取下一题",
+			query: buildNextQuestionQuery([]int{1, 2}), // 排除1和2
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证返回的不是1或2
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.NotContains(t, []int{1, 2}, qid, "不应该返回已问过的题目")
+				assert.Contains(t, []int{4, 5, 6}, qid, "应该返回4、5、6之一")
+
+				// ES返回的包含当前题，所以是3（题目4,5,6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(3), remaining, "ES应该返回3（包含当前题）")
+			},
+		},
+		{
+			name:  "场景3_排除4道题获取最后一题",
+			query: buildNextQuestionQuery([]int{1, 2, 4, 5}), // 排除4道，只剩题目6
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 1, len(hits), "应该返回1个结果")
+
+				// 验证返回的是题目6
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+				qid := int(source["question_id"].(float64))
+				assert.Equal(t, 6, qid, "应该返回最后一题(ID=6)")
+
+				// ES返回的包含当前题，所以是1（只有题目6）
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(1), remaining, "ES应该返回1（只剩最后一题）")
+			},
+		},
+		{
+			name:  "场景4_排除所有题目后返回空",
+			query: buildNextQuestionQuery([]int{1, 2, 4, 5, 6}), // 排除所有junior题目
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				assert.Equal(t, 0, len(hits), "排除所有题目后应该返回空")
+
+				// 没有题了，剩余数=0
+				aggs := result["aggregations"].(map[string]any)
+				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
+				assert.Equal(t, float64(0), remaining, "排除所有题目后剩余数应为0")
+			},
+		},
+		{
+			name:  "场景5_验证level过滤有效",
+			query: buildFirstQuestionQuery(), // 只查junior
+			validator: func(t *testing.T, result map[string]any) {
+				hits := result["hits"].(map[string]any)["hits"].([]any)
+				require.Greater(t, len(hits), 0, "应该有返回结果")
+
+				source := hits[0].(map[string]any)["_source"].(map[string]any)
+
+				// 验证level是junior
+				assert.Equal(t, "junior", source["level"], "level应该是junior")
+
+				// 验证question_id不是3（3是middle级别）
+				qid := int(source["question_id"].(float64))
+				assert.NotEqual(t, 3, qid, "不应该返回middle级别的题目(ID=3)")
+			},
+		},
+	}
+
+	// 执行所有测试
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := executeESQuery(t, kbaseBaseURL, indexName, tt.query)
+			tt.validator(t, result)
+		})
+	}
+}
+
 // prepareKbaseTestData 准备Kbase测试数据
 // 使用 go-elasticsearch 直接操作ES，创建索引并插入测试题目
 func prepareKbaseTestData(t *testing.T) {
 	// 1. 创建ES客户端
-	esAddr := "http://localhost:9200"
+	esAddr := "http://localhost:9229"
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{esAddr},
 	})
@@ -1179,118 +1317,6 @@ func insertQuestion(t *testing.T, client *elasticsearch.Client, indexName string
 	if resp.IsError() {
 		body, _ := io.ReadAll(resp.Body)
 		require.Failf(t, "插入文档失败", "[%s]: %s", resp.Status(), string(body))
-	}
-}
-
-// TestKbaseQuestionQuery 测试Kbase题库查询场景
-func TestKbaseQuestionQuery(t *testing.T) {
-	// 前置准备：创建测试数据
-	prepareKbaseTestData(t)
-
-	kbaseBaseURL := "http://localhost:8082"
-	indexName := "interview_questions_mysql"
-
-	// 表格驱动测试
-	tests := []struct {
-		name      string
-		query     map[string]any
-		validator func(t *testing.T, result map[string]any)
-	}{
-		{
-			name:  "场景1_获取第一题",
-			query: buildFirstQuestionQuery(),
-			validator: func(t *testing.T, result map[string]any) {
-				// 验证返回1个结果
-				hits := result["hits"].(map[string]any)["hits"].([]any)
-				assert.Equal(t, 1, len(hits), "应该返回1个结果")
-
-				// 验证是第一题（question_id=1）
-				firstHit := hits[0].(map[string]any)
-				source := firstHit["_source"].(map[string]any)
-				qid := int(source["question_id"].(float64))
-				assert.Equal(t, 1, qid, "应该返回第一题")
-
-				// ES返回的包含当前题，所以是5（题目1,2,4,5,6）
-				aggs := result["aggregations"].(map[string]any)
-				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
-				assert.Equal(t, float64(5), remaining, "ES应该返回5（包含当前题）")
-			},
-		},
-		{
-			name:  "场景2_排除2道题获取下一题",
-			query: buildNextQuestionQuery([]int{1, 2}), // 排除1和2
-			validator: func(t *testing.T, result map[string]any) {
-				hits := result["hits"].(map[string]any)["hits"].([]any)
-				assert.Equal(t, 1, len(hits), "应该返回1个结果")
-
-				// 验证返回的不是1或2
-				source := hits[0].(map[string]any)["_source"].(map[string]any)
-				qid := int(source["question_id"].(float64))
-				assert.NotContains(t, []int{1, 2}, qid, "不应该返回已问过的题目")
-				assert.Contains(t, []int{4, 5, 6}, qid, "应该返回4、5、6之一")
-
-				// ES返回的包含当前题，所以是3（题目4,5,6）
-				aggs := result["aggregations"].(map[string]any)
-				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
-				assert.Equal(t, float64(3), remaining, "ES应该返回3（包含当前题）")
-			},
-		},
-		{
-			name:  "场景3_排除4道题获取最后一题",
-			query: buildNextQuestionQuery([]int{1, 2, 4, 5}), // 排除4道，只剩题目6
-			validator: func(t *testing.T, result map[string]any) {
-				hits := result["hits"].(map[string]any)["hits"].([]any)
-				assert.Equal(t, 1, len(hits), "应该返回1个结果")
-
-				// 验证返回的是题目6
-				source := hits[0].(map[string]any)["_source"].(map[string]any)
-				qid := int(source["question_id"].(float64))
-				assert.Equal(t, 6, qid, "应该返回最后一题(ID=6)")
-
-				// ES返回的包含当前题，所以是1（只有题目6）
-				aggs := result["aggregations"].(map[string]any)
-				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
-				assert.Equal(t, float64(1), remaining, "ES应该返回1（只剩最后一题）")
-			},
-		},
-		{
-			name:  "场景4_排除所有题目后返回空",
-			query: buildNextQuestionQuery([]int{1, 2, 4, 5, 6}), // 排除所有junior题目
-			validator: func(t *testing.T, result map[string]any) {
-				hits := result["hits"].(map[string]any)["hits"].([]any)
-				assert.Equal(t, 0, len(hits), "排除所有题目后应该返回空")
-
-				// 没有题了，剩余数=0
-				aggs := result["aggregations"].(map[string]any)
-				remaining := aggs["remaining_questions"].(map[string]any)["value"].(float64)
-				assert.Equal(t, float64(0), remaining, "排除所有题目后剩余数应为0")
-			},
-		},
-		{
-			name:  "场景5_验证level过滤有效",
-			query: buildFirstQuestionQuery(), // 只查junior
-			validator: func(t *testing.T, result map[string]any) {
-				hits := result["hits"].(map[string]any)["hits"].([]any)
-				require.Greater(t, len(hits), 0, "应该有返回结果")
-
-				source := hits[0].(map[string]any)["_source"].(map[string]any)
-
-				// 验证level是junior
-				assert.Equal(t, "junior", source["level"], "level应该是junior")
-
-				// 验证question_id不是3（3是middle级别）
-				qid := int(source["question_id"].(float64))
-				assert.NotEqual(t, 3, qid, "不应该返回middle级别的题目(ID=3)")
-			},
-		},
-	}
-
-	// 执行所有测试
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := executeESQuery(t, kbaseBaseURL, indexName, tt.query)
-			tt.validator(t, result)
-		})
 	}
 }
 

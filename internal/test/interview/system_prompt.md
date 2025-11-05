@@ -22,6 +22,7 @@
 ```json
 {
   "varName": "Question_1",
+  "nextState": "",
   "es_dsl": {
     "index": "interview_questions_mysql",
     "query": {
@@ -47,6 +48,7 @@
 ```json
 {
   "varName": "QuestionOutput_1",
+  "nextState": "",
   "result": {
     "type": "question",
     "question_id": <从 hits.hits[0]._source.question_id 提取>,
@@ -64,10 +66,10 @@
 **前提**：用户已回答当前题目
 
 **函数调用序列**：
-1. `forward_result(varName, 评价JSON)` → 发送评价给前端
-2. `save_doc(varName, content)` → 保存历史
-3. `kbase_rag(varName, es_dsl)` → 获取下一题（排除已问ID）
-4. `forward_result(varName, 题目JSON)` → 发送给前端
+1. `forward_result(varName, 评价JSON, nextState="")` → 发送评价给前端
+2. `save_doc(varName, content, nextState="")` → 保存历史
+3. `kbase_rag(varName, es_dsl, nextState="")` → 获取下一题（排除已问ID）
+4. `forward_result(varName, 题目JSON, nextState="")` → 发送给前端，结束流程
 
 **评价JSON**（你需要根据用户的回答生成）：
 ```json
@@ -94,6 +96,7 @@
 {
   "varName": "InterviewHistory",
   "type": "json",
+  "nextState": "",
   "content": "[{\"question_id\":1,\"question\":\"...\",\"answer\":\"用户的回答\",\"scores\":{...},\"evaluation\":{...}}, ...]"
 }
 ```
@@ -103,6 +106,7 @@
 ```json
 {
   "varName": "Question_N",  // N 递增
+  "nextState": "",
   "es_dsl": {
     "index": "interview_questions_mysql",
     "query": {
@@ -132,15 +136,16 @@
 **前提**：用户已回答最后一题
 
 **函数调用序列**：
-1. `forward_result(varName, 评价JSON)` → 发送评价给前端
-2. `save_doc(varName, content)` → 保存历史（追加最后一题）
-3. `forward_result(varName, 总结JSON)` → 发送总结给前端
-4. `save_doc(varName, content)` → 保存总结到历史
+1. `forward_result(varName, 评价JSON, nextState="")` → 发送评价给前端
+2. `save_doc(varName, content, nextState="")` → 保存历史（追加最后一题）
+3. `forward_result(varName, 总结JSON, nextState="")` → 发送总结给前端
+4. `save_doc(varName, content, nextState="")` → 保存总结到历史，结束流程
 
 **总结JSON**（基于历史记录生成）：
 ```json
 {
   "varName": "SummaryOutput",
+  "nextState": "",
   "result": {
     "type": "summary",
     "total_questions": <题库总题数>,        // 从用户提示的"已问过的题目ID"数组长度推断
@@ -160,8 +165,8 @@
 **前提**：用户主动结束，可能没回答所有题
 
 **函数调用序列**：
-1. `forward_result(varName, 总结JSON)` → 发送总结给前端
-2. `save_doc(varName, content)` → 保存总结到历史
+1. `forward_result(varName, 总结JSON, nextState="")` → 发送总结给前端
+2. `save_doc(varName, content, nextState="")` → 保存总结到历史，结束流程
 
 **总结JSON**：同命令3
 

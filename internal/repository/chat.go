@@ -56,20 +56,9 @@ func (repo *ChatRepo) Save(ctx context.Context, chat domain.Chat) (string, error
 			Val:   chat.Vars,
 			Valid: chat.Vars != nil,
 		},
-		Orchestration: sqlx.JsonColumn[domain.Orchestration]{
-			Val: domain.Orchestration{
-				Main: domain.NewThread(1),
-				Threads: map[string]*domain.Thread{
-					"resume.project.basic_info":           domain.NewThread(2),
-					"resume.project.domain_contributions": domain.NewThread(3),
-					"resume.project.high_concurrency":     domain.NewThread(4),
-					"resume.project.high_availability":    domain.NewThread(5),
-					"resume.project.leadership":           domain.NewThread(6),
-					"resume.project.other":                domain.NewThread(7),
-					"resume.project.rewrite":              domain.NewThread(8),
-					"render_output":                       domain.NewThread(9),
-				},
-			},
+		BizID: chat.BizID,
+		BizOrchestration: sqlx.JsonColumn[domain.Orchestration]{
+			Val:   chat.BizOrchestration,
 			Valid: true,
 		},
 		Uid: chat.Uid,
@@ -147,12 +136,13 @@ func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error
 		vars = chat.Vars.Val
 	}
 	return domain.Chat{
-		Sn:            chat.Sn,
-		Uid:           chat.Uid,
-		Title:         chat.Title,
-		Vars:          vars,
-		Orchestration: chat.Orchestration.Val,
-		Ctime:         time.UnixMilli(chat.Ctime),
+		Sn:               chat.Sn,
+		Uid:              chat.Uid,
+		Title:            chat.Title,
+		Vars:             vars,
+		BizID:            chat.BizID,
+		BizOrchestration: chat.BizOrchestration.Val,
+		Ctime:            time.UnixMilli(chat.Ctime),
 		Turns: slice.Map(turns, func(idx int, src dao.Turn) *domain.Turn {
 			return &domain.Turn{
 				ID:           src.ID,

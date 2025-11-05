@@ -26,9 +26,9 @@ import (
 type Request struct {
 	// 参数名字，也就是放入到 Turn.AssistantRun.Vars 中的 key
 	VarName string `json:"varName"`
-	// 如果指定了 NextInvCfgID，则在查询完成后，继续调用 LLM
-	NextInvCfgID int64           `json:"nextInvCfgID"`
-	Result       json.RawMessage `json:"result"`
+	// 如果指定了 NextState，则在查询完成后，继续调用 LLM
+	NextState string          `json:"nextState"`
+	Result    json.RawMessage `json:"result"`
 }
 
 type Result struct {
@@ -78,6 +78,7 @@ func (r *Result) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respo
 	ctx.Chat.Vars[resReq.VarName] = string(resReq.Result)
 
 	return fcall.Response{
-		Content: "数据已发送给前端，等待用户下一步操作",
+		Content:   "数据已发送给前端，等待用户下一步操作",
+		NextState: resReq.NextState,
 	}, err
 }
