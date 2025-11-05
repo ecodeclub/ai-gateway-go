@@ -37,6 +37,14 @@ func (o *Orchestrator) Stream(ctx context.Context,
 	sender domain.StreamEventSender) error {
 	// 从 main 开始调度
 	thread := chat.Orchestration.Main
+	state := chat.CurrentTurn().StartState
+	if state != "" {
+		var ok bool
+		thread, ok = chat.Orchestration.Threads[state]
+		if !ok {
+			return fmt.Errorf("找不到 Thread，初始 state %s", state)
+		}
+	}
 	for {
 		chat.CurrentTurn().AssistantRun.StartLLMStep(thread)
 		resp, err1 := o.Handler.Stream(&domain.StreamContext{
@@ -47,7 +55,7 @@ func (o *Orchestrator) Stream(ctx context.Context,
 		if err1 != nil {
 			return err1
 		}
-		state := resp.NextState
+		state = resp.NextState
 		o.logger.Debug("", elog.String("NextState", state))
 		if state == "" {
 			return nil

@@ -33,20 +33,33 @@ type ChatServer struct {
 	ai.UnimplementedServiceServer
 	logger *elog.Component
 	o      *orchestrator.Orchestrator
+	bizSvc *service.BizService
 }
 
-func NewChatServer(svc *service.ChatService, o *orchestrator.Orchestrator) *ChatServer {
-	return &ChatServer{svc: svc,
+func NewChatServer(
+	svc *service.ChatService,
+	o *orchestrator.Orchestrator,
+	bizSvc *service.BizService,
+) *ChatServer {
+	return &ChatServer{
+		svc:    svc,
 		o:      o,
+		bizSvc: bizSvc,
 		logger: elog.DefaultLogger.With(elog.FieldComponent("grpc.ChatServer"))}
 }
 
 func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.SaveResponse, error) {
 	chat := request.GetChat()
+	biz, err := c.bizSvc.Detail(ctx, request.GetBizId())
+	if err != nil {
+		return nil, err
+	}
 	sn, err := c.svc.Save(ctx, domain.Chat{
 		Title: chat.Title,
 		Uid:   chat.Uid,
 		Sn:    chat.Sn,
+		// 初始化的编排配置
+		Orchestration: biz.Config.Orchestration,
 	})
 	if err != nil {
 		return &ai.SaveResponse{}, err
@@ -90,10 +103,11 @@ func (c *ChatServer) Detail(ctx context.Context, request *ai.DetailRequest) (*ai
 func (c *ChatServer) Stream(request *ai.StreamRequest, resp ai.Service_StreamServer) error {
 	chat, err := c.svc.Detail(resp.Context(), request.ChatSn)
 	if err != nil {
-		return fmt.Errorf("查找 Chat 详情失败 %w", err)
+		return fmt.Errorf("查找 Chat 详情失败 %w, sn %s", err, request.ChatSn)
 	}
 
 	turn := &domain.Turn{
+		StartState: request.State,
 		UserRun: &domain.UserRun{
 			Content: request.Input.Content,
 			Files:   request.Input.Files,

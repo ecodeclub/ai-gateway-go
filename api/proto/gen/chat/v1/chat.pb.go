@@ -44,6 +44,7 @@ type StreamRequest struct {
 	InvocationConfigId int64  `protobuf:"varint,3,opt,name=invocation_config_id,json=invocationConfigId,proto3" json:"invocation_config_id,omitempty"`
 	Uid                int64  `protobuf:"varint,4,opt,name=uid,proto3" json:"uid,omitempty"`
 	Key                string `protobuf:"bytes,5,opt,name=key,proto3" json:"key,omitempty"`
+	State              string `protobuf:"bytes,6,opt,name=state,proto3" json:"state,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -109,6 +110,13 @@ func (x *StreamRequest) GetUid() int64 {
 func (x *StreamRequest) GetKey() string {
 	if x != nil {
 		return x.Key
+	}
+	return ""
+}
+
+func (x *StreamRequest) GetState() string {
+	if x != nil {
+		return x.State
 	}
 	return ""
 }
@@ -984,13 +992,14 @@ var File_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x12chat/v1/chat.proto\x12\achat.v1\"\xa8\x01\n" +
+	"\x12chat/v1/chat.proto\x12\achat.v1\"\xbe\x01\n" +
 	"\rStreamRequest\x12\x17\n" +
 	"\achat_sn\x18\x01 \x01(\tR\x06chatSn\x12(\n" +
 	"\x05input\x18\x02 \x01(\v2\x12.chat.v1.UserInputR\x05input\x120\n" +
 	"\x14invocation_config_id\x18\x03 \x01(\x03R\x12invocationConfigId\x12\x10\n" +
 	"\x03uid\x18\x04 \x01(\x03R\x03uid\x12\x10\n" +
-	"\x03key\x18\x05 \x01(\tR\x03key\"\x83\x02\n" +
+	"\x03key\x18\x05 \x01(\tR\x03key\x12\x14\n" +
+	"\x05state\x18\x06 \x01(\tR\x05state\"\x83\x02\n" +
 	"\x0eStreamResponse\x12&\n" +
 	"\x05delta\x18\x01 \x01(\v2\x0e.chat.v1.DeltaH\x00R\x05delta\x128\n" +
 	"\vattachments\x18\x02 \x01(\v2\x14.chat.v1.AttachmentsH\x00R\vattachments\x12&\n" +
