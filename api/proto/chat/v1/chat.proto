@@ -36,6 +36,7 @@ message StreamRequest {
   int64 invocation_config_id = 3;
   int64 uid = 4;
   string key = 5;
+  string state = 6;
 }
 
 message StreamResponse {

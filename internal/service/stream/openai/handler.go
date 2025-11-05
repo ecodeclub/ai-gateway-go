@@ -92,9 +92,9 @@ func (h *Handler) initConversationsIfNeeded(ctx *domain.StreamContext) error {
 }
 
 func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion) (responses.ResponseNewParams, error) {
+
 	input := h.toInput(ctx)
 	step := ctx.Chat.CurrentTurn().AssistantRun.CurrentStep()
-	h.logger.Debug("调用 OpenAI 的输入", elog.String("cid3rd", step.Thread.Conversation.ID), elog.Any("input", input))
 	params := responses.ResponseNewParams{
 		Input:           input,
 		Model:           cfg.Model.Name,
@@ -115,6 +115,8 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		// 设置 instructions
 		params.Instructions = openai.String(cfg.SystemPrompt)
 	}
+
+	h.logger.Debug("调用 OpenAI 的输入", elog.String("cid3rd", step.Thread.Conversation.ID), elog.Any("input", input))
 
 	if len(cfg.Functions) > 0 {
 		params.ToolChoice = responses.ResponseNewParamsToolChoiceUnion{
@@ -185,8 +187,7 @@ func (h *Handler) toInputItem(content, role string) responses.ResponseInputItemU
 func (h *Handler) forward(ctx *domain.StreamContext,
 	cfg domain.InvocationConfigVersion,
 	sse *ssestream.Stream[responses.ResponseStreamEventUnion]) (stream.Response, error) {
-	// 一般都只有一个
-	fcallsItems := make([]responses.ResponseFunctionToolCall, 0, 1)
+	var nextState string
 	for sse.Next() {
 		event := sse.Current()
 		switch event.Type {
@@ -208,48 +209,28 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 				continue
 			}
 			fc := item.AsFunctionCall()
-			fcallsItems = append(fcallsItems, fc)
-		}
-	}
-
-	err := sse.Err()
-	if len(fcallsItems) == 0 {
-		return stream.Response{}, err
-	}
-	if err != nil {
-		h.logger.Error("sse 有 ERROR", elog.FieldErr(err))
-	}
-	fcallRespList := make([]FCResp, 0, len(fcallsItems))
-	for _, fc := range fcallsItems {
-		fcallResp, err1 := h.handleFC(ctx, fc)
-		if err1 != nil {
-			h.logger.Error("执行 function call 出现问题", elog.FieldErr(err), elog.Any("fc", fc))
-			continue
-		}
-		fcallRespList = append(fcallRespList, FCResp{
-			FC:   fc,
-			Resp: fcallResp,
-		})
-	}
-
-	// 不管有没有问题，都要返回一个 response，一次性返回所有的 function call 的结果
-	fcRespInput := h.toFCResulInput(ctx, cfg, fcallRespList)
-	if h.logger.IsDebugMode() {
-		val, _ := json.Marshal(fcRespInput)
-		h.logger.Debug(string(val))
-	}
-	_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
-	if err1 != nil {
-		h.logger.Error("返回 FC 响应给 OpenAI 失败",
-			elog.FieldErr(err1))
-	}
-	nextState := ""
-	for _, fc := range fcallRespList {
-		fcallResp := fc.Resp
-		if fcallResp.NextState != "" {
+			fcallResp, err := h.handleFC(ctx, fc)
+			if err != nil {
+				h.logger.Error("执行 function call 出现问题", elog.FieldErr(err), elog.Any("fc", fc))
+				continue
+			}
 			nextState = fcallResp.NextState
+			// 不管有没有问题，都要返回一个 response，一次性返回所有的 function call 的结果
+			fcRespInput := h.toFCResulInput(ctx, cfg, []FCResp{
+				{
+					FC:   fc,
+					Resp: fcallResp,
+				},
+			})
+
+			_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
+			if err1 != nil {
+				h.logger.Error("返回 FC 响应给 OpenAI 失败",
+					elog.FieldErr(err1))
+			}
 		}
 	}
+	err := sse.Err()
 	return stream.Response{NextState: nextState}, err
 }
 

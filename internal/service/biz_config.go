@@ -22,21 +22,21 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type BizConfigService struct {
+type BizService struct {
 	repo *repository.BizConfigRepository
 }
 
-func NewBizConfigService(repo *repository.BizConfigRepository) *BizConfigService {
-	return &BizConfigService{
+func NewBizConfigService(repo *repository.BizConfigRepository) *BizService {
+	return &BizService{
 		repo: repo,
 	}
 }
 
-func (s *BizConfigService) Save(ctx context.Context, req domain.Biz) (int64, error) {
+func (s *BizService) Save(ctx context.Context, req domain.Biz) (int64, error) {
 	return s.repo.Save(ctx, req)
 }
 
-func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domain.Biz, int64, error) {
+func (s *BizService) List(ctx context.Context, offset, limit int) ([]domain.Biz, int64, error) {
 	var (
 		eg    errgroup.Group
 		res   []domain.Biz
@@ -56,6 +56,6 @@ func (s *BizConfigService) List(ctx context.Context, offset, limit int) ([]domai
 	return res, total, err
 }
 
-func (s *BizConfigService) Detail(ctx context.Context, id int64) (domain.Biz, error) {
+func (s *BizService) Detail(ctx context.Context, id int64) (domain.Biz, error) {
 	return s.repo.GetByID(ctx, id)
 }
