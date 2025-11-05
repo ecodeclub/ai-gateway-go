@@ -99,6 +99,9 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		Input:           input,
 		Model:           cfg.Model.Name,
 		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
+		Reasoning: responses.ReasoningParam{
+			Effort: responses.ReasoningEffortMinimal,
+		},
 	}
 
 	if step.Thread.Conversation.ID == "" {
@@ -107,12 +110,16 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		if err != nil {
 			return responses.ResponseNewParams{}, err
 		}
-		params.Conversation = responses.ResponseNewParamsConversationUnion{
-			OfConversationObject: &responses.ResponseConversationParam{
-				ID: step.Thread.Conversation.ID,
-			},
-		}
-		// 设置 instructions
+	}
+	// 无论 Conversation ID 是否已存在，都需要设置，以便 OpenAI 能够正确关联 function call 和其响应
+	params.Conversation = responses.ResponseNewParamsConversationUnion{
+		OfConversationObject: &responses.ResponseConversationParam{
+			ID: step.Thread.Conversation.ID,
+		},
+	}
+
+	// 设置 instructions（只在首次初始化时设置，或者如果还未设置则设置）
+	if cfg.SystemPrompt != "" {
 		params.Instructions = openai.String(cfg.SystemPrompt)
 	}
 
@@ -130,9 +137,9 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		})
 	}
 
-	if cfg.Temperature >= 0 {
-		params.Temperature = openai.Float(float64(cfg.Temperature))
-	}
+	//if cfg.Temperature >= 0 {
+	//	params.Temperature = openai.Float(float64(cfg.Temperature))
+	//}
 
 	if cfg.TopP >= 0 {
 		params.TopP = openai.Float(float64(cfg.TopP))

@@ -57,10 +57,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-//go:embed system_prompt.md
+//go:embed system_prompt_v2.md
 var systemPrompt string
 
-//go:embed user_prompt.md
+//go:embed user_prompt_v2.md
 var userPrompt string
 
 // TestGrpcServer 启动 gRPC 服务器用于面试功能测试
@@ -153,7 +153,7 @@ func TestGrpcServer(t *testing.T) {
 
 	// 4.2 创建 Model
 	modelID, err := providerDAO.SaveModel(ctx, dao.Model{
-		Name:        openai3.ChatModelGPT5ChatLatest,
+		Name:        openai3.ChatModelGPT5,
 		Pid:         providerID,
 		InputPrice:  150, // $0.150 / 1M tokens
 		OutputPrice: 600, // $0.600 / 1M tokens
@@ -194,9 +194,13 @@ func TestGrpcServer(t *testing.T) {
 	// 更新 Biz 设置 BizOrchestration
 	biz.Config = domain.BizConfig{
 		Orchestration: domain.Orchestration{
-			Main:    domain.NewThread(cfgID), // 使用 InvocationConfig.ID
+			Main: domain.NewThread(cfgID), // 使用 InvocationConfig.ID
 			Threads: map[string]*domain.Thread{
-				// "continue": domain.NewThread(cfgID), // 继续状态，指向同一个 Thread
+				"send_to_user":      domain.NewThread(cfgID), // 发送题目给用户
+				"save_history":      domain.NewThread(cfgID), // 保存历史记录
+				"get_next_question": domain.NewThread(cfgID), // 获取下一题
+				"generate_summary":  domain.NewThread(cfgID), // 生成面试总结
+				"save_summary":      domain.NewThread(cfgID), // 保存总结
 			},
 		},
 	}
@@ -232,7 +236,8 @@ func TestGrpcServer(t *testing.T) {
       },
       "nextState": {
         "type": "string",
-        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
+        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
+        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
       },
       "es_dsl": {
         "type": "object",
@@ -400,7 +405,8 @@ func TestGrpcServer(t *testing.T) {
       },
       "nextState": {
         "type": "string",
-        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
+        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
+        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
       },
       "result": {
         "description": "要发送的JSON对象，根据type字段匹配对应的结构",
@@ -572,7 +578,8 @@ func TestGrpcServer(t *testing.T) {
       },
       "nextState": {
         "type": "string",
-        "description": "下一个状态。用于驱动开发者侧后续逻辑，开发者应该在系统提示词中明确给出值。如果为空字符串，则表示执行完本次调用即可无需驱动后续逻辑。"
+        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
+        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
       }
     },
     "required": ["varName", "content", "type", "nextState"],

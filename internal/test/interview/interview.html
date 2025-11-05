@@ -507,7 +507,7 @@
         await createChat();
 
         // 请求第一题（题目编号由后端的current字段控制）
-        await streamRequest("执行’开始面试‘命令");
+        await streamRequest("开始面试");
 
         els.btnSpeak.disabled = false;
         els.btnSpeak.onclick = () => speak(els.question.textContent);
@@ -542,7 +542,7 @@
             els.transcriptBox.textContent = transcript || '// 转写为空';
             els.transcriptBox.className = '';
 
-            // 2. 🚨 根据是否最后一题发送不同命令
+            // 2. 根据是否最后一题发送不同命令，同时包含用户的回答
             const q = els.question.textContent.trim();
             let command;
             if (isLastQuestion) {
@@ -553,7 +553,9 @@
                 console.log('📝 发送命令:', command);
             }
             
-            await streamRequest(command);
+            // 将命令和用户的回答一起发送
+            const userInput = `执行命令：${command}\n\n用户的回答：${transcript}`;
+            await streamRequest(userInput);
 
             // 3. 保存历史
             history.push({ question: q, transcript });
@@ -574,9 +576,10 @@
 
     els.btnDontKnow.onclick = async () => {
         const q = els.question.textContent.trim();
-        history.push({ question: q, transcript: '我不会', judge: { note: '跳过' } });
+        const answer = '我不会';
+        history.push({ question: q, transcript: answer, judge: { note: '跳过' } });
 
-        // 🚨 根据是否最后一题发送不同命令
+        // 根据是否最后一题发送不同命令，同时包含用户的回答
         let command;
         if (isLastQuestion) {
             command = "评价答案并生成面试总结";
@@ -586,7 +589,9 @@
             console.log('📝 发送命令:', command);
         }
         
-        await streamRequest(command);
+        // 将命令和用户的回答一起发送
+        const userInput = `执行命令：${command}\n\n用户的回答：${answer}`;
+        await streamRequest(userInput);
         resetUIForNextQuestion();
     };
 
