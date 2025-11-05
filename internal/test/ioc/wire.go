@@ -37,7 +37,7 @@ func InitApp(to TestOnly) *TestApp {
 		ioc.ProviderSet,
 		ioc.QuotaSet,
 		ioc.FuncCallSet,
-		wire.FieldsOf(new(TestOnly), "Handler"),
+		wire.FieldsOf(new(TestOnly), "Orchestrator"),
 		wire.Struct(new(TestApp), "*"),
 	)
 	return new(TestApp)

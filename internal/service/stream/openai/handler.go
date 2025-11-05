@@ -92,7 +92,6 @@ func (h *Handler) initConversationsIfNeeded(ctx *domain.StreamContext) error {
 }
 
 func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion) (responses.ResponseNewParams, error) {
-
 	input := h.toInput(ctx)
 	step := ctx.Chat.CurrentTurn().AssistantRun.CurrentStep()
 	h.logger.Debug("调用 OpenAI 的输入", elog.String("cid3rd", step.Thread.Conversation.ID), elog.Any("input", input))
