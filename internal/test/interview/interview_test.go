@@ -35,6 +35,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/repository"
 	"github.com/ecodeclub/ai-gateway-go/internal/repository/dao"
 	"github.com/ecodeclub/ai-gateway-go/internal/service"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/orchestrator"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/forward"
@@ -129,9 +130,10 @@ func TestGrpcServer(t *testing.T) {
 
 	// 创建 stream handler
 	streamHandler := initStreamHandler(openaiHandler, chatRepo, invConfigRepo, providerRepo)
+	orch := orchestrator.NewOrchestrator(streamHandler)
 
 	app := testioc.InitApp(testioc.TestOnly{
-		Handler: streamHandler,
+		Orchestrator: orch,
 	})
 
 	// 4. 准备测试数据
@@ -575,7 +577,7 @@ func TestGrpcServer(t *testing.T) {
 
 	// 5. 启动 gRPC 服务器
 	chatSvc := app.ChatService
-	chatServer := igrpc.NewChatServer(chatSvc, streamHandler)
+	chatServer := igrpc.NewChatServer(chatSvc, orch)
 
 	grpcServer := grpc.NewServer()
 	chatv1.RegisterServiceServer(grpcServer, chatServer)
@@ -704,7 +706,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		log.Printf("📥 收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
 
 		// 调用 gRPC StreamV1
-		stream, err := client.StreamV1(context.Background(), &chatv1.StreamV1Request{
+		stream, err := client.Stream(context.Background(), &chatv1.StreamRequest{
 			ChatSn: req.ChatSn,
 			Input: &chatv1.UserInput{
 				Content: req.Input,

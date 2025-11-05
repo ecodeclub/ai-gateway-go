@@ -66,7 +66,7 @@ func (r *Result) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respo
 
 	r.logger.Debug("resReq.Result："+string(resReq.Result), elog.String("varName", resReq.VarName))
 
-	err = ctx.Sender.Send(domain.StreamEventV1{
+	err = ctx.Sender.Send(domain.StreamEvent{
 		Delta: &domain.Delta{
 			Content: string(resReq.Result),
 		},
@@ -78,7 +78,6 @@ func (r *Result) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respo
 	ctx.Chat.Vars[resReq.VarName] = string(resReq.Result)
 
 	return fcall.Response{
-		Content:      "数据已发送给前端，等待用户下一步操作",
-		NextInvCfgID: resReq.NextInvCfgID,
+		Content: "数据已发送给前端，等待用户下一步操作",
 	}, err
 }

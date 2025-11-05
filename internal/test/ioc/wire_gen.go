@@ -36,13 +36,13 @@ func InitApp(to TestOnly) *TestApp {
 	quotaService := ioc.InitQuota(quotaRepo)
 	providerService := ioc.InitProvider(providerRepository)
 	chatService := service.NewChatService(chatRepo, invocationConfigRepo, quotaService, providerService)
-	handler := to.Handler
-	chatServer := grpc.NewChatServer(chatService, handler)
+	orchestrator := to.Orchestrator
+	chatServer := grpc.NewChatServer(chatService, orchestrator)
 	component := ioc.InitGrpcServer(chatServer)
 	provider := InitSession()
 	mockHandler := admin.NewMockHandler()
-	bizConfigDAO := dao.NewBizConfigDAO(db)
-	bizConfigRepository := repository.NewBizConfigRepository(bizConfigDAO)
+	bizDAO := dao.NewBizConfigDAO(db)
+	bizConfigRepository := repository.NewBizConfigRepository(bizDAO)
 	invocationConfigService := service.NewInvocationConfigService(invocationConfigRepo, bizConfigRepository, providerRepository)
 	invocationConfigHandler := admin.NewInvocationConfigHandler(invocationConfigService)
 	bizConfigService := service.NewBizConfigService(bizConfigRepository)
