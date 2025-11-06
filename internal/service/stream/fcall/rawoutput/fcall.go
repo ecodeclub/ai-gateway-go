@@ -52,6 +52,6 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 }
 
 type Request struct {
-	Content string `json:"content"`
-	State   string `json:"state"`
+	Content string `json:"content,omitempty"`
+	State   string `json:"state,omitempty"`
 }

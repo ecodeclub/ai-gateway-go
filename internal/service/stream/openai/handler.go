@@ -98,9 +98,6 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		Input:           input,
 		Model:           cfg.Model.Name,
 		MaxOutputTokens: openai.Int(int64(cfg.MaxTokens)),
-		Reasoning: responses.ReasoningParam{
-			Effort: responses.ReasoningEffortMinimal,
-		},
 	}
 
 	if step.Thread.Conversation.ID == "" {
@@ -110,14 +107,15 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 			return responses.ResponseNewParams{}, err
 		}
 	}
-	// 无论 Conversation ID 是否已存在，都需要设置，以便 OpenAI 能够正确关联 function call 和其响应
+
+	// 无论 Conversation ID 是否已存在，都需要设置，以便 OpenAI 能够正确关联历史对话、function call 和其响应等。
 	params.Conversation = responses.ResponseNewParamsConversationUnion{
 		OfConversationObject: &responses.ResponseConversationParam{
 			ID: step.Thread.Conversation.ID,
 		},
 	}
 
-	// 设置 instructions（只在首次初始化时设置，或者如果还未设置则设置）
+	// 设置 instructions
 	if cfg.SystemPrompt != "" {
 		params.Instructions = openai.String(cfg.SystemPrompt)
 	}

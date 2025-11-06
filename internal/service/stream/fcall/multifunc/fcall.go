@@ -19,7 +19,6 @@ import (
 
 	"github.com/ecodeclub/ai-gateway-go/internal/domain"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
-	"github.com/gotomicro/ego/core/elog"
 	"github.com/openai/openai-go/v3/responses"
 )
 
@@ -40,19 +39,6 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 	err := json.Unmarshal(req.Args, &fcReq)
 	if err != nil {
 		return fcall.Response{}, err
-	}
-	// 使用 elog 记录 multi_call 的调用参数
-	logger := elog.DefaultLogger.With(elog.FieldComponent("fcall.multi_call"))
-	logger.Debug("收到 multi_call 请求",
-		elog.Int("calls_count", len(fcReq.Calls)),
-		elog.String("content", fcReq.Content),
-		elog.String("nextState", fcReq.NextState))
-	for i, call := range fcReq.Calls {
-		logger.Debug("multi_call 中的函数调用",
-			elog.Int("index", i),
-			elog.String("name", call.Name),
-			elog.String("call_id", call.CallID),
-			elog.String("arguments", call.Arguments))
 	}
 	var resp fcall.Response
 	for _, call := range fcReq.Calls {
