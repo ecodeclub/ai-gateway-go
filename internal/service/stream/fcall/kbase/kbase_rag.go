@@ -59,10 +59,6 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	response := httpx.NewRequest(ctx.Ctx, http.MethodPost, k.url).
 		Client(k.client).JSONBody(ragReq.EsDsl).Do()
 
-	//if response.Err() != nil {
-	//	return fcall.Response{}, fmt.Errorf("执行知识库查询失败, err: %v", response.Err())
-	//}
-
 	if response.StatusCode != http.StatusOK {
 		return fcall.Response{}, fmt.Errorf("执行知识库查询失败, status code: %d", response.StatusCode)
 	}

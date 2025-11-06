@@ -16,7 +16,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gotomicro/ego/core/elog"
 
@@ -28,7 +27,6 @@ import (
 type ChatService struct {
 	repo            *repository.ChatRepo
 	configRepo      *repository.InvocationConfigRepo
-	bizRepo         *repository.BizConfigRepository
 	logger          *elog.Component
 	quotaService    *QuotaService
 	providerService *ProviderService
@@ -37,14 +35,12 @@ type ChatService struct {
 func NewChatService(
 	repo *repository.ChatRepo,
 	configRepo *repository.InvocationConfigRepo,
-	bizRepo *repository.BizConfigRepository,
 	quotaService *QuotaService,
 	provider *ProviderService,
 ) *ChatService {
 	return &ChatService{
 		repo:            repo,
 		configRepo:      configRepo,
-		bizRepo:         bizRepo,
 		quotaService:    quotaService,
 		providerService: provider,
 		logger:          elog.DefaultLogger.With(elog.FieldComponent("service.ChatService")),
@@ -52,11 +48,6 @@ func NewChatService(
 }
 
 func (c *ChatService) Save(ctx context.Context, chat domain.Chat) (string, error) {
-	biz, err := c.bizRepo.GetByID(ctx, chat.BizID)
-	if err != nil {
-		return "", fmt.Errorf("获取业务配置失败: %w", err)
-	}
-	chat.BizOrchestration = biz.Config.Orchestration
 	return c.repo.Save(ctx, chat)
 }
 

@@ -41,15 +41,15 @@ type Chat struct {
 
 type Orchestration struct {
 	// Threads 存储的是 Thread 有关的上下文
-	Threads map[string]*Thread `json:"threads"`
+	Threads map[string]*Thread `json:"threads,omitempty"`
 
 	// Main 不是主要的意思，而是 main 函数的那个 main，万物起点
-	Main *Thread `json:"main"`
+	Main *Thread `json:"main,omitempty"`
 }
 
 // LLMConversation 代表第三方的 Conversation
 type LLMConversation struct {
-	ID string
+	ID string `json:"id"`
 }
 
 // CurrentTurn 返回当前这一轮
@@ -84,6 +84,8 @@ type Turn struct {
 	ID           int64
 	UserRun      *UserRun
 	AssistantRun *AssistantRun
+	// 这一轮的初始化状态
+	StartState string
 }
 
 // AssistantRun 代表的是AI执行的内容

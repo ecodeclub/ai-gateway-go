@@ -194,13 +194,13 @@ func TestGrpcServer(t *testing.T) {
 	// 更新 Biz 设置 BizOrchestration
 	biz.Config = domain.BizConfig{
 		Orchestration: domain.Orchestration{
-			Main: domain.NewThread(cfgID), // 使用 InvocationConfig.ID
+			Main: &domain.Thread{CfgID: cfgID}, // 使用 InvocationConfig.ID
 			Threads: map[string]*domain.Thread{
-				"send_to_user":      domain.NewThread(cfgID), // 发送题目给用户
-				"save_history":      domain.NewThread(cfgID), // 保存历史记录
-				"get_next_question": domain.NewThread(cfgID), // 获取下一题
-				"generate_summary":  domain.NewThread(cfgID), // 生成面试总结
-				"save_summary":      domain.NewThread(cfgID), // 保存总结
+				"send_to_user":      {CfgID: cfgID}, // 发送题目给用户
+				"save_history":      {CfgID: cfgID}, // 保存历史记录
+				"get_next_question": {CfgID: cfgID}, // 获取下一题
+				"generate_summary":  {CfgID: cfgID}, // 生成面试总结
+				"save_summary":      {CfgID: cfgID}, // 保存总结
 			},
 		},
 	}
@@ -609,12 +609,12 @@ func TestGrpcServer(t *testing.T) {
 
 	// 5. 启动 gRPC 服务器
 	chatSvc := app.ChatService
-	chatServer := igrpc.NewChatServer(chatSvc, orch)
+	chatServer := igrpc.NewChatServer(chatSvc, orch, bizSvc)
 
 	grpcServer := grpc.NewServer()
 	chatv1.RegisterServiceServer(grpcServer, chatServer)
 
-	lis, err := net.Listen("tcp", ":9090")
+	lis, err := net.Listen("tcp", "localhost:9090")
 	if err != nil {
 		t.Fatalf("监听端口失败: %v", err)
 	}
@@ -719,9 +719,10 @@ func TestInterviewProxyServer(t *testing.T) {
 		log.Printf("Chat 已创建: %s", resp.Sn)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		err = json.NewEncoder(w).Encode(map[string]string{
 			"chat_sn": resp.Sn,
 		})
+		require.Error(t, err)
 	}))
 
 	// 4. Stream 流式接口（SSE）
@@ -741,7 +742,7 @@ func TestInterviewProxyServer(t *testing.T) {
 
 		// 调用 gRPC Stream
 		// InvocationConfigId 从 Chat.BizOrchestration 中获取，不需要传入
-		stream, err := client.Stream(context.Background(), &chatv1.StreamRequest{
+		streamRes, err := client.Stream(context.Background(), &chatv1.StreamRequest{
 			ChatSn: req.ChatSn,
 			Input: &chatv1.UserInput{
 				Content: req.Input,
@@ -769,7 +770,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		// 转发流式响应
 		deltaCount := 0
 		for {
-			resp, err := stream.Recv()
+			resp, err := streamRes.Recv()
 			if err == io.EOF {
 				fmt.Fprintf(w, "event: done\ndata: {}\n\n")
 				flusher.Flush()
@@ -799,11 +800,12 @@ func TestInterviewProxyServer(t *testing.T) {
 	// 5. 健康检查
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		err2 := json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 			"grpc":   "localhost:9090",
 			"time":   time.Now().Format(time.RFC3339),
 		})
+		require.Error(t, err2)
 	})
 
 	log.Println("HTTP 代理服务器启动于 :8080")
@@ -943,7 +945,8 @@ func TestAudioProxyServer(t *testing.T) {
 		}
 
 		w.WriteHeader(resp.StatusCode)
-		w.Write(respBytes)
+		_, err = w.Write(respBytes)
+		require.Error(t, err)
 	}
 
 	// ============ 注册路由 ============
@@ -953,11 +956,12 @@ func TestAudioProxyServer(t *testing.T) {
 	// 健康检查
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		err := json.NewEncoder(w).Encode(map[string]string{
 			"status":   "ok",
 			"base_url": baseURL,
 			"time":     time.Now().Format(time.RFC3339),
 		})
+		require.Error(t, err)
 	})
 
 	addr := ":" + port

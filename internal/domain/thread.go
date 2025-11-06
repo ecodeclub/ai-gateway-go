@@ -18,13 +18,6 @@ package domain
 // 为了处理用户的输入，而引入的不同处理方式/步骤等
 type Thread struct {
 	// CfgID 从设计上来说，应该不止一个 CfgID，但是目前只有一个
-	CfgID        int64
-	Conversation *LLMConversation
-}
-
-func NewThread(cid int64) *Thread {
-	return &Thread{
-		CfgID:        cid,
-		Conversation: &LLMConversation{},
-	}
+	CfgID        int64           `json:"cfgID,omitempty"`
+	Conversation LLMConversation `json:"conversation,omitempty"`
 }

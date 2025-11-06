@@ -153,18 +153,6 @@ func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error
 	}, nil
 }
 
-func (repo *ChatRepo) toDaoMessage(chatSN string, messages []domain.Message) []dao.Message {
-	return slice.Map[domain.Message, dao.Message](messages, func(idx int, src domain.Message) dao.Message {
-		return dao.Message{
-			ID:            src.ID,
-			ChatSN:        chatSN,
-			Role:          src.Role,
-			Content:       src.Content,
-			ReasonContent: src.ReasoningContent,
-		}
-	})
-}
-
 func (repo *ChatRepo) toDomainMessage(messages []dao.Message) []domain.Message {
 	return slice.Map[dao.Message, domain.Message](messages, func(idx int, src dao.Message) domain.Message {
 		return domain.Message{

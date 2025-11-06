@@ -26,10 +26,10 @@ import (
 )
 
 type BizConfigHandler struct {
-	svc *service.BizConfigService
+	svc *service.BizService
 }
 
-func NewBizConfigHandler(svc *service.BizConfigService) *BizConfigHandler {
+func NewBizConfigHandler(svc *service.BizService) *BizConfigHandler {
 	return &BizConfigHandler{svc: svc}
 }
 
