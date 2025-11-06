@@ -34,8 +34,6 @@ type Chat struct {
 	// 业务有关的编排信息
 	Orchestration Orchestration
 
-	Biz BizConfig
-
 	Turns []*Turn
 	Ctime time.Time
 }

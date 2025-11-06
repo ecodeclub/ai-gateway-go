@@ -55,9 +55,9 @@ func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.Sav
 		return nil, err
 	}
 	sn, err := c.svc.Save(ctx, domain.Chat{
-		Title: chat.Title,
 		Uid:   chat.Uid,
 		Sn:    chat.Sn,
+		Title: chat.Title,
 		// 初始化的编排配置
 		Orchestration: biz.Config.Orchestration,
 	})

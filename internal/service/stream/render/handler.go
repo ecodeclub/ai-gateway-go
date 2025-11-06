@@ -47,8 +47,17 @@ func (h *Handler) Stream(ctx *domain.StreamContext) (stream.Response, error) {
 }
 
 func (h *Handler) renderUserPrompt(ctx *domain.StreamContext) (string, error) {
-	assistant := ctx.Chat.CurrentTurn().AssistantRun
-	step := assistant.CurrentStep()
+	// 确保 Vars 已初始化
+	if ctx.Chat.Vars == nil {
+		ctx.Chat.Vars = make(map[string]any)
+	}
+	// 将用户输入放入 Vars，供模板使用
+	turn := ctx.Chat.CurrentTurn()
+	if turn.UserRun != nil {
+		ctx.Chat.Vars["Input"] = turn.UserRun.Content
+	}
+
+	step := turn.AssistantRun.CurrentStep()
 	// 暂时不用缓存，测试的时候我经常会直接修改数据库数据
 	name := fmt.Sprintf("user-%d", step.Cfg.ID)
 	tpl := template.New(name)

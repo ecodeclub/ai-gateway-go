@@ -42,10 +42,11 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 	if err != nil {
 		return fcall.Response{}, err
 	}
-	c.logger.Debug("收到 RawOutput", elog.Any("content", rawReq.Content))
+	c.logger.Debug("收到 RawOutput", elog.Any("rawReq", rawReq))
 	const varName = "RawOutput"
 	ctx.Chat.Vars[varName] = rawReq.Content
 	return fcall.Response{
+		Content:   rawReq.Content,
 		NextState: rawReq.State,
 	}, err
 }

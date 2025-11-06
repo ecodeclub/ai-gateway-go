@@ -54,14 +54,10 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	}
 
 	// 规避 JSON 转义问题
-	k.logger.Debug("ragReq.EsDsl："+string(ragReq.EsDsl), elog.String("varName", ragReq.VarName))
+	k.logger.Debug("收到LLM的调用请求参数", elog.Any("req", ragReq))
 
 	response := httpx.NewRequest(ctx.Ctx, http.MethodPost, k.url).
 		Client(k.client).JSONBody(ragReq.EsDsl).Do()
-
-	//if response.Err() != nil {
-	//	return fcall.Response{}, fmt.Errorf("执行知识库查询失败, err: %v", response.Err())
-	//}
 
 	if response.StatusCode != http.StatusOK {
 		return fcall.Response{}, fmt.Errorf("执行知识库查询失败, status code: %d", response.StatusCode)
@@ -73,13 +69,16 @@ func (k *RAG) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Response
 	k.logger.Debug("RAG 响应", elog.String("body", string(body)))
 	ctx.Chat.Vars[ragReq.VarName] = string(body)
 	return fcall.Response{
-		Content: string(body),
+		Content:   string(body),
+		NextState: ragReq.NextState,
 	}, err
 }
 
 type Request struct {
 	// 参数名字，也就是放入到 Turn.AssistantRun.Vars 中的 key
 	VarName string `json:"varName"`
+	// 如果指定了 NextState，则在查询完成后，根据配置继续后续逻辑
+	NextState string `json:"nextState"`
 	// 完整的 Elasticsearch DSL 查询对象，会直接透传给 ES
 	EsDsl json.RawMessage `json:"es_dsl"`
 }

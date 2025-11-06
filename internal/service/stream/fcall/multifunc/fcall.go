@@ -55,11 +55,13 @@ func (c *FCall) Call(ctx *domain.StreamContext, req fcall.Request) (fcall.Respon
 		}
 	}
 	return fcall.Response{
+		Content:   fcReq.Content,
 		NextState: resp.NextState,
 	}, nil
 }
 
 type Request struct {
+	Content   string                               `json:"content"`
 	Calls     []responses.ResponseFunctionToolCall `json:"calls"`
 	NextState string                               `json:"nextState"`
 }

@@ -92,7 +92,6 @@ func (h *Handler) initConversationsIfNeeded(ctx *domain.StreamContext) error {
 }
 
 func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConfigVersion) (responses.ResponseNewParams, error) {
-
 	input := h.toInput(ctx)
 	step := ctx.Chat.CurrentTurn().AssistantRun.CurrentStep()
 	params := responses.ResponseNewParams{
@@ -107,12 +106,17 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 		if err != nil {
 			return responses.ResponseNewParams{}, err
 		}
-		params.Conversation = responses.ResponseNewParamsConversationUnion{
-			OfConversationObject: &responses.ResponseConversationParam{
-				ID: step.Thread.Conversation.ID,
-			},
-		}
-		// 设置 instructions
+	}
+
+	// 无论 Conversation ID 是否已存在，都需要设置，以便 OpenAI 能够正确关联历史对话、function call 和其响应等。
+	params.Conversation = responses.ResponseNewParamsConversationUnion{
+		OfConversationObject: &responses.ResponseConversationParam{
+			ID: step.Thread.Conversation.ID,
+		},
+	}
+
+	// 设置 instructions
+	if cfg.SystemPrompt != "" {
 		params.Instructions = openai.String(cfg.SystemPrompt)
 	}
 
@@ -120,7 +124,7 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 
 	if len(cfg.Functions) > 0 {
 		params.ToolChoice = responses.ResponseNewParamsToolChoiceUnion{
-			OfToolChoiceMode: param.NewOpt(responses.ToolChoiceOptions("required")),
+			OfToolChoiceMode: param.NewOpt(responses.ToolChoiceOptions(responses.ToolChoiceAllowedModeRequired)),
 		}
 		params.Tools = slice.Map(cfg.Functions, func(_ int, src domain.Function) responses.ToolUnionParam {
 			var p responses.FunctionToolParam
@@ -130,10 +134,6 @@ func (h *Handler) newParams(ctx *domain.StreamContext, cfg domain.InvocationConf
 			}
 			return responses.ToolUnionParam{OfFunction: &p}
 		})
-	}
-
-	if cfg.Temperature >= 0 {
-		params.Temperature = openai.Float(float64(cfg.Temperature))
 	}
 
 	if cfg.TopP >= 0 {
@@ -188,6 +188,7 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 	cfg domain.InvocationConfigVersion,
 	sse *ssestream.Stream[responses.ResponseStreamEventUnion]) (stream.Response, error) {
 	var nextState string
+	var fcRespList []FCResp
 	for sse.Next() {
 		event := sse.Current()
 		switch event.Type {
@@ -214,23 +215,24 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 				h.logger.Error("执行 function call 出现问题", elog.FieldErr(err), elog.Any("fc", fc))
 				continue
 			}
+			// 更新 nextState（使用最后一个 function call 的 nextState）
 			nextState = fcallResp.NextState
-			// 不管有没有问题，都要返回一个 response，一次性返回所有的 function call 的结果
-			fcRespInput := h.toFCResulInput(ctx, cfg, []FCResp{
-				{
-					FC:   fc,
-					Resp: fcallResp,
-				},
+			// 收集所有 function call 的响应，等待流式响应完成后再统一返回
+			fcRespList = append(fcRespList, FCResp{
+				FC:   fc,
+				Resp: fcallResp,
 			})
-
-			_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
-			if err1 != nil {
-				h.logger.Error("返回 FC 响应给 OpenAI 失败",
-					elog.FieldErr(err1))
-			}
 		}
 	}
 	err := sse.Err()
+
+	if len(fcRespList) > 0 && err == nil {
+		fcRespInput := h.toFCResulInput(ctx, cfg, fcRespList)
+		_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
+		if err1 != nil {
+			h.logger.Error("返回 FC 响应给 OpenAI 失败", elog.FieldErr(err1))
+		}
+	}
 	return stream.Response{NextState: nextState}, err
 }
 
@@ -259,7 +261,7 @@ func (h *Handler) toFCResulInput(ctx *domain.StreamContext, cfg domain.Invocatio
 			},
 		},
 		Input: responses.ResponseNewParamsInputUnion{
-			OfInputItemList: slice.Map[FCResp, responses.ResponseInputItemUnionParam](respList, func(idx int, src FCResp) responses.ResponseInputItemUnionParam {
+			OfInputItemList: slice.Map(respList, func(idx int, src FCResp) responses.ResponseInputItemUnionParam {
 				return responses.ResponseInputItemUnionParam{
 					OfFunctionCallOutput: &responses.ResponseInputItemFunctionCallOutputParam{
 						CallID: src.FC.CallID,
