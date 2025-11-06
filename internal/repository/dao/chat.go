@@ -49,7 +49,7 @@ func (dao *ChatDAO) Save(ctx context.Context, c Chat) error {
 	c.Ctime = time.Now().Unix()
 	return dao.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			DoUpdates: clause.AssignmentColumns([]string{"title", "utime", "vars", "biz_orchestration"}),
+			DoUpdates: clause.AssignmentColumns([]string{"title", "utime", "vars", "orchestration"}),
 		}).Create(&c).Error
 }
 

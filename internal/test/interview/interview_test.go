@@ -25,7 +25,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -40,6 +42,8 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/forward"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/multifunc"
+	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/rawoutput"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	openaistream "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
@@ -47,7 +51,7 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/store"
 	_ "github.com/ecodeclub/ai-gateway-go/internal/test"
 	testioc "github.com/ecodeclub/ai-gateway-go/internal/test/ioc"
-	elasticsearch "github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/gotomicro/ego/core/elog"
 	openai3 "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -57,11 +61,39 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-//go:embed system_prompt_v2.md
-var systemPrompt string
+// 新的系统提示词文件
+//
+//go:embed system_prompt_main.md
+var systemPromptMain string
 
-//go:embed user_prompt_v2.md
-var userPrompt string
+//go:embed system_prompt_get_question.md
+var systemPromptGetQuestion string
+
+//go:embed system_prompt_evaluate_save.md
+var systemPromptEvaluateSave string
+
+//go:embed system_prompt_summary_save.md
+var systemPromptSummarySave string
+
+//go:embed system_prompt_send.md
+var systemPromptSend string
+
+// 新的用户提示词文件
+//
+//go:embed user_prompt_main.md
+var userPromptMain string
+
+//go:embed user_prompt_get_question.md
+var userPromptGetQuestion string
+
+//go:embed user_prompt_evaluate_save.md
+var userPromptEvaluateSave string
+
+//go:embed user_prompt_summary_save.md
+var userPromptSummarySave string
+
+//go:embed user_prompt_send.md
+var userPromptSend string
 
 // TestGrpcServer 启动 gRPC 服务器用于面试功能测试
 // 端口: 9090
@@ -120,6 +152,15 @@ func TestGrpcServer(t *testing.T) {
 	saveDocFCall := savedoc.NewFCall()
 	registry.Register(saveDocFCall)
 
+	// 注册 raw_output function call
+	rawOutputFCall := rawoutput.NewFCall()
+	registry.Register(rawOutputFCall)
+
+	// 注册 multi_call function call（需要 Registry，放在最后）
+	multiCallFCall := multifunc.NewFCall()
+	multiCallFCall.Registry = registry
+	registry.Register(multiCallFCall)
+
 	openaiHandler := openaistream.NewHandler(client, registry, headers)
 
 	// 需要先创建依赖的 repositories
@@ -132,10 +173,10 @@ func TestGrpcServer(t *testing.T) {
 
 	// 创建 stream handler
 	streamHandler := initStreamHandler(openaiHandler, chatRepo, invConfigRepo, providerRepo)
-	orch := orchestrator.NewOrchestrator(streamHandler)
+	orchestratorHdl := orchestrator.NewOrchestrator(streamHandler)
 
 	app := testioc.InitApp(testioc.TestOnly{
-		Orchestrator: orch,
+		Orchestrator: orchestratorHdl,
 	})
 
 	// 4. 准备测试数据
@@ -178,44 +219,134 @@ func TestGrpcServer(t *testing.T) {
 	require.NoError(t, err, "创建 Biz 失败")
 	log.Printf("创建 Biz 成功，ID = %d", biz.ID)
 
-	// 4.4 创建 InvocationConfig
+	// 4.4 创建 5 个 InvocationConfig
 	invSvc := service.NewInvocationConfigService(invConfigRepo, bizRepo, providerRepo)
 
-	cfgID, err := invSvc.Save(ctx, domain.InvocationConfig{
-		ID: 100001,
-		// 因为只有一个配置所以与业务名相同，如果分步骤可能是各个步骤的名称。
-		Name:        "MySQL模拟面试助手",
+	// 定义 5 个 ConfigID
+	cfgIDMain := int64(100001)         // Main 路由器
+	cfgIDGetQuestion := int64(100002)  // 获取题目
+	cfgIDEvaluateSave := int64(100003) // 评价答案并保存历史
+	cfgIDSummarySave := int64(100004)  // 生成总结并保存
+	cfgIDSend := int64(100005)         // 发送题目
+
+	// 创建 Main 路由器配置
+	_, err = invSvc.Save(ctx, domain.InvocationConfig{
+		ID:          cfgIDMain,
+		Name:        "Main路由器",
 		Biz:         domain.Biz{ID: biz.ID},
-		Description: "用于MySQL模拟面试的配置",
+		Description: "命令路由器，根据用户输入路由到对应的Thread",
 	})
 	require.NoError(t, err)
-	log.Printf("创建 InvocationConfig: MySQL模拟面试助手 (ID: %d)", cfgID)
+	log.Printf("创建 InvocationConfig: Main路由器 (ID: %d)", cfgIDMain)
+
+	// 创建 get_question 配置
+	_, err = invSvc.Save(ctx, domain.InvocationConfig{
+		ID:          cfgIDGetQuestion,
+		Name:        "获取题目",
+		Biz:         domain.Biz{ID: biz.ID},
+		Description: "获取面试题目（第一题或下一题）",
+	})
+	require.NoError(t, err)
+	log.Printf("创建 InvocationConfig: 获取题目 (ID: %d)", cfgIDGetQuestion)
+
+	// 创建 evaluate_and_save 配置
+	_, err = invSvc.Save(ctx, domain.InvocationConfig{
+		ID:          cfgIDEvaluateSave,
+		Name:        "评价答案并保存历史",
+		Biz:         domain.Biz{ID: biz.ID},
+		Description: "评价用户答案并保存历史记录",
+	})
+	require.NoError(t, err)
+	log.Printf("创建 InvocationConfig: 评价答案并保存历史 (ID: %d)", cfgIDEvaluateSave)
+
+	// 创建 summary_and_save 配置
+	_, err = invSvc.Save(ctx, domain.InvocationConfig{
+		ID:          cfgIDSummarySave,
+		Name:        "生成总结并保存",
+		Biz:         domain.Biz{ID: biz.ID},
+		Description: "生成面试总结并保存",
+	})
+	require.NoError(t, err)
+	log.Printf("创建 InvocationConfig: 生成总结并保存 (ID: %d)", cfgIDSummarySave)
+
+	// 创建 send_to_user 配置
+	_, err = invSvc.Save(ctx, domain.InvocationConfig{
+		ID:          cfgIDSend,
+		Name:        "发送题目给用户",
+		Biz:         domain.Biz{ID: biz.ID},
+		Description: "将题目格式化后发送给前端用户",
+	})
+	require.NoError(t, err)
+	log.Printf("创建 InvocationConfig: 发送题目给用户 (ID: %d)", cfgIDSend)
 
 	// 更新 Biz 设置 Orchestration
 	biz.Config = domain.BizConfig{
 		Orchestration: domain.Orchestration{
-			Main: &domain.Thread{CfgID: cfgID}, // 使用 InvocationConfig.ID
+			Main: &domain.Thread{CfgID: cfgIDMain},
 			Threads: map[string]*domain.Thread{
-				"send_to_user":      {CfgID: cfgID}, // 发送题目给用户
-				"save_history":      {CfgID: cfgID}, // 保存历史记录
-				"get_next_question": {CfgID: cfgID}, // 获取下一题
-				"generate_summary":  {CfgID: cfgID}, // 生成面试总结
-				"save_summary":      {CfgID: cfgID}, // 保存总结
+				"get_question":      {CfgID: cfgIDGetQuestion},
+				"evaluate_and_save": {CfgID: cfgIDEvaluateSave},
+				"summary_and_save":  {CfgID: cfgIDSummarySave},
+				"send_to_user":      {CfgID: cfgIDSend},
 			},
 		},
 	}
 	_, err = bizSvc.Save(ctx, biz)
 	require.NoError(t, err, "更新 Biz Orchestration 失败")
-	log.Printf("更新 Biz Orchestration (使用 ConfigID: %d)", cfgID)
+	log.Printf("更新 Biz Orchestration (Main: %d, Threads: get_question=%d, evaluate_and_save=%d, summary_and_save=%d, send_to_user=%d)",
+		cfgIDMain, cfgIDGetQuestion, cfgIDEvaluateSave, cfgIDSummarySave, cfgIDSend)
 
-	// 4.5 创建 InvocationConfigVersion（active）
-	versionID, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
-		Config:       domain.InvocationConfig{ID: cfgID},
+	// 4.5 创建 5 个 InvocationConfigVersion（active）
+	// 由于代码较长，我会创建一个辅助函数来生成函数定义JSON
+	// 先创建 Main 路由器的 Version
+	versionIDMain, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
+		Config:       domain.InvocationConfig{ID: cfgIDMain},
 		Model:        domain.Model{ID: modelID},
 		Version:      "v1.0",
 		Status:       domain.InvocationCfgVersionStatusActive,
-		SystemPrompt: systemPrompt, // 静态内容：状态机定义、规则、示例（可被LLM缓存）
-		Prompt:       userPrompt,   // 动态内容：用户输入、历史记录（每次都不同）
+		SystemPrompt: systemPromptMain,
+		Prompt:       userPromptMain,
+		Temperature:  0,
+		TopP:         1.0,
+		MaxTokens:    200000,
+		Functions: []domain.Function{
+			{
+				Name: "raw_output",
+				Definition: `{
+  "name": "raw_output",
+  "description": "设置下一个状态，用于命令路由。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "返回给LLM的确认信息。用于表示状态已设置，可以是简单的确认文本，如 \"状态已设置为 {state}\" 或 \"OK\"。"
+      },
+      "state": {
+        "type": "string",
+        "enum": ["get_question", "evaluate_and_save", "summary_and_save", ""],
+        "description": "下一个状态。必须从枚举值中选择。"
+      }
+    },
+    "required": ["content", "state"]
+  }
+}`,
+			},
+		},
+	})
+	require.NoError(t, err, "创建 Main Version 失败")
+	log.Printf("   ✓ 创建 InvocationConfigVersion: Main v1.0 (ID: %d)", versionIDMain)
+
+	// 创建 get_question 的 Version
+	versionIDGetQuestion, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
+		Config:       domain.InvocationConfig{ID: cfgIDGetQuestion},
+		Model:        domain.Model{ID: modelID},
+		Version:      "v1.0",
+		Status:       domain.InvocationCfgVersionStatusActive,
+		SystemPrompt: systemPromptGetQuestion,
+		Prompt:       userPromptGetQuestion,
 		Temperature:  0,
 		TopP:         1.0,
 		MaxTokens:    200000,
@@ -236,8 +367,8 @@ func TestGrpcServer(t *testing.T) {
       },
       "nextState": {
         "type": "string",
-        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
-        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
+        "enum": ["send_to_user", ""],
+        "description": "下一个状态。必须从枚举值中选择。固定为 send_to_user。"
       },
       "es_dsl": {
         "type": "object",
@@ -390,6 +521,65 @@ func TestGrpcServer(t *testing.T) {
   }
 }`,
 			},
+		},
+	})
+	require.NoError(t, err, "创建 get_question Version 失败")
+	log.Printf("   ✓ 创建 InvocationConfigVersion: get_question v1.0 (ID: %d)", versionIDGetQuestion)
+
+	// 创建 evaluate_and_save 的 Version（使用 multi_call）
+	versionIDEvaluateSave, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
+		Config:       domain.InvocationConfig{ID: cfgIDEvaluateSave},
+		Model:        domain.Model{ID: modelID},
+		Version:      "v1.0",
+		Status:       domain.InvocationCfgVersionStatusActive,
+		SystemPrompt: systemPromptEvaluateSave,
+		Prompt:       userPromptEvaluateSave,
+		Temperature:  0,
+		TopP:         1.0,
+		MaxTokens:    200000,
+		Functions: []domain.Function{
+			{
+				Name:       "multi_call",
+				Definition: getMultiCallFunctionDefinition(),
+			},
+		},
+	})
+	require.NoError(t, err, "创建 evaluate_and_save Version 失败")
+	log.Printf("   ✓ 创建 InvocationConfigVersion: evaluate_and_save v1.0 (ID: %d)", versionIDEvaluateSave)
+
+	// 创建 summary_and_save 的 Version（使用 multi_call）
+	versionIDSummarySave, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
+		Config:       domain.InvocationConfig{ID: cfgIDSummarySave},
+		Model:        domain.Model{ID: modelID},
+		Version:      "v1.0",
+		Status:       domain.InvocationCfgVersionStatusActive,
+		SystemPrompt: systemPromptSummarySave,
+		Prompt:       userPromptSummarySave,
+		Temperature:  0,
+		TopP:         1.0,
+		MaxTokens:    200000,
+		Functions: []domain.Function{
+			{
+				Name:       "multi_call",
+				Definition: getMultiCallFunctionDefinition(),
+			},
+		},
+	})
+	require.NoError(t, err, "创建 summary_and_save Version 失败")
+	log.Printf("   ✓ 创建 InvocationConfigVersion: summary_and_save v1.0 (ID: %d)", versionIDSummarySave)
+
+	// 创建 send_to_user 的 Version（使用 forward_result）
+	versionIDSend, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
+		Config:       domain.InvocationConfig{ID: cfgIDSend},
+		Model:        domain.Model{ID: modelID},
+		Version:      "v1.0",
+		Status:       domain.InvocationCfgVersionStatusActive,
+		SystemPrompt: systemPromptSend,
+		Prompt:       userPromptSend,
+		Temperature:  0,
+		TopP:         1.0,
+		MaxTokens:    200000,
+		Functions: []domain.Function{
 			{
 				Name: "forward_result",
 				Definition: `{
@@ -398,6 +588,7 @@ func TestGrpcServer(t *testing.T) {
   "strict": true,
   "parameters": {
     "type": "object",
+    "additionalProperties": false,
     "properties": {
       "varName": {
         "type": "string",
@@ -405,8 +596,8 @@ func TestGrpcServer(t *testing.T) {
       },
       "nextState": {
         "type": "string",
-        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
-        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
+        "enum": [""],
+        "description": "下一个状态。固定为空字符串，表示结束流程。"
       },
       "result": {
         "description": "要发送的JSON对象，根据type字段匹配对应的结构",
@@ -553,63 +744,45 @@ func TestGrpcServer(t *testing.T) {
   }
 }`,
 			},
-			{
-				Name: "save_doc",
-				Definition: `{
-  "name": "save_doc",
-  "description": "保存面试历史记录到变量中。用于保存单题的问答评价记录，或最终的总结报告。",
-  "strict": true,
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "varName": {
-        "type": "string",
-        "enum": ["InterviewHistory"],
-        "description": "变量名，固定为 InterviewHistory"
-      },
-      "type": {
-        "type": "string",
-        "enum": ["json"],
-        "description": "数据类型，固定为 json"
-      },
-      "content": {
-        "type": "string",
-        "description": "JSON数组字符串。每个元素包含: question_id, question(题目), answer(回答), scores(评分对象), evaluation(评价对象)。必须包含之前的所有记录加上当前新记录。"
-      },
-      "nextState": {
-        "type": "string",
-        "enum": ["send_to_user", "save_history", "get_next_question", "generate_summary", "save_summary", ""],
-        "description": "下一个状态。必须从枚举值中选择，不能使用其他任何值。具体使用哪个状态名，请参考系统提示词中的状态说明。空字符串\"\"表示结束流程。"
-      }
-    },
-    "required": ["varName", "content", "type", "nextState"],
-    "additionalProperties": false
-  }
-}`,
-			},
 		},
 	})
-	if err != nil {
-		t.Fatalf("创建 InvocationConfigVersion 失败: %v", err)
-	}
-	log.Printf("   ✓ 创建 InvocationConfigVersion: v1.0 (ID: %d, Status: active)", versionID)
+	require.NoError(t, err, "创建 send_to_user Version 失败")
+	log.Printf("   ✓ 创建 InvocationConfigVersion: send_to_user v1.0 (ID: %d)", versionIDSend)
 
-	// 清理函数
-	defer func() {
+	// 清理函数 - 使用 t.Cleanup 确保在测试失败、panic 或正常结束时都会执行
+	// 注意：如果进程被强制终止（如 IDE 中点击停止、Ctrl+C、kill -9），t.Cleanup 也不会执行
+	t.Cleanup(func() {
 		log.Println("\n清理测试数据...")
-		db.Delete(&dao.InvocationConfigVersion{}, versionID)
-		db.Delete(&dao.InvocationConfig{}, cfgID)
+		// 清理 Chat 相关数据（先清理依赖数据）
+		// 先查询测试用户的所有 Chat，然后删除相关的 Turn
+		var chats []dao.Chat
+		db.Where("uid = ?", 123).Find(&chats)
+		for _, chat := range chats {
+			db.Where("chat_sn = ?", chat.Sn).Delete(&dao.Turn{})
+		}
+		db.Where("uid = ?", 123).Delete(&dao.Chat{}) // 清理测试用户的 Chat
+		// 清理配置数据
+		db.Delete(&dao.InvocationConfigVersion{}, versionIDSend)
+		db.Delete(&dao.InvocationConfigVersion{}, versionIDSummarySave)
+		db.Delete(&dao.InvocationConfigVersion{}, versionIDEvaluateSave)
+		db.Delete(&dao.InvocationConfigVersion{}, versionIDGetQuestion)
+		db.Delete(&dao.InvocationConfigVersion{}, versionIDMain)
+		db.Delete(&dao.InvocationConfig{}, cfgIDSend)
+		db.Delete(&dao.InvocationConfig{}, cfgIDSummarySave)
+		db.Delete(&dao.InvocationConfig{}, cfgIDEvaluateSave)
+		db.Delete(&dao.InvocationConfig{}, cfgIDGetQuestion)
+		db.Delete(&dao.InvocationConfig{}, cfgIDMain)
 		db.Delete(&dao.Biz{}, biz.ID)
 		db.Delete(&dao.Model{}, modelID)
 		db.Delete(&dao.Provider{}, providerID)
 		log.Println("测试数据已清理")
-	}()
+	})
 
 	log.Println("\n数据准备完成，测试环境已就绪")
 
 	// 5. 启动 gRPC 服务器
 	chatSvc := app.ChatService
-	chatServer := igrpc.NewChatServer(chatSvc, orch, bizSvc)
+	chatServer := igrpc.NewChatServer(chatSvc, orchestratorHdl, bizSvc)
 
 	grpcServer := grpc.NewServer()
 	chatv1.RegisterServiceServer(grpcServer, chatServer)
@@ -625,16 +798,236 @@ func TestGrpcServer(t *testing.T) {
 		}
 	}()
 
-	defer grpcServer.Stop()
+	// 优雅关闭：监听信号并执行清理
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	log.Println("gRPC 服务器启动于 :9090")
-	log.Printf("InvocationConfig ID: %d", cfgID)
+	log.Println("gRPC 服务器启动于 localhost:9090")
+	log.Printf("Main Config ID: %d", cfgIDMain)
 	log.Printf("Biz.ID: %d", biz.ID)
 	log.Println("按 Ctrl+C 停止服务器")
 	log.Println("---")
 
-	// 保持运行
-	select {}
+	// 等待终止信号
+	<-sigChan
+	log.Println("\n收到终止信号，正在优雅关闭...")
+
+	// 停止 gRPC 服务器
+	grpcServer.Stop()
+	log.Println("gRPC 服务器已停止")
+
+	// 注意：t.Cleanup 会在测试函数返回时自动执行，这里不需要手动调用
+	// 但为了确保清理，我们也可以手动触发清理逻辑（如果需要立即清理）
+	// 实际上，让测试正常返回，t.Cleanup 会自动执行
+}
+
+// getMultiCallFunctionDefinition 返回 multi_call 函数的 JSON Schema 定义
+func getMultiCallFunctionDefinition() string {
+	return `{
+  "name": "multi_call",
+  "description": "依次执行多个函数调用。所有函数调用会按顺序执行，最后一个函数的 nextState 会作为整个 multi_call 的 nextState。",
+  "strict": true,
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "返回给LLM的确认信息。用于表示所有函数调用已执行完成，可以是总结性的确认文本，如 \"所有函数调用已执行完成\" 或 \"操作已完成\"。"
+      },
+      "calls": {
+        "type": "array",
+        "description": "要执行的函数调用列表，按顺序执行",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "enum": ["forward_result", "save_doc"],
+              "description": "函数名。必须是 forward_result 或 save_doc 之一。"
+            },
+            "arguments": {
+              "description": "函数参数对象。根据 name 字段的值，构造对应的参数结构。",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "description": "forward_result 的参数结构",
+                  "properties": {
+                    "varName": {
+                      "type": "string",
+                      "description": "变量名，用于保存结果。题目用QuestionOutput_N，评价用EvaluationOutput_N，总结用SummaryOutput"
+                    },
+                    "nextState": {
+                      "type": "string",
+                      "enum": ["get_question", "send_to_user", "summary_and_save", ""],
+                      "description": "下一个状态。"
+                    },
+                    "result": {
+                      "description": "要发送的JSON对象，根据type字段匹配对应的结构",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "description": "题目类型",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "question"
+                            },
+                            "question_id": {
+                              "type": "integer"
+                            },
+                            "question": {
+                              "type": "string"
+                            },
+                            "remaining_questions": {
+                              "type": "integer"
+                            },
+                            "current": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["type", "question_id", "question", "remaining_questions", "current"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "description": "评价类型",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "evaluation"
+                            },
+                            "question_id": {
+                              "type": "integer"
+                            },
+                            "scores": {
+                              "type": "object",
+                              "properties": {
+                                "content_score": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                },
+                                "coverage_score": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                },
+                                "structure_score": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                }
+                              },
+                              "required": ["content_score", "coverage_score", "structure_score"],
+                              "additionalProperties": false
+                            },
+                            "evaluation": {
+                              "type": "object",
+                              "properties": {
+                                "key_points_hit": {
+                                  "type": "array",
+                                  "items": {"type": "string"}
+                                },
+                                "missed_points": {
+                                  "type": "array",
+                                  "items": {"type": "string"}
+                                },
+                                "suggestion": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["key_points_hit", "missed_points", "suggestion"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["type", "question_id", "scores", "evaluation"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "description": "总结类型",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "summary"
+                            },
+                            "total_questions": {
+                              "type": "integer"
+                            },
+                            "answered_questions": {
+                              "type": "integer"
+                            },
+                            "overall_score": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "strengths": {
+                              "type": "array",
+                              "items": {"type": "string"}
+                            },
+                            "weaknesses": {
+                              "type": "array",
+                              "items": {"type": "string"}
+                            },
+                            "priority_actions": {
+                              "type": "array",
+                              "items": {"type": "string"}
+                            }
+                          },
+                          "required": ["type", "total_questions", "answered_questions", "overall_score", "strengths", "weaknesses", "priority_actions"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["varName", "result", "nextState"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "description": "save_doc 的参数结构",
+                  "properties": {
+                    "varName": {
+                      "type": "string",
+                      "description": "变量名，固定为 InterviewHistory"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": ["json"],
+                      "description": "文档类型，固定为 json"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "JSON数组字符串，包含所有历史记录"
+                    },
+                    "nextState": {
+                      "type": "string",
+                      "enum": ["get_question", "send_to_user", "summary_and_save", ""],
+                      "description": "下一个状态。"
+                    }
+                  },
+                  "required": ["varName", "type", "content", "nextState"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["name", "arguments"]
+        },
+        "minItems": 1
+      },
+      "nextState": {
+        "type": ["string", "null"],
+        "enum": ["get_question", "send_to_user", "summary_and_save", "", null],
+        "description": "最终的下一个状态。如果最后一个函数调用已经设置了 nextState，这里可以设置为 null 或空字符串。系统会使用最后一个函数调用的 nextState。"
+      }
+    },
+    "required": ["content", "calls", "nextState"]
+  }
+}`
 }
 
 // initStreamHandler 初始化 stream handler 链
@@ -662,7 +1055,8 @@ func initStreamHandler(
 // 功能: 将前端 HTTP 请求转换为 gRPC 调用，并将 gRPC 流式响应转换为 SSE
 func TestInterviewProxyServer(t *testing.T) {
 	elog.DefaultLogger.SetLevel(elog.DebugLevel)
-	// 1. 连接到 gRPC 服务器
+
+	// 连接到 gRPC 服务器
 	conn, err := grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("连接 gRPC 失败: %v", err)
@@ -670,11 +1064,81 @@ func TestInterviewProxyServer(t *testing.T) {
 	defer conn.Close()
 
 	client := chatv1.NewServiceClient(conn)
-
 	mux := http.NewServeMux()
 
-	// 2. CORS 处理函数
-	corsHandler := func(next http.HandlerFunc) http.HandlerFunc {
+	// 注册面试相关路由
+	registerInterviewRoutes(mux, client)
+
+	// 注册音频转文本代理路由
+	registerAudioProxyRoutes(mux, t)
+
+	log.Println("HTTP 代理服务器启动于 :8080")
+	log.Println("转发目标: localhost:9090 (gRPC)")
+	log.Println("端点:")
+	log.Println("   - POST /api/interview/chat/create")
+	log.Println("   - POST /api/interview/stream")
+	log.Println("   - POST /api/audio/transcriptions")
+	log.Println("   - GET  /health")
+	log.Println("按 Ctrl+C 停止服务器")
+	log.Println("---")
+
+	// 使用 http.Server 并设置timeout
+	// WriteTimeout 设置为 0 表示不限制写入超时（SSE 流式响应需要长时间保持连接）
+	// 或者设置为足够大的值（如 5 分钟）以支持 LLM 的长时间响应
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 0, // 0 表示不限制，适合 SSE 长连接
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// 优雅关闭：监听信号并执行清理
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// 在 goroutine 中启动服务器
+	errChan := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errChan <- err
+		}
+	}()
+
+	// 等待终止信号或服务器错误
+	select {
+	case err := <-errChan:
+		t.Fatalf("HTTP 服务器启动失败: %v", err)
+	case <-sigChan:
+		log.Println("\n收到终止信号，正在优雅关闭 HTTP 服务器...")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("HTTP 服务器关闭失败: %v", err)
+		} else {
+			log.Println("HTTP 服务器已优雅关闭")
+		}
+		// 测试函数返回，t.Cleanup 会自动执行
+	}
+}
+
+// registerInterviewRoutes 注册面试相关的 HTTP 路由
+func registerInterviewRoutes(mux *http.ServeMux, client chatv1.ServiceClient) {
+	corsHandler := newCORSHandler()
+
+	// 创建 Chat 接口
+	mux.HandleFunc("/api/interview/chat/create", corsHandler(handleCreateChat(client)))
+
+	// Stream 流式接口（SSE）
+	mux.HandleFunc("/api/interview/stream", corsHandler(handleStream(client)))
+
+	// 健康检查
+	mux.HandleFunc("/health", handleHealth())
+}
+
+// newCORSHandler 创建 CORS 处理函数
+func newCORSHandler() func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -686,9 +1150,11 @@ func TestInterviewProxyServer(t *testing.T) {
 			next(w, r)
 		}
 	}
+}
 
-	// 3. 创建 Chat 接口
-	mux.HandleFunc("/api/interview/chat/create", corsHandler(func(w http.ResponseWriter, r *http.Request) {
+// handleCreateChat 处理创建 Chat 的请求
+func handleCreateChat(client chatv1.ServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Uid   int64  `json:"uid"`
 			Title string `json:"title"`
@@ -719,14 +1185,17 @@ func TestInterviewProxyServer(t *testing.T) {
 		log.Printf("Chat 已创建: %s", resp.Sn)
 
 		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"chat_sn": resp.Sn,
-		})
-		require.Error(t, err)
-	}))
+		}); err != nil {
+			log.Printf("编码响应失败: %v", err)
+		}
+	}
+}
 
-	// 4. Stream 流式接口（SSE）
-	mux.HandleFunc("/api/interview/stream", corsHandler(func(w http.ResponseWriter, r *http.Request) {
+// handleStream 处理 Stream 流式请求
+func handleStream(client chatv1.ServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ChatSn string `json:"chat_sn"`
 			Input  string `json:"input"`
@@ -740,9 +1209,8 @@ func TestInterviewProxyServer(t *testing.T) {
 
 		log.Printf("收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
 
-		// 调用 gRPC Stream
-		// InvocationConfigId 从 Chat.Orchestration 中获取，不需要传入
-		streamRes, err := client.Stream(context.Background(), &chatv1.StreamRequest{
+		// 调用 gRPC Stream，使用请求的上下文以便正确处理取消和超时
+		streamRes, err := client.Stream(r.Context(), &chatv1.StreamRequest{
 			ChatSn: req.ChatSn,
 			Input: &chatv1.UserInput{
 				Content: req.Input,
@@ -795,37 +1263,28 @@ func TestInterviewProxyServer(t *testing.T) {
 				log.Printf("Delta #%d: %s", deltaCount, resp.GetDelta().Content)
 			}
 		}
-	}))
-
-	// 5. 健康检查
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		err2 := json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
-			"grpc":   "localhost:9090",
-			"time":   time.Now().Format(time.RFC3339),
-		})
-		require.Error(t, err2)
-	})
-
-	log.Println("HTTP 代理服务器启动于 :8080")
-	log.Println("转发目标: localhost:9090 (gRPC)")
-	log.Println("端点:")
-	log.Println("   - POST /api/interview/chat/create")
-	log.Println("   - POST /api/interview/stream")
-	log.Println("   - GET  /health")
-	log.Println("按 Ctrl+C 停止服务器")
-	log.Println("---")
-
-	if err := http.ListenAndServe(":8080", mux); err != nil {
-		t.Fatalf("HTTP 服务器启动失败: %v", err)
 	}
 }
 
-// TestAudioProxyServer 启动音频转文本代理服务器
-// 端口: 8000
-// 功能: 代理音频转文本请求到 OpenAI API
-func TestAudioProxyServer(t *testing.T) {
+// handleHealth 处理健康检查请求
+func handleHealth() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		baseURL := os.Getenv("BASE_URL")
+		if baseURL == "" {
+			baseURL = "未设置"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"status":   "ok",
+			"grpc":     "localhost:9090",
+			"base_url": baseURL,
+			"time":     time.Now().Format(time.RFC3339),
+		})
+	}
+}
+
+// registerAudioProxyRoutes 注册音频转文本代理路由
+func registerAudioProxyRoutes(mux *http.ServeMux, t *testing.T) {
 	apiKey := os.Getenv("API_KEY")
 	if apiKey == "" {
 		t.Fatal("未设置 API_KEY 环境变量")
@@ -838,7 +1297,7 @@ func TestAudioProxyServer(t *testing.T) {
 
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
-		t.Fatal("未设置 INTERNAL_TOKEN 环境变量")
+		t.Fatal("未设置 BASE_URL 环境变量")
 	}
 
 	origin := os.Getenv("ORIGIN")
@@ -846,135 +1305,143 @@ func TestAudioProxyServer(t *testing.T) {
 		t.Fatal("未设置 ORIGIN 环境变量")
 	}
 
-	port := os.Getenv("PROXY_PORT")
-	if port == "" {
-		port = "8000"
-	}
+	corsHandler := newCORSHandler()
+	proxyHandler := newAudioProxyHandler(apiKey, internalToken, baseURL, origin)
 
-	mux := http.NewServeMux()
+	// Audio API
+	mux.HandleFunc("/api/audio/transcriptions", corsHandler(proxyHandler))
+}
 
-	// ============ 通用代理处理器 ============
-	proxyHandler := func(w http.ResponseWriter, r *http.Request) {
-		// 启用 CORS
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// 读取请求体
-		bodyBytes, err := io.ReadAll(r.Body)
+// newAudioProxyHandler 创建音频转文本代理处理器
+func newAudioProxyHandler(apiKey, internalToken, baseURL, origin string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, err := readRequestBody(r)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("读取请求体失败: %v", err), http.StatusBadRequest)
 			return
 		}
-		r.Body.Close()
 
-		// 构建目标 URL
-		path := strings.TrimPrefix(r.URL.Path, "/api")
-		targetURL := baseURL + path
-		if r.URL.RawQuery != "" {
-			targetURL += "?" + r.URL.RawQuery
-		}
+		targetURL := buildTargetURL(baseURL, r)
+		logProxyRequest(r, bodyBytes, targetURL)
 
-		log.Printf("代理请求: %s %s -> %s", r.Method, r.URL.Path, targetURL)
-		if len(bodyBytes) > 0 && len(bodyBytes) < 2000 {
-			log.Printf("请求体: %s", string(bodyBytes))
-		}
-
-		// 创建新请求
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		req, err := http.NewRequestWithContext(ctx, r.Method, targetURL, bytes.NewReader(bodyBytes))
+		req, err := createProxyRequest(r, targetURL, bodyBytes, apiKey, internalToken, origin)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("创建请求失败: %v", err), http.StatusInternalServerError)
 			return
 		}
 
-		// 复制请求头
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-		req.Header.Set("X-Internal-Token", internalToken)
-		req.Header.Set("Origin", origin)
-		req.Header.Set("Content-Type", r.Header.Get("Content-Type"))
-		if req.Header.Get("Content-Type") == "" {
-			req.Header.Set("Content-Type", "application/json")
-		}
-
-		// 发送请求
-		client := &http.Client{Timeout: 60 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := sendProxyRequest(req)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("请求失败: %v", err), http.StatusBadGateway)
 			return
 		}
 		defer resp.Body.Close()
 
-		// 读取响应
 		respBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("读取响应失败: %v", err), http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("响应状态: %d, 大小: %d 字节", resp.StatusCode, len(respBytes))
-		if len(respBytes) < 2000 {
-			log.Printf("响应体: %s", string(respBytes))
-		}
+		logProxyResponse(resp, respBytes)
+		copyResponseHeaders(w, resp)
+		writeResponse(w, resp, respBytes)
+	}
+}
 
-		// 复制响应头（跳过 CORS 头，避免重复）
-		skipHeaders := map[string]bool{
-			"Access-Control-Allow-Origin":      true,
-			"Access-Control-Allow-Methods":     true,
-			"Access-Control-Allow-Headers":     true,
-			"Access-Control-Allow-Credentials": true,
-			"Access-Control-Expose-Headers":    true,
-			"Access-Control-Max-Age":           true,
-		}
+// readRequestBody 读取请求体
+func readRequestBody(r *http.Request) ([]byte, error) {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	return bodyBytes, nil
+}
 
-		for k, v := range resp.Header {
-			if skipHeaders[k] {
-				continue
-			}
-			for _, vv := range v {
-				w.Header().Add(k, vv)
-			}
-		}
+// buildTargetURL 构建目标 URL
+func buildTargetURL(baseURL string, r *http.Request) string {
+	path := strings.TrimPrefix(r.URL.Path, "/api")
+	targetURL := baseURL + path
+	if r.URL.RawQuery != "" {
+		targetURL += "?" + r.URL.RawQuery
+	}
+	return targetURL
+}
 
-		w.WriteHeader(resp.StatusCode)
-		_, err = w.Write(respBytes)
-		require.Error(t, err)
+// logProxyRequest 记录代理请求日志
+func logProxyRequest(r *http.Request, bodyBytes []byte, targetURL string) {
+	log.Printf("代理请求: %s %s -> %s", r.Method, r.URL.Path, targetURL)
+	if len(bodyBytes) > 0 && len(bodyBytes) < 2000 {
+		log.Printf("请求体: %s", string(bodyBytes))
+	}
+}
+
+// createProxyRequest 创建代理请求
+// 使用原始请求的 context，它会随请求生命周期自动管理
+func createProxyRequest(r *http.Request, targetURL string, bodyBytes []byte, apiKey, internalToken, origin string) (*http.Request, error) {
+	// 直接使用原始请求的 context，它会随请求生命周期自动管理
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, targetURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
 	}
 
-	// ============ 注册路由 ============
-	// Audio API
-	mux.HandleFunc("/api/audio/transcriptions", proxyHandler)
+	// 复制请求头
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("X-Internal-Token", internalToken)
+	req.Header.Set("Origin", origin)
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	req.Header.Set("Content-Type", contentType)
 
-	// 健康检查
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(map[string]string{
-			"status":   "ok",
-			"base_url": baseURL,
-			"time":     time.Now().Format(time.RFC3339),
-		})
-		require.Error(t, err)
-	})
+	return req, nil
+}
 
-	addr := ":" + port
-	log.Printf("远程代理服务器启动于 http://localhost%s", addr)
-	log.Printf("转发目标: %s", baseURL)
-	log.Printf("支持的端点:")
-	log.Printf("   - POST /api/audio/transcriptions")
-	log.Printf("   - GET  /health")
-	log.Printf("提示: 按 Ctrl+C 停止服务器")
-	log.Println("---")
+// sendProxyRequest 发送代理请求
+// 使用请求的 context，它会自动处理超时和取消
+func sendProxyRequest(req *http.Request) (*http.Response, error) {
+	// 使用默认的 http.Client，它会使用请求中的 context
+	// 不需要额外设置超时，因为 context 已经管理了生命周期
+	client := &http.Client{}
+	return client.Do(req)
+}
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		t.Fatalf("服务器启动失败: %v", err)
+// logProxyResponse 记录代理响应日志
+func logProxyResponse(resp *http.Response, respBytes []byte) {
+	log.Printf("响应状态: %d, 大小: %d 字节", resp.StatusCode, len(respBytes))
+	if len(respBytes) < 2000 {
+		log.Printf("响应体: %s", string(respBytes))
+	}
+}
+
+// copyResponseHeaders 复制响应头
+func copyResponseHeaders(w http.ResponseWriter, resp *http.Response) {
+	skipHeaders := map[string]bool{
+		"Access-Control-Allow-Origin":      true,
+		"Access-Control-Allow-Methods":     true,
+		"Access-Control-Allow-Headers":     true,
+		"Access-Control-Allow-Credentials": true,
+		"Access-Control-Expose-Headers":    true,
+		"Access-Control-Max-Age":           true,
+	}
+
+	for k, v := range resp.Header {
+		if skipHeaders[k] {
+			continue
+		}
+		for _, vv := range v {
+			w.Header().Add(k, vv)
+		}
+	}
+}
+
+// writeResponse 写入响应
+func writeResponse(w http.ResponseWriter, resp *http.Response, respBytes []byte) {
+	w.WriteHeader(resp.StatusCode)
+	if _, err := w.Write(respBytes); err != nil {
+		log.Printf("写入响应失败: %v", err)
 	}
 }
 
