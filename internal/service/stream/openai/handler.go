@@ -191,9 +191,6 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 	sse *ssestream.Stream[responses.ResponseStreamEventUnion]) (stream.Response, error) {
 	var nextState string
 	var fcRespList []FCResp
-	step := ctx.Chat.CurrentStep()
-	h.logger.Debug("开始处理流式响应",
-		elog.String("conversation_id", step.Thread.Conversation.ID))
 	for sse.Next() {
 		event := sse.Current()
 		switch event.Type {
@@ -201,7 +198,6 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 			h.sendEvt(ctx, domain.StreamEvent{
 				Err: errors.New(event.AsError().Message),
 			})
-			h.logger.Debug("收到错误", elog.String("err", event.AsError().Message))
 		case "response.output_text.delta":
 			text := event.AsResponseOutputTextDelta()
 			h.sendEvt(ctx, domain.StreamEvent{
@@ -209,7 +205,6 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 					Content: text.Delta,
 				},
 			})
-			h.logger.Debug("收到文本", elog.String("output_text.delta", text.Delta))
 		case "response.output_item.done":
 			item := event.AsResponseOutputItemDone().Item
 			if item.Type != "function_call" {
@@ -217,18 +212,9 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 				continue
 			}
 			fc := item.AsFunctionCall()
-			step := ctx.Chat.CurrentStep()
-			h.logger.Debug("收到 function call",
-				elog.String("function", fc.Name),
-				elog.String("call_id", fc.CallID),
-				elog.String("conversation_id", step.Thread.Conversation.ID),
-				elog.String("arguments", fc.Arguments))
 			fcallResp, err := h.handleFC(ctx, fc)
 			if err != nil {
-				h.logger.Error("执行 function call 出现问题",
-					elog.FieldErr(err),
-					elog.String("function", fc.Name),
-					elog.String("call_id", fc.CallID))
+				h.logger.Error("执行 function call 出现问题", elog.FieldErr(err), elog.Any("fc", fc))
 				continue
 			}
 			// 更新 nextState（使用最后一个 function call 的 nextState）
@@ -238,45 +224,17 @@ func (h *Handler) forward(ctx *domain.StreamContext,
 				FC:   fc,
 				Resp: fcallResp,
 			})
-			h.logger.Debug("收集 function call 响应，等待流式响应完成",
-				elog.String("function", fc.Name),
-				elog.String("call_id", fc.CallID),
-				elog.Int("total_fc_count", len(fcRespList)))
-		default:
-			// 忽略其他事件类型，不打印日志以减少日志量
-			// 常见的事件类型包括：
-			// - response.function_call_arguments.delta（非常频繁）
-			// - response.reasoning.delta（非常频繁）
-			// - response.created, response.in_progress, response.completed 等
 		}
 	}
 	err := sse.Err()
 
-	// 流式响应循环结束后，如果有 function call 响应需要返回，现在返回
-	// 此时 conversation 已经解锁，可以安全地返回响应
-	// 使用 Conversation 而不是 PreviousResponseID，因为流式响应已经完成，conversation 已经解锁
 	if len(fcRespList) > 0 && err == nil {
-		h.logger.Debug("流式响应处理完成，准备返回所有 function call 响应",
-			elog.String("conversation_id", step.Thread.Conversation.ID),
-			elog.Int("fc_count", len(fcRespList)))
 		fcRespInput := h.toFCResulInput(ctx, cfg, fcRespList)
-
 		_, err1 := h.client.Responses.New(ctx.Ctx, fcRespInput, h.options...)
 		if err1 != nil {
-			h.logger.Error("返回 FC 响应给 OpenAI 失败",
-				elog.FieldErr(err1),
-				elog.String("conversation_id", step.Thread.Conversation.ID))
-		} else {
-			h.logger.Debug("成功返回所有 function call 响应",
-				elog.String("conversation_id", step.Thread.Conversation.ID),
-				elog.Int("fc_count", len(fcRespList)))
+			h.logger.Error("返回 FC 响应给 OpenAI 失败", elog.FieldErr(err1))
 		}
 	}
-
-	h.logger.Debug("流式响应处理完成",
-		elog.String("conversation_id", step.Thread.Conversation.ID),
-		elog.String("nextState", nextState),
-		elog.FieldErr(err))
 	return stream.Response{NextState: nextState}, err
 }
 
@@ -297,17 +255,6 @@ func (h *Handler) toFCResulInput(ctx *domain.StreamContext, cfg domain.Invocatio
 	// 暂时固定为 completed
 	const fcStatusCompleted = "completed"
 	step := ctx.Chat.CurrentStep()
-	h.logger.Debug("构建 function call 响应参数",
-		elog.Int("resp_count", len(respList)),
-		elog.String("conversation_id", step.Thread.Conversation.ID),
-		elog.String("model", cfg.Model.Name))
-	for i, resp := range respList {
-		h.logger.Debug("function call 响应详情",
-			elog.Int("index", i),
-			elog.String("function", resp.FC.Name),
-			elog.String("call_id", resp.FC.CallID),
-			elog.String("content", resp.Resp.Content))
-	}
 	return responses.ResponseNewParams{
 		Model: cfg.Model.Name,
 		Conversation: responses.ResponseNewParamsConversationUnion{

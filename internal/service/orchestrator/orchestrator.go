@@ -47,7 +47,6 @@ func (o *Orchestrator) Stream(ctx context.Context,
 	}
 	for {
 		chat.CurrentTurn().AssistantRun.StartLLMStep(thread)
-
 		resp, err1 := o.Handler.Stream(&domain.StreamContext{
 			Ctx:    ctx,
 			Sender: sender,
@@ -56,8 +55,7 @@ func (o *Orchestrator) Stream(ctx context.Context,
 		if err1 != nil {
 			return err1
 		}
-
-		state := resp.NextState
+		state = resp.NextState
 		o.logger.Debug("", elog.String("NextState", state))
 		if state == "" {
 			return nil
