@@ -43,7 +43,6 @@ import (
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/forward"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/kbase"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/multifunc"
-	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/rawoutput"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/fcall/savedoc"
 	"github.com/ecodeclub/ai-gateway-go/internal/service/stream/loadcfg"
 	openaistream "github.com/ecodeclub/ai-gateway-go/internal/service/stream/openai"
@@ -63,9 +62,6 @@ import (
 
 // 新的系统提示词文件
 //
-//go:embed system_prompt_main.md
-var systemPromptMain string
-
 //go:embed system_prompt_get_question.md
 var systemPromptGetQuestion string
 
@@ -80,9 +76,6 @@ var systemPromptSend string
 
 // 新的用户提示词文件
 //
-//go:embed user_prompt_main.md
-var userPromptMain string
-
 //go:embed user_prompt_get_question.md
 var userPromptGetQuestion string
 
@@ -152,10 +145,6 @@ func TestGrpcServer(t *testing.T) {
 	saveDocFCall := savedoc.NewFCall()
 	registry.Register(saveDocFCall)
 
-	// 注册 raw_output function call
-	rawOutputFCall := rawoutput.NewFCall()
-	registry.Register(rawOutputFCall)
-
 	// 注册 multi_call function call（需要 Registry，放在最后）
 	multiCallFCall := multifunc.NewFCall()
 	multiCallFCall.Registry = registry
@@ -219,25 +208,14 @@ func TestGrpcServer(t *testing.T) {
 	require.NoError(t, err, "创建 Biz 失败")
 	log.Printf("创建 Biz 成功，ID = %d", biz.ID)
 
-	// 4.4 创建 5 个 InvocationConfig
+	// 4.4 创建 4 个 InvocationConfig
 	invSvc := service.NewInvocationConfigService(invConfigRepo, bizRepo, providerRepo)
 
-	// 定义 5 个 ConfigID
-	cfgIDMain := int64(100001)         // Main 路由器
+	// 定义 4 个 ConfigID
 	cfgIDGetQuestion := int64(100002)  // 获取题目
 	cfgIDEvaluateSave := int64(100003) // 评价答案并保存历史
 	cfgIDSummarySave := int64(100004)  // 生成总结并保存
 	cfgIDSend := int64(100005)         // 发送题目
-
-	// 创建 Main 路由器配置
-	_, err = invSvc.Save(ctx, domain.InvocationConfig{
-		ID:          cfgIDMain,
-		Name:        "Main路由器",
-		Biz:         domain.Biz{ID: biz.ID},
-		Description: "命令路由器，根据用户输入路由到对应的Thread",
-	})
-	require.NoError(t, err)
-	log.Printf("创建 InvocationConfig: Main路由器 (ID: %d)", cfgIDMain)
 
 	// 创建 get_question 配置
 	_, err = invSvc.Save(ctx, domain.InvocationConfig{
@@ -282,7 +260,7 @@ func TestGrpcServer(t *testing.T) {
 	// 更新 Biz 设置 Orchestration
 	biz.Config = domain.BizConfig{
 		Orchestration: domain.Orchestration{
-			Main: &domain.Thread{CfgID: cfgIDMain},
+			Main: nil, // Main 不再使用，前端直接传递 state 参数
 			Threads: map[string]*domain.Thread{
 				"get_question":      {CfgID: cfgIDGetQuestion},
 				"evaluate_and_save": {CfgID: cfgIDEvaluateSave},
@@ -293,52 +271,11 @@ func TestGrpcServer(t *testing.T) {
 	}
 	_, err = bizSvc.Save(ctx, biz)
 	require.NoError(t, err, "更新 Biz Orchestration 失败")
-	log.Printf("更新 Biz Orchestration (Main: %d, Threads: get_question=%d, evaluate_and_save=%d, summary_and_save=%d, send_to_user=%d)",
-		cfgIDMain, cfgIDGetQuestion, cfgIDEvaluateSave, cfgIDSummarySave, cfgIDSend)
+	log.Printf("更新 Biz Orchestration (Threads: get_question=%d, evaluate_and_save=%d, summary_and_save=%d, send_to_user=%d)",
+		cfgIDGetQuestion, cfgIDEvaluateSave, cfgIDSummarySave, cfgIDSend)
 
-	// 4.5 创建 5 个 InvocationConfigVersion（active）
+	// 4.5 创建 4 个 InvocationConfigVersion（active）
 	// 由于代码较长，我会创建一个辅助函数来生成函数定义JSON
-	// 先创建 Main 路由器的 Version
-	versionIDMain, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
-		Config:       domain.InvocationConfig{ID: cfgIDMain},
-		Model:        domain.Model{ID: modelID},
-		Version:      "v1.0",
-		Status:       domain.InvocationCfgVersionStatusActive,
-		SystemPrompt: systemPromptMain,
-		Prompt:       userPromptMain,
-		Temperature:  0,
-		TopP:         1.0,
-		MaxTokens:    200000,
-		Functions: []domain.Function{
-			{
-				Name: "raw_output",
-				Definition: `{
-  "name": "raw_output",
-  "description": "设置下一个状态，用于命令路由。",
-  "strict": true,
-  "parameters": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "content": {
-        "type": "string",
-        "description": "返回给LLM的确认信息。用于表示状态已设置，可以是简单的确认文本，如 \"状态已设置为 {state}\" 或 \"OK\"。"
-      },
-      "state": {
-        "type": "string",
-        "enum": ["get_question", "evaluate_and_save", "summary_and_save", ""],
-        "description": "下一个状态。必须从枚举值中选择。"
-      }
-    },
-    "required": ["content", "state"]
-  }
-}`,
-			},
-		},
-	})
-	require.NoError(t, err, "创建 Main Version 失败")
-	log.Printf("   ✓ 创建 InvocationConfigVersion: Main v1.0 (ID: %d)", versionIDMain)
-
 	// 创建 get_question 的 Version
 	versionIDGetQuestion, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
 		Config:       domain.InvocationConfig{ID: cfgIDGetQuestion},
@@ -766,12 +703,10 @@ func TestGrpcServer(t *testing.T) {
 		db.Delete(&dao.InvocationConfigVersion{}, versionIDSummarySave)
 		db.Delete(&dao.InvocationConfigVersion{}, versionIDEvaluateSave)
 		db.Delete(&dao.InvocationConfigVersion{}, versionIDGetQuestion)
-		db.Delete(&dao.InvocationConfigVersion{}, versionIDMain)
 		db.Delete(&dao.InvocationConfig{}, cfgIDSend)
 		db.Delete(&dao.InvocationConfig{}, cfgIDSummarySave)
 		db.Delete(&dao.InvocationConfig{}, cfgIDEvaluateSave)
 		db.Delete(&dao.InvocationConfig{}, cfgIDGetQuestion)
-		db.Delete(&dao.InvocationConfig{}, cfgIDMain)
 		db.Delete(&dao.Biz{}, biz.ID)
 		db.Delete(&dao.Model{}, modelID)
 		db.Delete(&dao.Provider{}, providerID)
@@ -803,7 +738,6 @@ func TestGrpcServer(t *testing.T) {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	log.Println("gRPC 服务器启动于 localhost:9090")
-	log.Printf("Main Config ID: %d", cfgIDMain)
 	log.Printf("Biz.ID: %d", biz.ID)
 	log.Println("按 Ctrl+C 停止服务器")
 	log.Println("---")
@@ -1200,6 +1134,7 @@ func handleStream(client chatv1.ServiceClient) http.HandlerFunc {
 			ChatSn string `json:"chat_sn"`
 			Input  string `json:"input"`
 			Uid    int64  `json:"uid"`
+			State  string `json:"state"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1207,7 +1142,7 @@ func handleStream(client chatv1.ServiceClient) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
+		log.Printf("收到请求: chat_sn=%s, input=%s (前30字), state=%s", req.ChatSn, truncate(req.Input, 30), req.State)
 
 		// 调用 gRPC Stream，使用请求的上下文以便正确处理取消和超时
 		streamRes, err := client.Stream(r.Context(), &chatv1.StreamRequest{
@@ -1215,8 +1150,9 @@ func handleStream(client chatv1.ServiceClient) http.HandlerFunc {
 			Input: &chatv1.UserInput{
 				Content: req.Input,
 			},
-			Uid: req.Uid,
-			Key: "", // 未使用，传空字符串
+			Uid:   req.Uid,
+			Key:   "", // 未使用，传空字符串
+			State: req.State,
 		})
 		if err != nil {
 			log.Printf("调用 Stream 失败: %v", err)
@@ -1701,52 +1637,6 @@ func buildTestQuestions() []map[string]any {
 				"35k": map[string]any{
 					"content":    "深入分析执行计划、优化SQL(子查询改JOIN、避免SELECT *)、添加合适的索引、考虑分库分表、使用缓存。",
 					"key_points": []string{"执行计划优化", "索引设计", "SQL重写", "分库分表"},
-				},
-			},
-			"created_at": now,
-			"updated_at": now,
-		},
-		{
-			"question_id": 4,
-			"level":       "junior",
-			"title":       "请解释COUNT(*)、COUNT(1)和COUNT(column)的区别",
-			"analysis":    "COUNT是常用的聚合函数，用于统计行数，但不同的写法有不同的含义。",
-			"tags":        []string{"COUNT", "聚合函数", "SQL"},
-			"answers": map[string]any{
-				"15k": map[string]any{
-					"content":    "COUNT(*)统计所有行（包括NULL），COUNT(column)统计该列非NULL的行数，COUNT(1)和COUNT(*)效果相同。",
-					"key_points": []string{"COUNT(*)", "NULL处理", "行数统计"},
-				},
-				"25k": map[string]any{
-					"content":    "COUNT(1)和COUNT(*)性能基本相同，MySQL优化器会自动优化。COUNT(column)需要判断NULL，性能略低。",
-					"key_points": []string{"性能对比", "优化器", "NULL判断"},
-				},
-				"35k": map[string]any{
-					"content":    "不同存储引擎的COUNT实现差异：MyISAM保存了表的行数，COUNT(*)很快；InnoDB需要扫描，可以通过添加索引或使用缓存优化。",
-					"key_points": []string{"InnoDB", "MyISAM", "实现原理", "优化方案"},
-				},
-			},
-			"created_at": now,
-			"updated_at": now,
-		},
-		{
-			"question_id": 5,
-			"level":       "junior",
-			"title":       "数据库设计的三大范式是什么？",
-			"analysis":    "数据库范式是设计关系数据库的基本原则，用于减少数据冗余和提高数据完整性。",
-			"tags":        []string{"范式", "数据库设计", "规范化"},
-			"answers": map[string]any{
-				"15k": map[string]any{
-					"content":    "第一范式(1NF)：列不可再分，每个字段都是原子性的。第二范式(2NF)：消除部分依赖，非主键列完全依赖于主键。第三范式(3NF)：消除传递依赖，非主键列不依赖于其他非主键列。",
-					"key_points": []string{"1NF", "2NF", "3NF", "原子性"},
-				},
-				"25k": map[string]any{
-					"content":    "需要举例说明：如订单表包含客户信息违反2NF，应拆分为订单表和客户表。理解反范式化：为了性能有时会适当冗余数据。",
-					"key_points": []string{"实际案例", "表拆分", "反范式化"},
-				},
-				"35k": map[string]any{
-					"content":    "理解BCNF(消除主属性对码的部分和传递依赖)、4NF(消除多值依赖)。掌握反范式化的应用场景：高并发读场景、数据仓库、适当的冗余可以减少JOIN提升性能。",
-					"key_points": []string{"BCNF", "4NF", "反范式化场景", "性能权衡"},
 				},
 			},
 			"created_at": now,

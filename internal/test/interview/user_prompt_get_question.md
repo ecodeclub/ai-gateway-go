@@ -9,7 +9,17 @@
 {{end}}
 {{end}}
 
-# 已问题目ID列表（用于kbase_rag排除）
+# 当前面试历史（用于提取已问题目ID）
+{{if .InterviewHistory}}
+历史记录：
+{{.InterviewHistory}}
+
+**重要**：从上面的历史记录中提取所有 `question_id`，用于排除已问过的题目。
+{{else}}
+（无历史记录，说明是首题）
+{{end}}
+
+# 已问题目ID列表（仅供参考，可能未更新）
 {{if .AskedQuestionIDs}}
 已问过的题目ID: [{{.AskedQuestionIDs}}]
 {{else}}

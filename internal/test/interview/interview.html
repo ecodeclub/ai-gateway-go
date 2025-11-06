@@ -150,8 +150,6 @@
             return;
         }
         
-        console.log('🔍 处理JSON类型:', result.type);
-        
         switch (result.type) {
             case 'question':
                 // 题目去重：用 question_id
@@ -186,15 +184,17 @@
     }
 
     function displayQuestion(q) {
+        console.log('收到题目JSON:', q);
+        // 更新题目内容
         els.question.textContent = q.question;
+        
         // remaining_questions 包含当前题，所以实际剩余 = remaining_questions - 1
         const actualRemaining = q.remaining_questions - 1;
         els.questionNum.textContent = `(第 ${q.current} 题，剩余 ${actualRemaining} 题)`;
         
-        // 🚨 判断是否最后一题
+        // 判断是否最后一题
         // remaining_questions 包含当前题，所以 remaining_questions === 1 才是最后一题
         if (q.remaining_questions === 1) {
-            console.log('⚠️ 这是最后一题');
             isLastQuestion = true;
         } else {
             isLastQuestion = false;
@@ -221,18 +221,37 @@
             els.scores.appendChild(div);
         });
         
-        // 渲染评价详情
-        els.judgeBox.textContent = JSON.stringify(e.evaluation, null, 2);
+        // 渲染评价详情（显示完整的评价对象，包括 scores 和 evaluation）
+        console.log('收到评价JSON:', e);
+        els.judgeBox.textContent = JSON.stringify(e, null, 2);
         els.judgeBox.className = '';
         
         // 启用下一题按钮
         els.btnNext.disabled = false;
         
-        // 🚨 注意：不再需要自动结束逻辑，因为现在由命令驱动
-        // 前端会根据 isLastQuestion 状态发送正确的命令
+        // 前端驱动：根据 isLastQuestion 自动发送下一步命令
+        // 等待当前的 streamRequest 完成（isStreaming 变为 false）
+        const waitForStreamComplete = () => {
+            if (isStreaming) {
+                setTimeout(waitForStreamComplete, 50); // 每50ms检查一次
+                return;
+            }
+            // isStreaming 已为 false，可以发送新请求
+            if (isLastQuestion) {
+                streamRequest("结束面试", "summary_and_save", false).catch(err => {
+                    console.error('自动发送"结束面试"失败:', err);
+                });
+            } else {
+                streamRequest("获取题目", "get_question", false).catch(err => {
+                    console.error('自动发送"获取题目"失败:', err);
+                });
+            }
+        };
+        waitForStreamComplete();
     }
 
     function displaySummary(s) {
+        console.log('收到总体评价JSON:', s);
         els.summaryBox.textContent = JSON.stringify(s, null, 2);
         els.summaryBox.className = 'highlight';
         els.summaryCard.scrollIntoView({ behavior: 'smooth' });
@@ -305,12 +324,18 @@
     }
 
     // ========== 流式请求 Stream ==========
-    async function streamRequest(userInput, shouldUpdateJudgeBox = true) {
+    async function streamRequest(command, state, userInput = '', shouldUpdateJudgeBox = true) {
         // 防止并发请求
         if (isStreaming) {
             console.warn('⚠️ 已有请求在处理中，请等待...');
             return;
         }
+
+        // 统一输出发送命令的log
+        console.log(`发送命令：${command}`);
+
+        // 组合命令和用户输入
+        const input = userInput ? `${command}\n\n${userInput}` : command;
 
         isStreaming = true;
         
@@ -332,8 +357,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_sn: chatSn,
-                    input: userInput,
-                    uid: 123
+                    input: input,
+                    uid: 123,
+                    state: state
                 })
             });
 
@@ -547,7 +573,7 @@
 
         // 请求第一题（题目编号由后端的current字段控制）
         // 获取题目时不需要更新 judgeBox
-        await streamRequest("开始面试", false);
+        await streamRequest("开始面试", "get_question", false);
 
         els.btnSpeak.disabled = false;
         els.btnSpeak.onclick = () => speak(els.question.textContent);
@@ -584,12 +610,9 @@
 
             // 2. 统一发送"评价答案"命令，后端自动判断流程
             const q = els.question.textContent.trim();
-            const command = "评价答案";
             
             // 将命令和用户的回答一起发送
-            const userInput = `评价答案\n\n用户的回答：${transcript}`;
-            console.log('📝 发送命令:', command);
-            await streamRequest(userInput);
+            await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${transcript}`);
 
             // 3. 保存历史
             history.push({ question: q, transcript });
@@ -614,13 +637,9 @@
         history.push({ question: q, transcript: answer, judge: { note: '跳过' } });
 
         // 统一发送"评价答案"命令，后端自动判断流程
-        const command = "评价答案";
-        
         // 将命令和用户的回答一起发送
-        const userInput = `评价答案\n\n用户的回答：${answer}`;
-        console.log('📝 发送命令:', command);
-        await streamRequest(userInput);
-        resetUIForNextQuestion();
+        await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${answer}`);
+        // 注意：不要在这里调用 resetUIForNextQuestion，因为 displayEvaluation 会自动发送下一步命令
     };
 
     els.btnEnd.onclick = async () => {
@@ -637,8 +656,7 @@
         try {
             // 🚨 发送"结束面试"命令
             // 结束面试是生成总结，不需要更新 judgeBox
-            console.log('📝 发送命令: 结束面试');
-            await streamRequest("结束面试", false);
+            await streamRequest("结束面试", "summary_and_save", false);
 
         } catch (e) {
             console.error('❌ 总结失败:', e);
