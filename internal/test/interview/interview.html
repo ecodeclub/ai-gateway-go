@@ -238,11 +238,13 @@
             }
             // isStreaming 已为 false，可以发送新请求
             if (isLastQuestion) {
-                streamRequest("结束面试", "summary_and_save", false).catch(err => {
+                // 最后一题：自动发送"结束面试"命令，但不清空评价区域（shouldUpdateJudgeBox = false）
+                streamRequest("结束面试", "summary_and_save", '', false).catch(err => {
                     console.error('自动发送"结束面试"失败:', err);
                 });
             } else {
-                streamRequest("获取题目", "get_question", false).catch(err => {
+                // 非最后一题：自动发送"获取题目"命令
+                streamRequest("获取题目", "get_question", '', false).catch(err => {
                     console.error('自动发送"获取题目"失败:', err);
                 });
             }
@@ -573,7 +575,7 @@
 
         // 请求第一题（题目编号由后端的current字段控制）
         // 获取题目时不需要更新 judgeBox
-        await streamRequest("开始面试", "get_question", false);
+        await streamRequest("开始面试", "get_question", '', false);
 
         els.btnSpeak.disabled = false;
         els.btnSpeak.onclick = () => speak(els.question.textContent);
@@ -612,7 +614,8 @@
             const q = els.question.textContent.trim();
             
             // 将命令和用户的回答一起发送
-            await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${transcript}`);
+            // 注意：shouldUpdateJudgeBox 默认为 true，会在请求开始时显示"处理中..."
+            await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${transcript}`, true);
 
             // 3. 保存历史
             history.push({ question: q, transcript });
@@ -638,7 +641,8 @@
 
         // 统一发送"评价答案"命令，后端自动判断流程
         // 将命令和用户的回答一起发送
-        await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${answer}`);
+        // 注意：shouldUpdateJudgeBox 默认为 true，会在请求开始时显示"处理中..."
+        await streamRequest("评价答案", "evaluate_and_save", `用户的回答：${answer}`, true);
         // 注意：不要在这里调用 resetUIForNextQuestion，因为 displayEvaluation 会自动发送下一步命令
     };
 
@@ -655,8 +659,8 @@
 
         try {
             // 🚨 发送"结束面试"命令
-            // 结束面试是生成总结，不需要更新 judgeBox
-            await streamRequest("结束面试", "summary_and_save", false);
+            // 结束面试是生成总结，不需要更新 judgeBox（保留最后一题的评价显示）
+            await streamRequest("结束面试", "summary_and_save", '', false);
 
         } catch (e) {
             console.error('❌ 总结失败:', e);
