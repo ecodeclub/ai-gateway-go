@@ -59,8 +59,7 @@ func (c *ChatServer) Save(ctx context.Context, request *ai.SaveRequest) (*ai.Sav
 		Sn:    chat.Sn,
 		Title: chat.Title,
 		// 初始化的编排配置
-		BizID:            request.GetBizId(),
-		BizOrchestration: biz.Config.Orchestration,
+		Orchestration: biz.Config.Orchestration,
 	})
 	if err != nil {
 		return &ai.SaveResponse{}, err

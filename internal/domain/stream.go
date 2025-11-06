@@ -32,8 +32,7 @@ type Chat struct {
 	Vars map[string]any
 
 	// 业务有关的编排信息
-	BizID            int64
-	BizOrchestration Orchestration
+	Orchestration Orchestration
 
 	Turns []*Turn
 	Ctime time.Time

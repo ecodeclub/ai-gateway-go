@@ -56,9 +56,8 @@ func (repo *ChatRepo) Save(ctx context.Context, chat domain.Chat) (string, error
 			Val:   chat.Vars,
 			Valid: chat.Vars != nil,
 		},
-		BizID: chat.BizID,
-		BizOrchestration: sqlx.JsonColumn[domain.Orchestration]{
-			Val:   chat.BizOrchestration,
+		Orchestration: sqlx.JsonColumn[domain.Orchestration]{
+			Val:   chat.Orchestration,
 			Valid: true,
 		},
 		Uid: chat.Uid,
@@ -136,13 +135,12 @@ func (repo *ChatRepo) Detail(ctx context.Context, sn string) (domain.Chat, error
 		vars = chat.Vars.Val
 	}
 	return domain.Chat{
-		Sn:               chat.Sn,
-		Uid:              chat.Uid,
-		Title:            chat.Title,
-		Vars:             vars,
-		BizID:            chat.BizID,
-		BizOrchestration: chat.BizOrchestration.Val,
-		Ctime:            time.UnixMilli(chat.Ctime),
+		Sn:            chat.Sn,
+		Uid:           chat.Uid,
+		Title:         chat.Title,
+		Vars:          vars,
+		Orchestration: chat.Orchestration.Val,
+		Ctime:         time.UnixMilli(chat.Ctime),
 		Turns: slice.Map(turns, func(idx int, src dao.Turn) *domain.Turn {
 			return &domain.Turn{
 				ID:           src.ID,

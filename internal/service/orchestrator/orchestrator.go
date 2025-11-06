@@ -36,11 +36,11 @@ func (o *Orchestrator) Stream(ctx context.Context,
 	chat domain.Chat,
 	sender domain.StreamEventSender) error {
 	// 从 main 开始调度
-	thread := chat.BizOrchestration.Main
+	thread := chat.Orchestration.Main
 	state := chat.CurrentTurn().StartState
 	if state != "" {
 		var ok bool
-		thread, ok = chat.BizOrchestration.Threads[state]
+		thread, ok = chat.Orchestration.Threads[state]
 		if !ok {
 			return fmt.Errorf("找不到 Thread，初始 state %s", state)
 		}
@@ -63,7 +63,7 @@ func (o *Orchestrator) Stream(ctx context.Context,
 			return nil
 		}
 		var ok bool
-		thread, ok = chat.BizOrchestration.Threads[state]
+		thread, ok = chat.Orchestration.Threads[state]
 		if !ok {
 			return fmt.Errorf("找不到 Thread %s", state)
 		}

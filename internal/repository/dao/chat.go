@@ -101,12 +101,11 @@ func (dao *ChatDAO) GetTurnsBySN(ctx context.Context, sn string) ([]Turn, error)
 }
 
 type Chat struct {
-	ID               int64                                 `gorm:"primary_key;autoIncrement"`
-	Sn               string                                `gorm:"uniqueIndex;column:sn;size:36"`
-	Uid              int64                                 `gorm:"column:uid;index"`
-	Title            string                                `gorm:"column:title"`
-	BizID            int64                                 `gorm:"column:biz_id;index"`
-	BizOrchestration sqlx.JsonColumn[domain.Orchestration] `gorm:"column:biz_orchestration;type:text"`
+	ID            int64                                 `gorm:"primary_key;autoIncrement"`
+	Sn            string                                `gorm:"uniqueIndex;column:sn;size:36"`
+	Uid           int64                                 `gorm:"column:uid;index"`
+	Title         string                                `gorm:"column:title"`
+	Orchestration sqlx.JsonColumn[domain.Orchestration] `gorm:"column:orchestration;type:text"`
 	// 整个对话中产生的关键内容，大概率是一个 JSON 字段
 	Vars sqlx.JsonColumn[map[string]any] `gorm:"column:vars;type:text"` // 扩展字段
 

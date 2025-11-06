@@ -191,7 +191,7 @@ func TestGrpcServer(t *testing.T) {
 	require.NoError(t, err)
 	log.Printf("创建 InvocationConfig: MySQL模拟面试助手 (ID: %d)", cfgID)
 
-	// 更新 Biz 设置 BizOrchestration
+	// 更新 Biz 设置 Orchestration
 	biz.Config = domain.BizConfig{
 		Orchestration: domain.Orchestration{
 			Main: &domain.Thread{CfgID: cfgID}, // 使用 InvocationConfig.ID
@@ -205,8 +205,8 @@ func TestGrpcServer(t *testing.T) {
 		},
 	}
 	_, err = bizSvc.Save(ctx, biz)
-	require.NoError(t, err, "更新 Biz BizOrchestration 失败")
-	log.Printf("更新 Biz BizOrchestration (使用 ConfigID: %d)", cfgID)
+	require.NoError(t, err, "更新 Biz Orchestration 失败")
+	log.Printf("更新 Biz Orchestration (使用 ConfigID: %d)", cfgID)
 
 	// 4.5 创建 InvocationConfigVersion（active）
 	versionID, err := invSvc.SaveVersion(ctx, domain.InvocationConfigVersion{
@@ -741,7 +741,7 @@ func TestInterviewProxyServer(t *testing.T) {
 		log.Printf("收到请求: chat_sn=%s, input=%s (前30字)", req.ChatSn, truncate(req.Input, 30))
 
 		// 调用 gRPC Stream
-		// InvocationConfigId 从 Chat.BizOrchestration 中获取，不需要传入
+		// InvocationConfigId 从 Chat.Orchestration 中获取，不需要传入
 		streamRes, err := client.Stream(context.Background(), &chatv1.StreamRequest{
 			ChatSn: req.ChatSn,
 			Input: &chatv1.UserInput{
